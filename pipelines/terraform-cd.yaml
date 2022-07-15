@@ -33,7 +33,7 @@ stages:
         displayName: 'Checkout'
 
       - script: |
-          echo "Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
           az login \
             --service-principal \
             --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -41,7 +41,7 @@ stages:
             --tenant $(AZURE_TENANT_ID) \
           && az account set \
             --subscription $(SUBSCRIPTION_ID)
-          echo "Subscription scope set to $(SUBSCRIPTION_ID)"
+          echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
           az account show
         displayName: 'Azure Login'
 
@@ -100,7 +100,7 @@ stages:
         displayName: 'Verify Artifact'
 
       - script: |
-          echo "Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
           az login \
             --service-principal \
             --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -108,18 +108,18 @@ stages:
             --tenant $(AZURE_TENANT_ID) \
           && az account set \
             --subscription $(SUBSCRIPTION_ID)
-          echo "Subscription scope set to $(SUBSCRIPTION_ID)"
+          echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
           az account show
         displayName: 'Azure Login'
 
-      # - script: |
-      #     terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
-      #     terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
-      #   condition: ne(variables['skipApply'], 'true')
-      #   displayName: 'Terraform Apply'
-      #   workingDirectory: infrastructure
-      #   env:
-      #     ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-      #     ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-      #     ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-      #     ARM_TENANT_ID: $(AZURE_TENANT_ID)
+      - script: |
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+          terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+        condition: ne(variables['skipApply'], 'true')
+        displayName: 'Terraform Apply'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
