@@ -40,6 +40,7 @@ stages:
         displayName: 'Setup'
 
       - script: |
+          echo "##[section]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
           az login \
             --service-principal \
             --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -47,6 +48,8 @@ stages:
             --tenant $(AZURE_TENANT_ID) \
           && az account set \
             --subscription $(SUBSCRIPTION_ID)
+          echo "##[section]Subscription scope set to $(SUBSCRIPTION_ID)"
+          az account show
         displayName: 'Azure Login'
 
       - script: |
