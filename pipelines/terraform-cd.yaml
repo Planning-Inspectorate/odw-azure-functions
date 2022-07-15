@@ -75,51 +75,55 @@ stages:
     dependsOn: Plan
     displayName: Terraform Apply ${{ parameters.environment }}
     jobs:
-    - job: Apply
+    - deployment: Apply
       displayName: Terraform Apply
-      steps:
-      - checkout: self
-        displayName: 'Checkout'
+      environment: ${{ parameters.environment }}
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - checkout: self
+              displayName: 'Checkout'
 
-      - download: current
-        artifact: ${{ variables.artifactName }}
-        displayName: 'Download Artifact'
+            - download: current
+              artifact: ${{ variables.artifactName }}
+              displayName: 'Download Artifact'
 
-      - script: |
-          echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}"
+            - script: |
+                echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}"
 
-          if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
-            echo "##[warning]Failed to find Terraform Plan, skipping Terraform Apply"
-            echo "##vso[task.setvariable variable=skipApply]true"
-          else
-            echo "Found ${{ variables.planFileName }} file"
-            chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
-          fi
+                if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
+                  echo "##[warning]Failed to find Terraform Plan, skipping Terraform Apply"
+                  echo "##vso[task.setvariable variable=skipApply]true"
+                else
+                  echo "Found ${{ variables.planFileName }} file"
+                  chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
+                fi
 
-          ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
-        displayName: 'Verify Artifact'
+                ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
+              displayName: 'Verify Artifact'
 
-      - script: |
-          echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
-          az login \
-            --service-principal \
-            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
-            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
-            --tenant $(AZURE_TENANT_ID) \
-          && az account set \
-            --subscription $(SUBSCRIPTION_ID)
-          echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
-          az account show
-        displayName: 'Azure Login'
+            - script: |
+                echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+                az login \
+                  --service-principal \
+                  --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+                  --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+                  --tenant $(AZURE_TENANT_ID) \
+                && az account set \
+                  --subscription $(SUBSCRIPTION_ID)
+                echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
+                az account show
+              displayName: 'Azure Login'
 
-      - script: |
-          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
-          terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
-        condition: ne(variables['skipApply'], 'true')
-        displayName: 'Terraform Apply'
-        workingDirectory: infrastructure
-        env:
-          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+            - script: |
+                terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+                terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+              condition: ne(variables['skipApply'], 'true')
+              displayName: 'Terraform Apply'
+              workingDirectory: infrastructure
+              env:
+                ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+                ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+                ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+                ARM_TENANT_ID: $(AZURE_TENANT_ID)
