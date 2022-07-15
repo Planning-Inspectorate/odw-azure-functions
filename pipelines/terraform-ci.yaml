@@ -1,0 +1,100 @@
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: Dev
+    values:
+    - Dev
+    - Test
+    - Prod
+
+variables:
+- group: Terraform ${{ parameters.environment }}
+- name: environment
+  value: ${{ lower(parameters.environment) }}
+
+trigger:
+  branches:
+    include:
+    - '*'
+  paths:
+    include:
+    - infrastructure
+    exclude:
+    - '**/README.md'
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Validate
+    jobs:
+    - job: Validate
+      steps:
+      - checkout: self
+        displayName: 'Checkout Repo'
+
+      - script: |
+          brew install tflint
+          brew install checkov
+        displayName: 'Setup'
+
+      - script: |
+          az login \
+            --service-principal \
+            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+            --tenant $(AZURE_TENANT_ID) \
+          && az account set \
+            --subscription $(SUBSCRIPTION_ID)
+        displayName: 'Azure Login'
+
+      - script: |
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend
+        displayName: 'Terraform Init'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      - script: |
+          terraform fmt -check -recursive
+        displayName: 'Terraform Format'
+        workingDirectory: infrastructure
+
+      - script: |
+          terraform validate -no-color
+        displayName: 'Terraform Validate'
+        workingDirectory: infrastructure
+
+      - script: |
+          tflint \
+            --init \
+            --config $(Build.Repository.LocalPath)/.tflint.hcl \
+            --no-color \
+            --loglevel warn \
+          && tflint \
+            --config $(Build.Repository.LocalPath)/.tflint.hcl \
+            --format compact \
+            --module \
+            --no-color \
+            --loglevel warn
+
+          if [[ $? -ne 0 ]]; then
+            echo "##vso[task.logissue type=error]TFLint reported failures"
+          fi
+        displayName: 'TFLint Validate'
+        workingDirectory: infrastructure
+
+      - script: |
+          checkov \
+            --directory . \
+            --framework terraform \
+
+          if [[ $? -ne 0 ]]; then
+            echo "##vso[task.logissue type=error]Checkov reported failures"
+          fi
+        displayName: 'Checkov Validate'
+        workingDirectory: infrastructure
