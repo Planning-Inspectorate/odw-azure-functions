@@ -1,0 +1,119 @@
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: Dev
+    values:
+    - Dev
+    - Test
+    - Prod
+
+variables:
+- group: Terraform ${{ parameters.environment }}
+- name: artifactName
+  value: terraform-plan
+- name: environment
+  value: ${{ lower(parameters.environment) }}
+- name: planFileName
+  value: tfplan
+
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Plan
+    displayName: Terraform Plan ${{ parameters.environment }}
+    jobs:
+    - job: Plan
+      displayName: Terraform Plan
+      steps:
+      - checkout: self
+        displayName: 'Checkout'
+
+      - script: |
+          az login \
+            --service-principal \
+            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+            --tenant $(AZURE_TENANT_ID) \
+          && az account set \
+            --subscription $(SUBSCRIPTION_ID)
+        displayName: 'Azure Login'
+
+      - script: |
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+          terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}
+        displayName: 'Terraform Plan'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      - task: CopyFiles@2
+        displayName: 'Create Artifact'
+        inputs:
+          sourceFolder: infrastructure
+          contents: |
+            .terraform/**
+            .terraform.lock.hcl
+            *.tftpl
+            ${{ variables.planFileName }}
+          targetFolder: $(Build.ArtifactStagingDirectory)
+
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifact'
+
+  - stage: Apply
+    dependsOn: Plan
+    displayName: Terraform Apply ${{ parameters.environment }}
+    jobs:
+    - job: Apply
+      displayName: Terraform Apply
+      steps:
+      - checkout: self
+        displayName: 'Checkout'
+
+      - download: current
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Download Artifact'
+
+      - script: |
+          echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}"
+
+          if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
+            echo "##[warning]Failed to find Terraform Plan, skipping Terraform Apply"
+            echo "##vso[task.setvariable variable=skipApply]true"
+          else
+            echo "Found ${{ variables.planFileName }} file"
+            chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
+          fi
+
+          ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
+        displayName: 'Verify Artifact'
+
+      - script: |
+          az login \
+            --service-principal \
+            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+            --tenant $(AZURE_TENANT_ID) \
+          && az account set \
+            --subscription $(SUBSCRIPTION_ID)
+        displayName: 'Azure Login'
+
+      # - script: |
+      #     terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+      #     terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+      #   condition: ne(variables['skipApply'], 'true')
+      #   displayName: 'Terraform Apply'
+      #   workingDirectory: infrastructure
+      #   env:
+      #     ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+      #     ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+      #     ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+      #     ARM_TENANT_ID: $(AZURE_TENANT_ID)
