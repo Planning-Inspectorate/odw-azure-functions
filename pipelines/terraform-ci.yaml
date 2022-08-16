@@ -2,7 +2,7 @@ parameters:
   - name: environment
     displayName: Environment
     type: string
-    default: Test
+    default: Dev
     values:
     - Dev
     - Test
