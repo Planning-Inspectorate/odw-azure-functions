@@ -8,7 +8,7 @@ parameters:
     - Prod
 
 variables:
-- group: Synapse ${{ parameters.environment }}
+- group: Terraform ${{ parameters.environment }}
 - name: environment
   value: ${{ lower(parameters.environment) }}
 - name: publishBranchName
@@ -22,7 +22,46 @@ pool:
   vmImage: ubuntu-22.04
 
 stages:
+  - stage: Output
+    displayName: Terraform Output ${{ parameters.environment }}
+    jobs:
+    - job: Output
+      displayName: Terraform Output
+      steps:
+      - checkout: self
+        displayName: 'Checkout'
+
+      - script: |
+          echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+          az login \
+            --service-principal \
+            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+            --tenant $(AZURE_TENANT_ID) \
+          && az account set \
+            --subscription $(SUBSCRIPTION_ID)
+          echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
+          az account show
+        displayName: 'Azure Login'
+
+      - script: |
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+          echo "##[command]Terraform output:"
+          terraform output -json
+          echo
+          echo "##vso[task.setvariable variable=DATA_RESOURCE_GROUP_NAME;]$(terraform output -raw data_resource_group_name)"
+          echo
+          echo $(DATA_RESOURCE_GROUP_NAME)
+        displayName: 'Terraform Output'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
   - stage: Release
+    dependsOn: Output
     displayName: Synapse Release ${{ parameters.environment }}
     jobs:
     - deployment: Release
