@@ -46,9 +46,10 @@ stages:
 
       - script: |
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
-          echo "##[command]terraform output -json"
-          terraform output -json
-          TF_OUTPUT=$(terraform output -json)
+          echo "##[command]terraform output -json > output.json"
+          terraform output -json > output.json
+          echo "##[command]TF_OUTPUT=$(cat output.json)"
+          TF_OUTPUT=$(cat output.json)
           echo "##vso[task.setvariable variable=TF_OUTPUT]$TF_OUTPUT"
         displayName: 'Terraform Output'
         workingDirectory: infrastructure
@@ -57,6 +58,11 @@ stages:
           ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      - script: |
+          echo "##[command]echo $(TF_OUTPUT)"
+          echo $(TF_OUTPUT)
+        displayName: Set Variables
 
   # - stage: Release
   #   dependsOn: Output
