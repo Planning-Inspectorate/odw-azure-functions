@@ -52,7 +52,6 @@ stages:
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
           echo "##[command]terraform output -json -no-color > ${{ variables.outputFileName }}"
           terraform output -json -no-color > ${{ variables.outputFileName }}
-          echo "##[command]ls -l ${{ variables.outputFileName }}"
           ls -l ${{ variables.outputFileName }}
         displayName: 'Terraform Output'
         workingDirectory: infrastructure
@@ -75,7 +74,15 @@ stages:
 
       - powershell: |
           Write-Host "##[command]Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json"
-          Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json
+          $Output = Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json
+          $Output
+          Write-Host "##[command]Settings variables:"
+          $Output |
+          Get-Member -MemberType NoteProperty |
+          Foreach-Object {
+            $Var = $Output.($_.Name)
+            Write-Host "`t##vso[task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.sensitive)]$($Var.value)"
+          }
         displayName: 'Test Output'
         workingDirectory: infrastructure
 
