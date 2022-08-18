@@ -39,12 +39,9 @@ stages:
 
             - script: |
                 git checkout ${{ variables.publishBranchName }}
+                echo "##[command]$(Build.SourcesDirectory):"
+                ls -l $(Build.SourcesDirectory)
               displayName: 'Switch to ${{ variables.publishBranchName }}'
-
-            - script: |
-                tree /f
-              displayName: 'Diagnostics'
-              workingDirectory: $(Build.SourcesDirectory)
 
             # - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
             #   displayName: 'Disable Synapse Triggers'
