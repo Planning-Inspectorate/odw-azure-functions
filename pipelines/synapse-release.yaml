@@ -48,10 +48,7 @@ stages:
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
           echo "##[command]Terraform output:"
           terraform output -json
-          echo
-          echo "##vso[task.setvariable variable=DATA_RESOURCE_GROUP_NAME;]$(terraform output -raw data_resource_group_name)"
-          echo
-          echo $(DATA_RESOURCE_GROUP_NAME)
+          TF_OUTPUT=$(terraform output -json)
         displayName: 'Terraform Output'
         workingDirectory: infrastructure
         env:
@@ -59,6 +56,18 @@ stages:
           ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      - bash: |
+          echo "##[command]Terraform output:"
+          echo $TF_OUTPUT
+          echo
+          echo "##[command]DATA_RESOURCE_GROUP_NAME=$(jq -r '["data_resource_group_name"].value' $TF_OUTPUT)"
+          DATA_RESOURCE_GROUP_NAME=$(jq -r '["data_resource_group_name"].value' $TF_OUTPUT)
+          echo
+          echo "##[command]vso[task.setvariable variable=DATA_RESOURCE_GROUP_NAME]$DATA_RESOURCE_GROUP_NAME"
+          echo "##vso[task.setvariable variable=DATA_RESOURCE_GROUP_NAME]$DATA_RESOURCE_GROUP_NAME"
+          echo
+        displayName: Set Variables
 
   - stage: Release
     dependsOn: Output
