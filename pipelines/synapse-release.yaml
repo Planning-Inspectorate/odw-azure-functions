@@ -46,9 +46,10 @@ stages:
 
       - script: |
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
-          echo "##[command]Terraform output:"
+          echo "##[command]terraform output -json"
           terraform output -json
           TF_OUTPUT=$(terraform output -json)
+          echo "##vso[task.setvariable variable=TF_OUTPUT]$TF_OUTPUT"
         displayName: 'Terraform Output'
         workingDirectory: infrastructure
         env:
@@ -57,39 +58,27 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
-      - bash: |
-          echo "##[command]Terraform output:"
-          echo $TF_OUTPUT
-          echo
-          echo "##[command]DATA_RESOURCE_GROUP_NAME=$(jq -r '["data_resource_group_name"].value' $TF_OUTPUT)"
-          DATA_RESOURCE_GROUP_NAME=$(jq -r '["data_resource_group_name"].value' $TF_OUTPUT)
-          echo
-          echo "##[command]vso[task.setvariable variable=DATA_RESOURCE_GROUP_NAME]$DATA_RESOURCE_GROUP_NAME"
-          echo "##vso[task.setvariable variable=DATA_RESOURCE_GROUP_NAME]$DATA_RESOURCE_GROUP_NAME"
-          echo
-        displayName: Set Variables
+  # - stage: Release
+  #   dependsOn: Output
+  #   displayName: Synapse Release ${{ parameters.environment }}
+  #   jobs:
+  #   - deployment: Release
+  #     displayName: Synapse Release
+  #     environment: ${{ parameters.environment }}
+  #     strategy:
+  #       runOnce:
+  #         deploy:
+  #           steps:
+  #           - checkout: self
+  #             clean: true
+  #             displayName: 'Checkout'
+  #             persistCredentials: true
 
-  - stage: Release
-    dependsOn: Output
-    displayName: Synapse Release ${{ parameters.environment }}
-    jobs:
-    - deployment: Release
-      displayName: Synapse Release
-      environment: ${{ parameters.environment }}
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-            - checkout: self
-              clean: true
-              displayName: 'Checkout'
-              persistCredentials: true
-
-            - script: |
-                git checkout ${{ variables.publishBranchName }}
-                echo "##[command]ls -l $(Build.SourcesDirectory):"
-                ls -l $(Build.SourcesDirectory)
-              displayName: 'Switch to ${{ variables.publishBranchName }}'
+  #           - script: |
+  #               git checkout ${{ variables.publishBranchName }}
+  #               echo "##[command]ls -l $(Build.SourcesDirectory):"
+  #               ls -l $(Build.SourcesDirectory)
+  #             displayName: 'Switch to ${{ variables.publishBranchName }}'
 
             # - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
             #   displayName: 'Disable Synapse Triggers'
