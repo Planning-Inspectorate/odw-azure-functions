@@ -39,7 +39,7 @@ stages:
 
             - script: |
                 git checkout ${{ variables.publishBranchName }}
-                echo "##[command]$(Build.SourcesDirectory):"
+                echo "##[command]ls -l $(Build.SourcesDirectory):"
                 ls -l $(Build.SourcesDirectory)
               displayName: 'Switch to ${{ variables.publishBranchName }}'
 
