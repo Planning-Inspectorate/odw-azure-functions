@@ -130,5 +130,6 @@ stages:
                 ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
                 ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
-            - script: echo $(Apply.out)
-              displayName: ''
+            - script: |
+                terraform output -json -no-color
+              displayName: 'Terraform Output'
