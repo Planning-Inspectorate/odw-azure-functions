@@ -10,7 +10,7 @@ parameters:
 variables:
 - group: Terraform ${{ parameters.environment }}
 - name: artifactName
-  value: synapse-release
+  value: synapse-arm
 - name: environment
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
@@ -106,18 +106,39 @@ stages:
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Check Variables'
 
-      - task: CopyFiles@2
-        displayName: 'Create Artifact'
-        inputs:
-          sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
-          contents: |
-            TemplateForWorkspace.json
-            TemplateParametersForWorkspace.json
-          targetFolder: $(Build.ArtifactStagingDirectory)
+      # - task: CopyFiles@2
+      #   displayName: 'Create Artifact'
+      #   inputs:
+      #     sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
+      #     contents: |
+      #       TemplateForWorkspace.json
+      #       TemplateParametersForWorkspace.json
+      #     targetFolder: $(Build.ArtifactStagingDirectory)
 
-      - publish: $(Build.ArtifactStagingDirectory)
-        artifact: ${{ variables.artifactName }}
-        displayName: 'Publish Artifact'
+      # - publish: $(Build.ArtifactStagingDirectory)
+      #   artifact: ${{ variables.artifactName }}
+      #   displayName: 'Publish Artifact'
+
+      # - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@1
+      #   displayName: 'Validate Release'
+      #   inputs:
+      #     azureSubscription: $(SUBSCRIPTION_ID)
+      #     DeleteArtifactsNotInTemplate: true
+      #     operation: 'validate'
+      #     OverrideArmParameters: >-
+      #       -workspaceName $(synapse_workspace_name)
+      #       -ls_dsql_connectionString
+      #       -ls_ssql_builtin_connectionString
+      #       -pins-synw-odw-dev-uks-WorkspaceDefaultSqlServer_connectionString
+      #       -ls_kv_properties_typeProperties_baseUrl "https://$().vault.azure.net/"
+      #       -ls_servicebus_properties_typeProperties_url
+      #       -ls_servicebus_properties_typeProperties_aadResourceId
+      #       -
+      #     OverrideArmParameters: '-workspaceName $(synapse_workspace_name) -ls_kv_properties_typeProperties_baseUrl https://$(synapse_workspace_name).vault.azure.net/ -pins-odw-data-dev-syn-ws-WorkspaceDefaultStorage_properties_typeProperties_url https://$(storage_account_name).dfs.core.windows.net -odw_curated_properties_0_NewEntity_Source_Location abfss://$(curated_lake_database_name)@$(storage_account_name).dfs.core.windows.net/ -odw_chris_test_properties_0_NewEntity_Source_Location abfss://$(christest_lake_database_name)@$(storage_account_name).dfs.core.windows.net/'
+      #     ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
+      #     ResourceGroupName: $(data_resource_group_name)
+      #     TargetWorkspaceName: $(synapse_workspace_name)
+      #     TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
       variables:
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
