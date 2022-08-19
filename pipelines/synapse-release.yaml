@@ -103,6 +103,7 @@ stages:
       - script: |
           echo "data_resource_group_name: $(data_resource_group_name)"
           echo "source_workspace_name: $(source_workspace_name)"
+          echo "synapse_endpoints: $(synapse_endpoints)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Check Variables'
 
@@ -142,6 +143,7 @@ stages:
       variables:
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
+        synapse_endpoints: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_endpoints'] ]
         synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]
 
   # - stage: Release
