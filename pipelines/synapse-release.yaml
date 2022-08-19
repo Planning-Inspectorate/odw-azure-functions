@@ -64,6 +64,7 @@ stages:
       - powershell: |
           Write-Host "##[command]Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json"
           $Output = Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json
+
           $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##[command][task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
           $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##vso[task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
         displayName: 'Set Variables'
@@ -84,16 +85,18 @@ stages:
 
       - script: |
           git checkout ${{ variables.publishBranchName }}
-          echo "##[command]ls -l $(Build.SourcesDirectory)/$(synapse_workspace_name):"
-          ls -l $(Build.SourcesDirectory)/$(synapse_workspace_name)
+          echo "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
+          ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
         displayName: 'Switch to ${{ variables.publishBranchName }}'
 
       - script: |
           echo "data_resource_group_name: $(data_resource_group_name)"
+          echo "source_workspace_name: $(source_workspace_name)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Check Variables'
       variables:
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
+        source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', 'dev') ]
         synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]
 
   # - stage: Release
