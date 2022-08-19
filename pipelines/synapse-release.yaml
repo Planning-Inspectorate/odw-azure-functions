@@ -61,30 +61,29 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
-      # - task: CopyFiles@2
-      #   displayName: 'Create Artifact'
-      #   inputs:
-      #     sourceFolder: infrastructure
-      #     contents: ${{ variables.outputFileName }}
-      #     targetFolder: $(Build.ArtifactStagingDirectory)
-
-      # - publish: $(Build.ArtifactStagingDirectory)
-      #   artifact: ${{ variables.artifactName }}
-      #   displayName: 'Publish Artifact'
-
       - powershell: |
           Write-Host "##[command]Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json"
           $Output = Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json
-          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { Write-Host "##[command]$Var = $Output.($_.Name); [task.setvariable variable=$($_.Name);issecret=$($Var.Sensitive)]$($Var.Value)" }
-          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##vso[task.setvariable variable=$($_.Name);issecret=$($Var.Sensitive)]$($Var.Value)" }
-          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "$($_.Name): $($Var.Value)" }
+          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##[command][task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
+          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##vso[task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
         displayName: 'Set Variables'
+        name: SetVariables
         workingDirectory: infrastructure
 
+  - stage: Release
+    dependsOn: Output
+    displayName: Synapse Release ${{ parameters.environment }}
+    jobs:
+    - job: Test
+      displayName: Test Variables
+      steps:
       - script: |
           echo "data_resource_group_name: $(data_resource_group_name)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Test Variables'
+      variables:
+        data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
+        synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]
 
   # - stage: Release
   #   dependsOn: Output
