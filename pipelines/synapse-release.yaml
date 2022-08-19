@@ -101,7 +101,9 @@ stages:
         displayName: 'Switch to ${{ variables.publishBranchName }}'
 
       - script: |
+          echo "data_lake_dfs_endpoint: $(data_lake_dfs_endpoint)"
           echo "data_resource_group_name: $(data_resource_group_name)"
+          echo "key_vault_uri: $(key_vault_uri)"
           echo "source_workspace_name: $(source_workspace_name)"
           echo "synapse_dsql_endpoint: $(synapse_dsql_endpoint)"
           echo "synapse_ssql_endpoint: $(synapse_ssql_endpoint)"
@@ -129,20 +131,22 @@ stages:
       #     operation: 'validate'
       #     OverrideArmParameters: >-
       #       -workspaceName $(synapse_workspace_name)
-      #       -ls_dsql_connectionString
-      #       -ls_ssql_builtin_connectionString
+      #       -ls_dsql_connectionString $(synapse_dsql_endpoint)
+      #       -ls_ssql_builtin_connectionString $(synapse_ssql_endpoint)
       #       -pins-synw-odw-dev-uks-WorkspaceDefaultSqlServer_connectionString
-      #       -ls_kv_properties_typeProperties_baseUrl "https://$().vault.azure.net/"
+      #       -ls_kv_properties_typeProperties_baseUrl $(key_vault_uri)
       #       -ls_servicebus_properties_typeProperties_url
       #       -ls_servicebus_properties_typeProperties_aadResourceId
-      #       -
+      #       -ls_storage_properties_typeProperties_url $(data_lake_dfs_endpoint)
       #     OverrideArmParameters: '-workspaceName $(synapse_workspace_name) -ls_kv_properties_typeProperties_baseUrl https://$(synapse_workspace_name).vault.azure.net/ -pins-odw-data-dev-syn-ws-WorkspaceDefaultStorage_properties_typeProperties_url https://$(storage_account_name).dfs.core.windows.net -odw_curated_properties_0_NewEntity_Source_Location abfss://$(curated_lake_database_name)@$(storage_account_name).dfs.core.windows.net/ -odw_chris_test_properties_0_NewEntity_Source_Location abfss://$(christest_lake_database_name)@$(storage_account_name).dfs.core.windows.net/'
       #     ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
       #     ResourceGroupName: $(data_resource_group_name)
       #     TargetWorkspaceName: $(synapse_workspace_name)
       #     TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
       variables:
+        data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
+        key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
         source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
         synapse_dsql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dsql_endpoint'] ]
         synapse_ssql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_ssql_endpoint'] ]
