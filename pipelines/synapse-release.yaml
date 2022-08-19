@@ -10,7 +10,7 @@ parameters:
 variables:
 - group: Terraform ${{ parameters.environment }}
 - name: artifactName
-  value: terraform-outputs
+  value: synapse-release
 - name: environment
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
@@ -105,6 +105,19 @@ stages:
           echo "source_workspace_name: $(source_workspace_name)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Check Variables'
+
+      - task: CopyFiles@2
+        displayName: 'Create Artifact'
+        inputs:
+          sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
+          contents: |
+            TemplateForWorkspace.json
+            TemplateParametersForWorkspace.json
+          targetFolder: $(Build.ArtifactStagingDirectory)
+
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifact'
       variables:
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
