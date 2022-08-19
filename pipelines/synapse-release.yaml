@@ -74,13 +74,24 @@ stages:
     dependsOn: Output
     displayName: Synapse Release ${{ parameters.environment }}
     jobs:
-    - job: Test
-      displayName: Test Variables
+    - job: Release
+      displayName: Synapse Release
       steps:
+      - checkout: self
+        clean: true
+        displayName: 'Checkout'
+        persistCredentials: true
+
+      - script: |
+          git checkout ${{ variables.publishBranchName }}
+          echo "##[command]ls -l $(Build.SourcesDirectory):"
+          ls -l $(Build.SourcesDirectory)
+        displayName: 'Switch to ${{ variables.publishBranchName }}'
+
       - script: |
           echo "data_resource_group_name: $(data_resource_group_name)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
-        displayName: 'Test Variables'
+        displayName: 'Check Variables'
       variables:
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]
