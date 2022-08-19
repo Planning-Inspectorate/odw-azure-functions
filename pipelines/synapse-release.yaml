@@ -84,8 +84,8 @@ stages:
 
       - script: |
           git checkout ${{ variables.publishBranchName }}
-          echo "##[command]ls -l $(Build.SourcesDirectory):"
-          ls -l $(Build.SourcesDirectory)
+          echo "##[command]ls -l $(Build.SourcesDirectory)/$(synapse_workspace_name):"
+          ls -l $(Build.SourcesDirectory)/$(synapse_workspace_name)
         displayName: 'Switch to ${{ variables.publishBranchName }}'
 
       - script: |
