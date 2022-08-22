@@ -127,6 +127,7 @@ stages:
       - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@1
         displayName: 'Validate Release'
         inputs:
+          AzureResourceManagerConnection: 'ODW PreProd'
           azureSubscription: $(SUBSCRIPTION_ID)
           DeleteArtifactsNotInTemplate: true
           operation: 'validate'
