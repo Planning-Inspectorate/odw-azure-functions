@@ -112,39 +112,39 @@ stages:
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Check Variables'
 
-      # Disabled for testing, uncomment for release:
-      # - task: CopyFiles@2
-      #   displayName: 'Create Artifact'
-      #   inputs:
-      #     sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
-      #     contents: |
-      #       TemplateForWorkspace.json
-      #       TemplateParametersForWorkspace.json
-      #     targetFolder: $(Build.ArtifactStagingDirectory)
+      - task: CopyFiles@2
+        displayName: 'Create Artifact'
+        enabled: false
+        inputs:
+          sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
+          contents: |
+            TemplateForWorkspace.json
+            TemplateParametersForWorkspace.json
+          targetFolder: $(Build.ArtifactStagingDirectory)
 
-      # Disabled for testing, uncomment for release:
-      # - publish: $(Build.ArtifactStagingDirectory)
-      #   artifact: ${{ variables.artifactName }}
-      #   displayName: 'Publish Artifact'
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifact'
+        enabled: false
 
-      # Disabled for testing, uncomment for release:
-      # - task: AzurePowerShell@5
-      #   displayName: 'Check SQL Pool'
-      #   inputs:
-      #     ConnectedServiceNameARM: 'ODW PreProd'
-      #     errorActionPreference: 'stop'
-      #     inline: |
-      #       Write-Host "Checking Synapse SQL pool..."
-      #       Write-Host "##[command]Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)"
-      #       $Pool = Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)
-      #       $Pool | Format-List 'SqlPoolName','Sku','Status'
-      #       If ($Pool.Status -eq 'Paused') {
-      #         Write-Host "Synapse SQL pool $($Pool.SqlPoolName) will be temporarily resumed for release..."
-      #         Write-Host "##vso[task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
-      #         Write-Host "##[command][task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
-      #       }
-      #     scriptType: inlineScript
-      #     TargetAzurePs: LatestVersion
+      - task: AzurePowerShell@5
+        displayName: 'Check SQL Pool'
+        enabled: false
+        inputs:
+          ConnectedServiceNameARM: 'ODW PreProd'
+          errorActionPreference: 'stop'
+          inline: |
+            Write-Host "Checking Synapse SQL pool..."
+            Write-Host "##[command]Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)"
+            $Pool = Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)
+            $Pool | Format-List 'SqlPoolName','Sku','Status'
+            If ($Pool.Status -eq 'Paused') {
+              Write-Host "Synapse SQL pool $($Pool.SqlPoolName) will be temporarily resumed for release..."
+              Write-Host "##vso[task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
+              Write-Host "##[command][task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
+            }
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
 
       - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
         displayName: 'Disable Synapse Triggers'
@@ -154,55 +154,56 @@ stages:
           WorkspaceName: $(synapse_workspace_name)
           ToggleOn: false
 
-      # Disabled for testing, uncomment for release:
-      # - task: AzurePowerShell@5
-      #   condition: ne(variables['pause_sql_pool_name'], '')
-      #   displayName: 'Resume SQL Pool'
-      #   inputs:
-      #     ConnectedServiceNameARM: 'ODW PreProd'
-      #     errorActionPreference: 'stop'
-      #     inline: |
-      #       Write-Host "Resuming paused SQL pool $(pause_sql_pool_name)..."
-      #       Write-Host "##[command]Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
-      #       $Start = Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
-      #       $Start | Format-List 'SqlPoolName','Sku','Status'
-      #     scriptType: inlineScript
-      #     TargetAzurePs: LatestVersion
+      - task: AzurePowerShell@5
+        condition: ne(variables['pause_sql_pool_name'], '')
+        displayName: 'Resume SQL Pool'
+        enabled: false
+        inputs:
+          ConnectedServiceNameARM: 'ODW PreProd'
+          errorActionPreference: 'stop'
+          inline: |
+            Write-Host "Resuming paused SQL pool $(pause_sql_pool_name)..."
+            Write-Host "##[command]Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
+            $Start = Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
+            $Start | Format-List 'SqlPoolName','Sku','Status'
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
 
-      # - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@1
-      #   displayName: 'Validate Release'
-      #   inputs:
-      #     AzureResourceManagerConnection: ${{ variables.armServiceConnection }}
-      #     azureSubscription: $(SUBSCRIPTION_ID)
-      #     DeleteArtifactsNotInTemplate: true
-      #     operation: 'validate'
-      #     OverrideArmParameters: >-
-      #       -workspaceName $(synapse_workspace_name)
-      #       -ls_dsql_connectionString $(synapse_dsql_endpoint)
-      #       -ls_ssql_builtin_connectionString $(synapse_ssql_endpoint)
-      #       -ls_kv_properties_typeProperties_baseUrl $(key_vault_uri)
-      #       -ls_servicebus_properties_typeProperties_url $(service_bus_namespace_name).servicebus.windows.net
-      #       -ls_servicebus_properties_typeProperties_aadResourceId https://servicebus.azure.net
-      #       -ls_storage_properties_typeProperties_url $(data_lake_dfs_endpoint)
-      #     ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
-      #     ResourceGroupName: $(data_resource_group_name)
-      #     TargetWorkspaceName: $(synapse_workspace_name)
-      #     TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
+      - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@1
+        displayName: 'Validate Release'
+        enabled: false
+        inputs:
+          AzureResourceManagerConnection: ${{ variables.armServiceConnection }}
+          azureSubscription: $(SUBSCRIPTION_ID)
+          DeleteArtifactsNotInTemplate: true
+          operation: 'validate'
+          OverrideArmParameters: >-
+            -workspaceName $(synapse_workspace_name)
+            -ls_dsql_connectionString $(synapse_dsql_endpoint)
+            -ls_ssql_builtin_connectionString $(synapse_ssql_endpoint)
+            -ls_kv_properties_typeProperties_baseUrl $(key_vault_uri)
+            -ls_servicebus_properties_typeProperties_url $(service_bus_namespace_name).servicebus.windows.net
+            -ls_servicebus_properties_typeProperties_aadResourceId https://servicebus.azure.net
+            -ls_storage_properties_typeProperties_url $(data_lake_dfs_endpoint)
+          ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
+          ResourceGroupName: $(data_resource_group_name)
+          TargetWorkspaceName: $(synapse_workspace_name)
+          TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
 
-      # Disabled for testing, uncomment for release:
-      # - task: AzurePowerShell@5
-      #   condition: ne(variables['pause_sql_pool_name'], '')
-      #   displayName: 'Suspend SQL Pool'
-      #   inputs:
-      #     ConnectedServiceNameARM: 'ODW PreProd'
-      #     errorActionPreference: 'stop'
-      #     inline: |
-      #       Write-Host "Suspending previously paused SQL pool $(pause_sql_pool_name)..."
-      #       Write-Host "##[command]Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
-      #       $Stop = Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
-      #       $Stop | Format-List 'SqlPoolName','Sku','Status'
-      #     scriptType: inlineScript
-      #     TargetAzurePs: LatestVersion
+      - task: AzurePowerShell@5
+        condition: ne(variables['pause_sql_pool_name'], '')
+        displayName: 'Suspend SQL Pool'
+        enabled: false
+        inputs:
+          ConnectedServiceNameARM: 'ODW PreProd'
+          errorActionPreference: 'stop'
+          inline: |
+            Write-Host "Suspending previously paused SQL pool $(pause_sql_pool_name)..."
+            Write-Host "##[command]Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
+            $Stop = Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
+            $Stop | Format-List 'SqlPoolName','Sku','Status'
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
 
       - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
         displayName: 'Enable Synapse Triggers'
