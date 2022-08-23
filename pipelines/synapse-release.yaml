@@ -132,7 +132,6 @@ stages:
 
       - task: AzurePowerShell@5
         displayName: 'Check SQL Pool'
-        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
@@ -160,7 +159,6 @@ stages:
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
         displayName: 'Resume SQL Pool'
-        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
@@ -196,7 +194,6 @@ stages:
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
         displayName: 'Suspend SQL Pool'
-        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
