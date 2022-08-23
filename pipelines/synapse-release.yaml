@@ -9,6 +9,8 @@ parameters:
 
 variables:
 - group: Terraform ${{ parameters.environment }}
+- name: armServiceConnectionName
+  value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
 - name: artifactName
   value: synapse-arm
 - name: environment
@@ -102,6 +104,7 @@ stages:
         displayName: 'Switch to ${{ variables.publishBranchName }}'
 
       - script: |
+          echo "armServiceConnectionName: ${{ variables.armServiceConnectionName }}"
           echo "data_lake_dfs_endpoint: $(data_lake_dfs_endpoint)"
           echo "data_resource_group_name: $(data_resource_group_name)"
           echo "key_vault_uri: $(key_vault_uri)"
@@ -131,7 +134,7 @@ stages:
         displayName: 'Check SQL Pool'
         enabled: false
         inputs:
-          ConnectedServiceNameARM: 'ODW PreProd'
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
           inline: |
             Write-Host "Checking Synapse SQL pool..."
@@ -149,7 +152,7 @@ stages:
       - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
         displayName: 'Disable Synapse Triggers'
         inputs:
-          azureSubscription: 'ODW PreProd'
+          azureSubscription: ${{ variables.armServiceConnectionName }}
           ResourceGroupName: $(data_resource_group_name)
           WorkspaceName: $(synapse_workspace_name)
           ToggleOn: false
@@ -159,7 +162,7 @@ stages:
         displayName: 'Resume SQL Pool'
         enabled: false
         inputs:
-          ConnectedServiceNameARM: 'ODW PreProd'
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
           inline: |
             Write-Host "Resuming paused SQL pool $(pause_sql_pool_name)..."
@@ -195,7 +198,7 @@ stages:
         displayName: 'Suspend SQL Pool'
         enabled: false
         inputs:
-          ConnectedServiceNameARM: 'ODW PreProd'
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
           inline: |
             Write-Host "Suspending previously paused SQL pool $(pause_sql_pool_name)..."
@@ -208,7 +211,7 @@ stages:
       - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
         displayName: 'Enable Synapse Triggers'
         inputs:
-          azureSubscription: 'ODW PreProd'
+          azureSubscription: ${{ variables.armServiceConnectionName }}
           ResourceGroupName: $(data_resource_group_name)
           WorkspaceName: $(synapse_workspace_name)
       variables:
@@ -246,7 +249,7 @@ stages:
             # - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
             #   displayName: 'Disable Synapse Triggers'
             #   inputs:
-            #     azureSubscription: 'ODW PreProd'
+            #     azureSubscription: ${{ variables.armServiceConnectionName }}
             #     ResourceGroupName: 'pins-odw-data-preprod-rg'
             #     WorkspaceName: 'pins-odw-data-preprod-syn-ws'
             #     ToggleOn: false
@@ -257,7 +260,7 @@ stages:
             #   inputs:
             #     TemplateFile: '$(System.DefaultWorkingDirectory)/_Planning-Inspectorate.ODW-Service/workspace_arm_templates/TemplateForWorkspace.json'
             #     ParametersFile: '$(System.DefaultWorkingDirectory)/_Planning-Inspectorate.ODW-Service/workspace_arm_templates/TemplateParametersForWorkspace.json'
-            #     azureSubscription: 'ODW PreProd'
+            #     azureSubscription: ${{ variables.armServiceConnectionName }}
             #     ResourceGroupName: 'pins-odw-data-preprod-rg'
             #     TargetWorkspaceName: 'pins-odw-data-preprod-syn-ws'
             #     DeleteArtifactsNotInTemplate: true
@@ -267,7 +270,7 @@ stages:
             # - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
             #   displayName: 'Enable Synapse Triggers'
             #   inputs:
-            #     azureSubscription: 'ODW PreProd'
+            #     azureSubscription: ${{ variables.armServiceConnectionName }}
             #     ResourceGroupName: 'pins-odw-data-preprod-rg'
             #     WorkspaceName: 'pins-odw-data-preprod-syn-ws'
 
@@ -275,7 +278,7 @@ stages:
             # - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
             #   displayName: 'Trigger pipeline run '
             #   inputs:
-            #     azureSubscription: 'ODW PreProd'
+            #     azureSubscription: ${{ variables.armServiceConnectionName }}
             #     DatafactoryType: synapse
             #     WorkspaceUrl: 'https://pins-odw-data-preprod-syn-ws.dev.azuresynapse.net'
             #     PipelineFilter: 'pln_create_lake_databases'
