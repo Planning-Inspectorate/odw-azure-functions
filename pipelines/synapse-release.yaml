@@ -174,7 +174,7 @@ stages:
         continueOnError: true
         displayName: 'Deploy Workspace'
         inputs:
-          AzureResourceManagerConnection: 'ODW PreProd' # ${{ variables.armServiceConnection }}
+          AzureResourceManagerConnection: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }} # 'ODW PreProd' # ${{ variables.armServiceConnection }}
           DeleteArtifactsNotInTemplate: true
           Environment: 'prod'
           operation: 'deploy'
