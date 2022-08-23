@@ -176,7 +176,7 @@ stages:
         inputs:
           AzureResourceManagerConnection: 'ODW PreProd' # ${{ variables.armServiceConnection }}
           DeleteArtifactsNotInTemplate: true
-          Environment: 'Azure Public'
+          Environment: 'prod'
           operation: 'deploy'
           OverrideArmParameters: |
             workspaceName: $(synapse_workspace_name)
