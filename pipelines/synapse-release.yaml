@@ -176,20 +176,21 @@ stages:
         inputs:
           AzureResourceManagerConnection: ${{ variables.armServiceConnection }}
           DeleteArtifactsNotInTemplate: true
-          Environment: ${{ parameters.environment }}
+          Environment: 'Azure Public'
           operation: 'validate'
-          OverrideArmParameters: >-
-            -workspaceName $(synapse_workspace_name)
-            -ls_dsql_connectionString $(synapse_dsql_endpoint)
-            -ls_ssql_builtin_connectionString $(synapse_ssql_endpoint)
-            -ls_kv_properties_typeProperties_baseUrl $(key_vault_uri)
-            -ls_servicebus_properties_typeProperties_url $(service_bus_namespace_name).servicebus.windows.net
-            -ls_servicebus_properties_typeProperties_aadResourceId https://servicebus.azure.net
-            -ls_storage_properties_typeProperties_url $(data_lake_dfs_endpoint)
+          OverrideArmParameters: |
+            workspaceName: $(synapse_workspace_name)
+            ls_dsql_connectionString: $(synapse_dsql_endpoint)
+            ls_ssql_builtin_connectionString: $(synapse_ssql_endpoint)
+            ls_kv_properties_typeProperties_baseUrl: $(key_vault_uri)
+            ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
+            ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
+            ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
           ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
           ResourceGroupName: $(data_resource_group_name)
           TargetWorkspaceName: $(synapse_workspace_name)
           TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
+
 
       # - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@1
       #   displayName: 'Validate Release'
