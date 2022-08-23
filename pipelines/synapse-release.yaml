@@ -172,12 +172,12 @@ stages:
 
       - task: Synapse workspace deployment@2
         continueOnError: true
-        displayName: 'Validate Release'
+        displayName: 'Deploy Workspace'
         inputs:
-          AzureResourceManagerConnection: ${{ variables.armServiceConnection }}
+          AzureResourceManagerConnection: 'ODW PreProd' # ${{ variables.armServiceConnection }}
           DeleteArtifactsNotInTemplate: true
           Environment: 'Azure Public'
-          operation: 'validate'
+          operation: 'deploy'
           OverrideArmParameters: |
             workspaceName: $(synapse_workspace_name)
             ls_dsql_connectionString: $(synapse_dsql_endpoint)
