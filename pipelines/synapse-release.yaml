@@ -109,6 +109,7 @@ stages:
 
       - script: |
           echo "armServiceConnectionName: ${{ variables.armServiceConnectionName }}"
+          echo "data_lake_account_id: $(data_lake_account_id)"
           echo "data_lake_dfs_endpoint: $(data_lake_dfs_endpoint)"
           echo "data_lake_managed_private_endpoint_name: $(data_lake_managed_private_endpoint_name)"
           echo "data_resource_group_name: $(data_resource_group_name)"
@@ -201,18 +202,29 @@ stages:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
           inline: |
-            Write-Host "Retrieving existing data lake managed private endpoint configuration for $(data_lake_managed_private_endpoint_name)..."
-            Write-Host "##[command]Get-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name)"
-            $Endpoint = Get-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name)
-            $Endpoint | Format-List
+            # Write-Host "Retrieving existing data lake managed private endpoint configuration for $(data_lake_managed_private_endpoint_name)..."
+            # Write-Host "##[command]Get-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name)"
+            # $Endpoint = Get-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name)
+            # $Endpoint | Format-List
 
-            Write-Host "Building new managed private endpoint definition..."
-            Write-Host "##[command][PsCustomObject]@{name=$Endpoint.Name;properties=[PsCustomObject]@{privateLinkResourceId=$Endpoint.Properties.PrivateLinkResourceId;groupId=$Endpoint.Properties.GroupId}}"
+            # Write-Host "Building new managed private endpoint definition..."
+            # Write-Host "##[command][PsCustomObject]@{name=$Endpoint.Name;properties=[PsCustomObject]@{privateLinkResourceId=$Endpoint.Properties.PrivateLinkResourceId;groupId=$Endpoint.Properties.GroupId}}"
+            # $Definition = [PsCustomObject]@{
+            #   name       = $Endpoint.Name
+            #   properties = [PsCustomObject]@{
+            #     privateLinkResourceId = $Endpoint.Properties.PrivateLinkResourceId
+            #     groupId               = $Endpoint.Properties.GroupId
+            #   }
+            # }
+            # $Definition | ConvertTo-Json
+
+            Write-Host "Building data lake managed private endpoint definition..."
+            Write-Host "##[command][PsCustomObject]@{name=$(data_lake_managed_private_endpoint_name);properties=[PsCustomObject]@{privateLinkResourceId=$(data_lake_account_id);groupId=dfs}}"
             $Definition = [PsCustomObject]@{
-              name       = $Endpoint.Name
+              name       = $(data_lake_managed_private_endpoint_name)
               properties = [PsCustomObject]@{
-                privateLinkResourceId = $Endpoint.Properties.PrivateLinkResourceId
-                groupId               = $Endpoint.Properties.GroupId
+                privateLinkResourceId = $(data_lake_account_id)
+                groupId               = 'dfs'
               }
             }
             $Definition | ConvertTo-Json
@@ -222,9 +234,10 @@ stages:
             $Definition | ConvertTo-Json | Out-File ${{ variables.dataLakeMpeDefinitionFilePath }}
             ls -l ${{ variables.dataLakeMpeDefinitionFilePath }}
 
-            Write-Host "Resetting existing data lake managed private endpoint $(data_lake_managed_private_endpoint_name)..."
-            Write-Host "##[command]Remove-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -Confirm:$false -Force"
-            $Remove = Remove-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -Confirm:$false -Force
+            # Write-Host "Resetting existing data lake managed private endpoint $(data_lake_managed_private_endpoint_name)..."
+            # Write-Host "##[command]Remove-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -Confirm:$false -Force"
+            # $Remove = Remove-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -Confirm:$false -Force
+
             Write-Host "##[command]New-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -DefinitionFile ${{ variables.dataLakeMpeDefinitionFilePath }}"
             $Add = New-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -DefinitionFile ${{ variables.dataLakeMpeDefinitionFilePath }}
             [PsCustomObject]@{
@@ -292,6 +305,7 @@ stages:
           WorkspaceUrl: $(synapse_dev_endpoint)
           PipelineFilter: ${{ variables.plnCreateLakeDatabases }}
       variables:
+        data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
         data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
         data_lake_managed_private_endpoint_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_managed_private_endpoint_name'] ]
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
