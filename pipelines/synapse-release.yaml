@@ -225,7 +225,7 @@ stages:
             Write-Host "Resetting existing data lake managed private endpoint $(data_lake_managed_private_endpoint_name)..."
             Write-Host "##[command]Remove-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -Confirm:$false -Force"
             $Remove = Remove-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -Confirm:$false -Force
-            Write-Host "##[command]New-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -DefinitionFile ${{ variables.dataLakeMpeDefinitionFilePath }}
+            Write-Host "##[command]New-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -DefinitionFile ${{ variables.dataLakeMpeDefinitionFilePath }}"
             $Add = New-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name) -DefinitionFile ${{ variables.dataLakeMpeDefinitionFilePath }}
             [PsCustomObject]@{
               WorkspaceName         = $Add.WorkspaceName
@@ -250,7 +250,7 @@ stages:
             } | Format-List
 
             Write-Host "Approving data lake managed private endpoint connection for $(data_lake_managed_private_endpoint_name)..."
-            Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $NewEndpoint.Id"
+            Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $($NewEndpoint.Id)"
             $Approval = Approve-AzPrivateEndpointConnection -ResourceId $NewEndpoint.Id -Description "Approved by Synapse Release pipeline"
             [PsCustomObject]@{
               Name                  = $Approval.Name
