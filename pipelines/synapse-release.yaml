@@ -117,7 +117,6 @@ stages:
 
       - task: CopyFiles@2
         displayName: 'Create Artifact'
-        enabled: false
         inputs:
           sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
           contents: |
@@ -128,7 +127,6 @@ stages:
       - publish: $(Build.ArtifactStagingDirectory)
         artifact: ${{ variables.artifactName }}
         displayName: 'Publish Artifact'
-        enabled: false
 
       - task: AzurePowerShell@5
         displayName: 'Check SQL Pool'
@@ -174,7 +172,7 @@ stages:
         continueOnError: true
         displayName: 'Deploy Workspace'
         inputs:
-          AzureResourceManagerConnection: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }} # 'ODW PreProd' # ${{ variables.armServiceConnection }}
+          AzureResourceManagerConnection: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }} # Using "${{ variables.armServiceConnection }}" causes step to fail
           DeleteArtifactsNotInTemplate: true
           Environment: 'prod'
           operation: 'deploy'
@@ -190,26 +188,6 @@ stages:
           ResourceGroupName: $(data_resource_group_name)
           TargetWorkspaceName: $(synapse_workspace_name)
           TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
-
-
-      # - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@1
-      #   displayName: 'Validate Release'
-      #   inputs:
-      #     AzureResourceManagerConnection: ${{ variables.armServiceConnection }}
-      #     DeleteArtifactsNotInTemplate: true
-      #     operation: 'validate'
-      #     OverrideArmParameters: >-
-      #       -workspaceName $(synapse_workspace_name)
-      #       -ls_dsql_connectionString $(synapse_dsql_endpoint)
-      #       -ls_ssql_builtin_connectionString $(synapse_ssql_endpoint)
-      #       -ls_kv_properties_typeProperties_baseUrl $(key_vault_uri)
-      #       -ls_servicebus_properties_typeProperties_url $(service_bus_namespace_name).servicebus.windows.net
-      #       -ls_servicebus_properties_typeProperties_aadResourceId https://servicebus.azure.net
-      #       -ls_storage_properties_typeProperties_url $(data_lake_dfs_endpoint)
-      #     ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
-      #     ResourceGroupName: $(data_resource_group_name)
-      #     TargetWorkspaceName: $(synapse_workspace_name)
-      #     TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
 
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
@@ -256,40 +234,6 @@ stages:
   #             clean: true
   #             displayName: 'Checkout'
   #             persistCredentials: true
-
-  #           - script: |
-  #               git checkout ${{ variables.publishBranchName }}
-  #               echo "##[command]ls -l $(Build.SourcesDirectory):"
-  #               ls -l $(Build.SourcesDirectory)
-  #             displayName: 'Switch to ${{ variables.publishBranchName }}'
-
-            # - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
-            #   displayName: 'Disable Synapse Triggers'
-            #   inputs:
-            #     azureSubscription: ${{ variables.armServiceConnectionName }}
-            #     ResourceGroupName: 'pins-odw-data-preprod-rg'
-            #     WorkspaceName: 'pins-odw-data-preprod-syn-ws'
-            #     ToggleOn: false
-
-            # steps:
-            # - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@1
-            #   displayName: 'Synapse deployment task for workspace: pins-odw-data-preprod-syn-ws'
-            #   inputs:
-            #     TemplateFile: '$(System.DefaultWorkingDirectory)/_Planning-Inspectorate.ODW-Service/workspace_arm_templates/TemplateForWorkspace.json'
-            #     ParametersFile: '$(System.DefaultWorkingDirectory)/_Planning-Inspectorate.ODW-Service/workspace_arm_templates/TemplateParametersForWorkspace.json'
-            #     azureSubscription: ${{ variables.armServiceConnectionName }}
-            #     ResourceGroupName: 'pins-odw-data-preprod-rg'
-            #     TargetWorkspaceName: 'pins-odw-data-preprod-syn-ws'
-            #     DeleteArtifactsNotInTemplate: true
-            #     OverrideArmParameters: '-workspaceName $(synapse_workspace_name) -ls_kv_properties_typeProperties_baseUrl https://$(synapse_workspace_name).vault.azure.net/ -pins-odw-data-dev-syn-ws-WorkspaceDefaultStorage_properties_typeProperties_url https://$(storage_account_name).dfs.core.windows.net -odw_curated_properties_0_NewEntity_Source_Location abfss://$(curated_lake_database_name)@$(storage_account_name).dfs.core.windows.net/ -odw_chris_test_properties_0_NewEntity_Source_Location abfss://$(christest_lake_database_name)@$(storage_account_name).dfs.core.windows.net/'
-
-            # steps:
-            # - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
-            #   displayName: 'Enable Synapse Triggers'
-            #   inputs:
-            #     azureSubscription: ${{ variables.armServiceConnectionName }}
-            #     ResourceGroupName: 'pins-odw-data-preprod-rg'
-            #     WorkspaceName: 'pins-odw-data-preprod-syn-ws'
 
             # steps:
             # - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
