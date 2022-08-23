@@ -17,6 +17,8 @@ variables:
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
   value: outputs.json
+- name: plnCreateLakeDatabases
+  value: pln_create_lake_databases
 - name: publishBranchName
   value: 'workspace_publish'
 - name: sourceEnvironment
@@ -110,6 +112,7 @@ stages:
           echo "key_vault_uri: $(key_vault_uri)"
           echo "service_bus_namespace_name: $(service_bus_namespace_name)"
           echo "source_workspace_name: $(source_workspace_name)"
+          echo "synapse_dev_endpoint: $(synapse_dev_endpoint)"
           echo "synapse_dsql_endpoint: $(synapse_dsql_endpoint)"
           echo "synapse_ssql_endpoint: $(synapse_ssql_endpoint)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
@@ -209,12 +212,22 @@ stages:
           azureSubscription: ${{ variables.armServiceConnectionName }}
           ResourceGroupName: $(data_resource_group_name)
           WorkspaceName: $(synapse_workspace_name)
+
+      - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
+        displayName: 'Trigger Pipeline: ${{ variables.plnCreateLakeDatabases }}'
+        enabled: false
+        inputs:
+          azureSubscription: ${{ variables.armServiceConnectionName }}
+          DatafactoryType: synapse
+          WorkspaceUrl: $(synapse_dev_endpoint)
+          PipelineFilter: ${{ variables.plnCreateLakeDatabases }}
       variables:
         data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
         service_bus_namespace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.service_bus_namespace_name'] ]
         source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
+        synapse_dev_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dev_endpoint'] ]
         synapse_dsql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dsql_endpoint'] ]
         synapse_ssql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_ssql_endpoint'] ]
         synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]
@@ -234,12 +247,3 @@ stages:
   #             clean: true
   #             displayName: 'Checkout'
   #             persistCredentials: true
-
-            # steps:
-            # - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
-            #   displayName: 'Trigger pipeline run '
-            #   inputs:
-            #     azureSubscription: ${{ variables.armServiceConnectionName }}
-            #     DatafactoryType: synapse
-            #     WorkspaceUrl: 'https://pins-odw-data-preprod-syn-ws.dev.azuresynapse.net'
-            #     PipelineFilter: 'pln_create_lake_databases'
