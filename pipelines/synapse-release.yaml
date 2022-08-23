@@ -108,6 +108,7 @@ stages:
       - script: |
           echo "armServiceConnectionName: ${{ variables.armServiceConnectionName }}"
           echo "data_lake_dfs_endpoint: $(data_lake_dfs_endpoint)"
+          echo "data_lake_managed_private_endpoint_name: $(data_lake_managed_private_endpoint_name)"
           echo "data_resource_group_name: $(data_resource_group_name)"
           echo "key_vault_uri: $(key_vault_uri)"
           echo "service_bus_namespace_name: $(service_bus_namespace_name)"
@@ -192,6 +193,19 @@ stages:
           TargetWorkspaceName: $(synapse_workspace_name)
           TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
 
+      # - task: AzurePowerShell@5
+      #   displayName: 'Reset Data Lake MPE'
+      #   enabled: false
+      #   inputs:
+      #     ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+      #     errorActionPreference: 'stop'
+      #     inline: |
+      #       Write-Host "Resetting data lake managed private endpoint $(data_lake_managed_private_endpoint_name)..."
+
+      #       $Remove = Remove-AzSynapseManagedPrivateEndpoint -WorkspaceName $(synapse_workspace_name) -Name $(data_lake_managed_private_endpoint_name)
+      #     scriptType: inlineScript
+      #     TargetAzurePs: LatestVersion
+
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
         displayName: 'Suspend SQL Pool'
@@ -223,6 +237,7 @@ stages:
           PipelineFilter: ${{ variables.plnCreateLakeDatabases }}
       variables:
         data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
+        data_lake_managed_private_endpoint_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_managed_private_endpoint_name'] ]
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
         service_bus_namespace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.service_bus_namespace_name'] ]
