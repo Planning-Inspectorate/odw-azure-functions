@@ -19,6 +19,8 @@ variables:
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
   value: outputs.json
+- name: planFileName
+  value: tfplan
 - name: plnCreateLakeDatabases
   value: pln_create_lake_databases
 - name: publishBranchName
@@ -99,13 +101,50 @@ stages:
         displayName: 'Checkout'
         persistCredentials: true
 
-      - script: |
+      - powershell: |
+          $SourceBranch = "$(Build.SourceBranch)" -replace "refs/heads/", ""
+          Write-Host "Exporting current branch name $SourceBranch..."
+          Write-Host "##[command][task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
+          Write-Host "##vso[task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
+
+          Write-Host "Switching to ${{ variables.publishBranchName }} branch..."
+          Write-Host "##[command]git checkout ${{ variables.publishBranchName }}"
           git checkout ${{ variables.publishBranchName }}
 
-          echo "Listing source Synapse Workspace directory..."
-          echo "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
+          Write-Host "Listing source Synapse Workspace directory..."
+          Write-Host "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
           ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
         displayName: 'Switch to ${{ variables.publishBranchName }}'
+
+      # - script: |
+      #     BRANCH=$(Build.SourceBranch)
+      #     echo "Exporting current branch name $(Build.SourceBranch)..."
+      #     echo "##[command][task.setvariable variable=source_branch;isOutput=false]$(Build.SourceBranch)"
+      #     echo "##vso[task.setvariable variable=source_branch;isOutput=false]$(Build.SourceBranch)"
+
+      #     echo "Switching to ${{ variables.publishBranchName }} branch..."
+      #     echo "##[command]git checkout ${{ variables.publishBranchName }}"
+      #     git checkout ${{ variables.publishBranchName }}
+
+      #     echo "Listing source Synapse Workspace directory..."
+      #     echo "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
+      #     ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
+      #   displayName: 'Switch to ${{ variables.publishBranchName }}'
+
+      - script: |
+          echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]az login && az account set"
+          az login \
+            --service-principal \
+            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+            --tenant $(AZURE_TENANT_ID) \
+          && az account set \
+            --subscription $(SUBSCRIPTION_ID)
+          echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+          echo "##[command]az account show"
+          az account show
+        displayName: 'Azure Login'
 
       - script: |
           echo "armServiceConnectionName: ${{ variables.armServiceConnectionName }}"
@@ -122,21 +161,19 @@ stages:
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Check Variables'
 
-      - task: CopyFiles@2
-        displayName: 'Create Artifact'
-        inputs:
-          sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
-          contents: |
-            TemplateForWorkspace.json
-            TemplateParametersForWorkspace.json
-          targetFolder: $(Build.ArtifactStagingDirectory)
-
-      - publish: $(Build.ArtifactStagingDirectory)
-        artifact: ${{ variables.artifactName }}
-        displayName: 'Publish Artifact'
+      # - task: CopyFiles@2
+      #   displayName: 'Create Artifact'
+      #   enabled: false
+      #   inputs:
+      #     sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
+      #     contents: |
+      #       TemplateForWorkspace.json
+      #       TemplateParametersForWorkspace.json
+      #     targetFolder: $(Build.ArtifactStagingDirectory)/$(source_workspace_name)
 
       - task: AzurePowerShell@5
         displayName: 'Check SQL Pool'
+        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
@@ -164,6 +201,7 @@ stages:
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
         displayName: 'Resume SQL Pool'
+        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
@@ -178,6 +216,7 @@ stages:
       - task: Synapse workspace deployment@2
         continueOnError: true
         displayName: 'Deploy Workspace'
+        enabled: false
         inputs:
           AzureResourceManagerConnection: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }} # Using "${{ variables.armServiceConnection }}" causes step to fail
           DeleteArtifactsNotInTemplate: true
@@ -196,9 +235,48 @@ stages:
           TargetWorkspaceName: $(synapse_workspace_name)
           TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
 
+      - script: |
+          echo "Switching to $(source_branch) branch..."
+          echo "##[command]git checkout $(source_branch)"
+          git checkout $(source_branch)
+
+          echo "Listing root Terraform directory..."
+          echo "##[command]ls -l $(Build.SourcesDirectory)/infrastructure:"
+          ls -l $(Build.SourcesDirectory)/infrastructure
+        displayName: 'Switch to $(source_branch)'
+
+      - script: |
+          echo "Initialising Terraform..."
+          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+
+          echo "Planning Terraform deployment..."
+          echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
+          terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}
+        displayName: 'Terraform Plan'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      # - script: |
+      #     echo "Deploying Terraform..."
+      #     echo "##[command]terraform apply -input=false ${{ variables.planFileName }}"
+      #     terraform apply -input=false ${{ variables.planFileName }}
+      #   displayName: 'Terraform Plan'
+      #   workingDirectory: infrastructure
+      #   env:
+      #     ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+      #     ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+      #     ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+      #     ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
         displayName: 'Suspend SQL Pool'
+        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
@@ -211,20 +289,37 @@ stages:
           TargetAzurePs: LatestVersion
 
       - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
+        condition: succeededOrFailed()
         displayName: 'Enable Synapse Triggers'
         inputs:
           azureSubscription: ${{ variables.armServiceConnectionName }}
           ResourceGroupName: $(data_resource_group_name)
           WorkspaceName: $(synapse_workspace_name)
 
-      - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
-        displayName: 'Trigger Pipeline: ${{ variables.plnCreateLakeDatabases }}'
-        enabled: false
-        inputs:
-          azureSubscription: ${{ variables.armServiceConnectionName }}
-          DatafactoryType: synapse
-          WorkspaceUrl: $(synapse_dev_endpoint)
-          PipelineFilter: ${{ variables.plnCreateLakeDatabases }}
+      # - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
+      #   displayName: 'Create Lake Databases'
+      #   enabled: false
+      #   inputs:
+      #     azureSubscription: ${{ variables.armServiceConnectionName }}
+      #     DatafactoryType: synapse
+      #     WorkspaceUrl: $(synapse_dev_endpoint)
+      #     PipelineFilter: ${{ variables.plnCreateLakeDatabases }}
+
+      # - task: CopyFiles@2
+      #   displayName: 'Create Artifact'
+      #   inputs:
+      #     sourceFolder: infrastructure
+      #     contents: |
+      #       .terraform/**
+      #       .terraform.lock.hcl
+      #       *.tftpl
+      #       ${{ variables.planFileName }}
+      #     targetFolder: $(Build.ArtifactStagingDirectory)/terraform-plan
+
+      # - publish: $(Build.ArtifactStagingDirectory)
+      #   artifact: ${{ variables.artifactName }}
+      #   displayName: 'Publish Artifact'
+      #   enabled: false
       variables:
         data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
         data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
