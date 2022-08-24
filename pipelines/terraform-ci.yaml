@@ -13,6 +13,16 @@ variables:
 - name: environment
   value: ${{ lower(parameters.environment) }}
 
+pr:
+  branches:
+    include:
+    - '*'
+  paths:
+    include:
+    - infrastructure
+    exclude:
+    - '**/README.md'
+
 trigger:
   branches:
     include:
