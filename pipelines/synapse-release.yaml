@@ -116,21 +116,6 @@ stages:
           ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
         displayName: 'Switch to ${{ variables.publishBranchName }}'
 
-      # - script: |
-      #     BRANCH=$(Build.SourceBranch)
-      #     echo "Exporting current branch name $(Build.SourceBranch)..."
-      #     echo "##[command][task.setvariable variable=source_branch;isOutput=false]$(Build.SourceBranch)"
-      #     echo "##vso[task.setvariable variable=source_branch;isOutput=false]$(Build.SourceBranch)"
-
-      #     echo "Switching to ${{ variables.publishBranchName }} branch..."
-      #     echo "##[command]git checkout ${{ variables.publishBranchName }}"
-      #     git checkout ${{ variables.publishBranchName }}
-
-      #     echo "Listing source Synapse Workspace directory..."
-      #     echo "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
-      #     ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
-      #   displayName: 'Switch to ${{ variables.publishBranchName }}'
-
       - script: |
           echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
           echo "##[command]az login && az account set"
@@ -162,17 +147,16 @@ stages:
         displayName: 'Check Variables'
 
       - task: CopyFiles@2
-        displayName: 'Create Synapse Artifacts'
+        displayName: 'Create Release Artifacts'
         inputs:
           sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
           contents: |
             TemplateForWorkspace.json
             TemplateParametersForWorkspace.json
-          targetFolder: $(Build.ArtifactStagingDirectory)/$(source_workspace_name)
+          targetFolder: $(Build.ArtifactStagingDirectory)/synapse-templates
 
       - task: AzurePowerShell@5
         displayName: 'Check SQL Pool'
-        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
@@ -200,7 +184,6 @@ stages:
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
         displayName: 'Resume SQL Pool'
-        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
@@ -215,7 +198,6 @@ stages:
       - task: Synapse workspace deployment@2
         continueOnError: true
         displayName: 'Deploy Workspace'
-        enabled: false
         inputs:
           AzureResourceManagerConnection: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }} # Using "${{ variables.armServiceConnection }}" causes step to fail
           DeleteArtifactsNotInTemplate: true
@@ -260,22 +242,21 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
-      # - script: |
-      #     echo "Deploying Terraform..."
-      #     echo "##[command]terraform apply -input=false ${{ variables.planFileName }}"
-      #     terraform apply -input=false ${{ variables.planFileName }}
-      #   displayName: 'Terraform Plan'
-      #   workingDirectory: infrastructure
-      #   env:
-      #     ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-      #     ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-      #     ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-      #     ARM_TENANT_ID: $(AZURE_TENANT_ID)
+      - script: |
+          echo "Deploying Terraform..."
+          echo "##[command]terraform apply -input=false ${{ variables.planFileName }}"
+          terraform apply -input=false ${{ variables.planFileName }}
+        displayName: 'Terraform Plan'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
       - task: AzurePowerShell@5
         condition: ne(variables['pause_sql_pool_name'], '')
         displayName: 'Suspend SQL Pool'
-        enabled: false
         inputs:
           ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
           errorActionPreference: 'stop'
