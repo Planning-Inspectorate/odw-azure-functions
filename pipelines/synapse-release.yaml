@@ -12,7 +12,7 @@ variables:
 - name: armServiceConnectionName
   value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
 - name: artifactName
-  value: synapse-arm
+  value: synapse-release
 - name: dataLakeMpeDefinitionFilePath
   value: $(System.DefaultWorkingDirectory)/definition.json
 - name: environment
@@ -161,15 +161,14 @@ stages:
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Check Variables'
 
-      # - task: CopyFiles@2
-      #   displayName: 'Create Artifact'
-      #   enabled: false
-      #   inputs:
-      #     sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
-      #     contents: |
-      #       TemplateForWorkspace.json
-      #       TemplateParametersForWorkspace.json
-      #     targetFolder: $(Build.ArtifactStagingDirectory)/$(source_workspace_name)
+      - task: CopyFiles@2
+        displayName: 'Create Synapse Artifacts'
+        inputs:
+          sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
+          contents: |
+            TemplateForWorkspace.json
+            TemplateParametersForWorkspace.json
+          targetFolder: $(Build.ArtifactStagingDirectory)/$(source_workspace_name)
 
       - task: AzurePowerShell@5
         displayName: 'Check SQL Pool'
@@ -243,7 +242,7 @@ stages:
           echo "Listing root Terraform directory..."
           echo "##[command]ls -l $(Build.SourcesDirectory)/infrastructure:"
           ls -l $(Build.SourcesDirectory)/infrastructure
-        displayName: 'Switch to $(source_branch)'
+        displayName: 'Switch to source branch'
 
       - script: |
           echo "Initialising Terraform..."
@@ -305,21 +304,20 @@ stages:
       #     WorkspaceUrl: $(synapse_dev_endpoint)
       #     PipelineFilter: ${{ variables.plnCreateLakeDatabases }}
 
-      # - task: CopyFiles@2
-      #   displayName: 'Create Artifact'
-      #   inputs:
-      #     sourceFolder: infrastructure
-      #     contents: |
-      #       .terraform/**
-      #       .terraform.lock.hcl
-      #       *.tftpl
-      #       ${{ variables.planFileName }}
-      #     targetFolder: $(Build.ArtifactStagingDirectory)/terraform-plan
+      - task: CopyFiles@2
+        displayName: 'Create Terraform Artifacts'
+        inputs:
+          sourceFolder: infrastructure
+          contents: |
+            .terraform/**
+            .terraform.lock.hcl
+            *.tftpl
+            ${{ variables.planFileName }}
+          targetFolder: $(Build.ArtifactStagingDirectory)/terraform-plan
 
-      # - publish: $(Build.ArtifactStagingDirectory)
-      #   artifact: ${{ variables.artifactName }}
-      #   displayName: 'Publish Artifact'
-      #   enabled: false
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifacts'
       variables:
         data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
         data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
