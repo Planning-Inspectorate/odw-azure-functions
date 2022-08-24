@@ -334,7 +334,6 @@ stages:
       # Run an internal Synapse pipeline to create data lake databases
       - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
         displayName: 'Create Lake Databases'
-        enabled: false
         inputs:
           azureSubscription: ${{ variables.armServiceConnectionName }}
           DatafactoryType: synapse
