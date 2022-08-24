@@ -226,6 +226,10 @@ stages:
 
       # Initialise and run terraform plan to check for components removed by the workspace deployment step
       - script: |
+          echo "Pausing after Synapse Workspace deployment..."
+          echo "##[command]sleep 60"
+          sleep 60
+
           echo "Initialising Terraform..."
           echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
@@ -262,13 +266,16 @@ stages:
           errorActionPreference: 'stop'
           inline: |
             $ResourceName = "$(data_lake_account_id)".Split("/")[-1]
-            $EndTime = (Get-Date).AddSeconds(60)
+            $EndTime = (Get-Date).AddSeconds(180)
             Write-Host "Checking private endpoint connections for $ResourceName..."
             Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)"
 
+            $i = 0
             Do {
               $Endpoint = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)
               Start-Sleep -Seconds 10
+              $i += 10
+              Write-Host "... [$i`s]"
             } Until (($null -ne $Endpoint) -or ((Get-Date) -gt $EndTime))
 
             If ($null -eq $Endpoint) {
@@ -281,7 +288,7 @@ stages:
               ProvisioningState     = $Endpoint.ProvisioningState
               ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
               ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
-            } | Format-List
+            } | ConvertTo-Json
 
             If ($EndpointStatus -ne "Approved") {
               $ApprovalDescription = "Approved by Synapse Release pipeline"
@@ -295,7 +302,7 @@ stages:
                 ProvisioningState     = $Approval.ProvisioningState
                 ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
                 ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
-              } | Format-List
+              } | ConvertTo-Json
             }
           scriptType: inlineScript
           TargetAzurePs: LatestVersion
