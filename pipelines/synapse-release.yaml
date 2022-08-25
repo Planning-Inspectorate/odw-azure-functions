@@ -17,6 +17,8 @@ variables:
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
   value: outputs.json
+- name: postDeploymentDelaySeconds
+  value: 180
 - name: planFileName
   value: tfplan
 - name: createLakeDatabasesPipeline
@@ -214,6 +216,13 @@ stages:
           TargetWorkspaceName: $(synapse_workspace_name)
           TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
 
+      # Pause pipeline after Synapse Workspace deployment
+      - script: |
+          echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
+          echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
+          sleep ${{ variables.postDeploymentDelaySeconds }}
+        displayName: 'Post-Deployment Pause'
+
       # Switch back to the source repo branch
       - script: |
           echo "Switching to $(source_branch) branch..."
@@ -227,10 +236,6 @@ stages:
 
       # Initialise and run terraform plan to check for components removed by the workspace deployment step
       - script: |
-          echo "Pausing after Synapse Workspace deployment..."
-          echo "##[command]sleep 60"
-          sleep 60
-
           echo "Initialising Terraform..."
           echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
@@ -259,6 +264,13 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
+      # Pause pipeline after Terraform deployment
+      - script: |
+          echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
+          echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
+          sleep ${{ variables.postDeploymentDelaySeconds }}
+        displayName: 'Post-Deployment Pause'
+
       # Approve the data lake managed private endpoint if it has been reinstated
       - task: AzurePowerShell@5
         displayName: 'Approve Endpoint'
@@ -267,7 +279,7 @@ stages:
           errorActionPreference: 'stop'
           inline: |
             $ResourceName = "$(data_lake_account_id)".Split("/")[-1]
-            $EndTime = (Get-Date).AddSeconds(180)
+            $EndTime = (Get-Date).AddSeconds(120)
             Write-Host "Checking private endpoint connections for $ResourceName..."
             Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)"
 
@@ -305,10 +317,6 @@ stages:
                 ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
               } | ConvertTo-Json
             }
-
-            Write-Host "Pausing after endpoint approval..."
-            Write-Host "##[command]Start-Sleep -Seconds 60"
-            Start-Sleep -Seconds 60
           scriptType: inlineScript
           TargetAzurePs: LatestVersion
 
