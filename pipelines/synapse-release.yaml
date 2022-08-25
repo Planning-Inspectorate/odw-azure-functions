@@ -13,15 +13,13 @@ variables:
   value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
 - name: artifactName
   value: synapse-release
-- name: dataLakeMpeDefinitionFilePath
-  value: $(System.DefaultWorkingDirectory)/definition.json
 - name: environment
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
   value: outputs.json
 - name: planFileName
   value: tfplan
-- name: plnCreateLakeDatabases
+- name: createLakeDatabasesPipeline
   value: pln_create_lake_databases
 - name: publishBranchName
   value: 'workspace_publish'
@@ -345,7 +343,7 @@ stages:
           azureSubscription: ${{ variables.armServiceConnectionName }}
           DatafactoryType: synapse
           WorkspaceUrl: $(synapse_dev_endpoint)
-          PipelineFilter: ${{ variables.plnCreateLakeDatabases }}
+          PipelineFilter: ${{ variables.createLakeDatabasesPipeline }}
 
       # Copy Terraform plan files to artifact directory
       - task: CopyFiles@2
