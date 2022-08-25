@@ -17,6 +17,8 @@ variables:
 - name: planFileName
   value: tfplan
 
+pr: none
+
 trigger: none
 
 pool:

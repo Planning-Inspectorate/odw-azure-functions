@@ -1,0 +1,382 @@
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: Test
+    values:
+    - Test
+    - Prod
+
+variables:
+- group: Terraform ${{ parameters.environment }}
+- name: armServiceConnectionName
+  value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
+- name: artifactName
+  value: synapse-release
+- name: environment
+  value: ${{ lower(parameters.environment) }}
+- name: outputFileName
+  value: outputs.json
+- name: postDeploymentDelaySeconds
+  value: 180
+- name: planFileName
+  value: tfplan
+- name: createLakeDatabasesPipeline
+  value: pln_create_lake_databases
+- name: publishBranchName
+  value: 'workspace_publish'
+- name: sourceEnvironment
+  value: 'dev'
+
+pr: none
+
+trigger:
+  branches:
+    include:
+    - 'workspace_publish' # Cannot reference ${{ variables.publishBranchName }} here
+
+pool:
+  vmImage: ubuntu-22.04
+
+stages:
+  - stage: Output
+    displayName: Terraform Output ${{ parameters.environment }}
+    jobs:
+    - job: Output
+      displayName: Terraform Output
+      steps:
+      # Checkout repo
+      - checkout: self
+        displayName: 'Checkout'
+
+      # Login to Azure using Terraform service principal
+      - script: |
+          echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]az login && az account set"
+          az login \
+            --service-principal \
+            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+            --tenant $(AZURE_TENANT_ID) \
+          && az account set \
+            --subscription $(SUBSCRIPTION_ID)
+          echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+          echo "##[command]az account show"
+          az account show
+        displayName: 'Azure Login'
+
+      # Retrieve Terraform outputs for the target environment
+      - script: |
+          echo "Initialising Terraform..."
+          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+
+          echo "Retieving Terraform outputs from state file..."
+          echo "##[command]terraform output -json -no-color > ${{ variables.outputFileName }}"
+          terraform output -json -no-color > ${{ variables.outputFileName }}
+          ls -l ${{ variables.outputFileName }}
+        displayName: 'Terraform Output'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      # Convert Terraform outputs to pipeline variables
+      - powershell: |
+          Write-Host "Parsing Terraform outputs..."
+          Write-Host "##[command]Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json"
+          $Output = Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json
+
+          Write-Host "Setting variables..."
+          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##[command][task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
+          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##vso[task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
+        displayName: 'Set Variables'
+        name: SetVariables
+        workingDirectory: infrastructure
+
+  - stage: Release
+    dependsOn: Output
+    displayName: Synapse Release ${{ parameters.environment }}
+    jobs:
+    - job: Release
+      displayName: Synapse Release
+      steps:
+      # Checkout repo
+      - checkout: self
+        clean: true
+        displayName: 'Checkout'
+        persistCredentials: true
+
+      # Login to Azure using Terraform service principal
+      - script: |
+          echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]az login && az account set"
+          az login \
+            --service-principal \
+            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
+            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
+            --tenant $(AZURE_TENANT_ID) \
+          && az account set \
+            --subscription $(SUBSCRIPTION_ID)
+          echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+          echo "##[command]az account show"
+          az account show
+        displayName: 'Azure Login'
+
+      # Switch to the Synapse Workspace publish repo branch
+      - powershell: |
+          $SourceBranch = "$(Build.SourceBranch)" -replace "refs/heads/", ""
+          Write-Host "Exporting current branch name $SourceBranch..."
+          Write-Host "##[command][task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
+          Write-Host "##vso[task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
+
+          Write-Host "Switching to ${{ variables.publishBranchName }} branch..."
+          Write-Host "##[command]git checkout ${{ variables.publishBranchName }}"
+          git checkout ${{ variables.publishBranchName }}
+
+          Write-Host "Listing source Synapse Workspace directory..."
+          Write-Host "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
+          ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
+        displayName: 'Switch to ${{ variables.publishBranchName }}'
+
+      # Copy Synapse Workspace ARM template files to artifact directory
+      - task: CopyFiles@2
+        displayName: 'Create Release Artifacts'
+        inputs:
+          sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
+          contents: |
+            TemplateForWorkspace.json
+            TemplateParametersForWorkspace.json
+          targetFolder: $(Build.ArtifactStagingDirectory)/synapse-templates
+
+      # Check if the dedicated SQL pool is currently paused
+      - task: AzurePowerShell@5
+        displayName: 'Check SQL Pool'
+        inputs:
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+          errorActionPreference: 'stop'
+          inline: |
+            Write-Host "Checking Synapse SQL pool..."
+            Write-Host "##[command]Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)"
+            $Pool = Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)
+            $Pool | Format-List 'SqlPoolName','Sku','Status'
+            If ($Pool.Status -eq 'Paused') {
+              Write-Host "Synapse SQL pool $($Pool.SqlPoolName) will be temporarily resumed for release..."
+              Write-Host "##vso[task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
+              Write-Host "##[command][task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
+            }
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
+
+      # Disable triggers in the target Synapse Workspace
+      - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
+        displayName: 'Disable Synapse Triggers'
+        inputs:
+          azureSubscription: ${{ variables.armServiceConnectionName }}
+          ResourceGroupName: $(data_resource_group_name)
+          WorkspaceName: $(synapse_workspace_name)
+          ToggleOn: false
+
+      # Resume the dedicated SQL pool if it was in a paused state
+      - task: AzurePowerShell@5
+        condition: ne(variables['pause_sql_pool_name'], '')
+        displayName: 'Resume SQL Pool'
+        inputs:
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+          errorActionPreference: 'stop'
+          inline: |
+            Write-Host "Resuming paused SQL pool $(pause_sql_pool_name)..."
+            Write-Host "##[command]Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
+            $Start = Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
+            $Start | Format-List 'SqlPoolName','Sku','Status'
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
+
+      # Deploy Synapse Workspace artifacts from the source Workspace to the target Workspace
+      - task: Synapse workspace deployment@2
+        continueOnError: true
+        displayName: 'Deploy Workspace'
+        inputs:
+          AzureResourceManagerConnection: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }} # Using "${{ variables.armServiceConnection }}" causes step to fail
+          DeleteArtifactsNotInTemplate: true
+          Environment: 'prod'
+          operation: 'deploy'
+          OverrideArmParameters: |
+            workspaceName: $(synapse_workspace_name)
+            ls_dsql_connectionString: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=$(synapse_dsql_endpoint);Initial Catalog=@{linkedService().db_name}
+            ls_ssql_builtin_connectionString: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=$(synapse_ssql_endpoint);Initial Catalog=@{linkedService().db_name}
+            ls_kv_properties_typeProperties_baseUrl: $(key_vault_uri)
+            ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
+            ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
+            ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
+          ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
+          ResourceGroupName: $(data_resource_group_name)
+          TargetWorkspaceName: $(synapse_workspace_name)
+          TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
+
+      # Pause pipeline after Synapse Workspace deployment
+      - script: |
+          echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
+          echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
+          sleep ${{ variables.postDeploymentDelaySeconds }}
+        displayName: 'Post-Deployment Pause'
+
+      # Switch back to the source repo branch
+      - script: |
+          echo "Switching to $(source_branch) branch..."
+          echo "##[command]git checkout $(source_branch)"
+          git checkout $(source_branch)
+
+          echo "Listing root Terraform directory..."
+          echo "##[command]ls -l $(Build.SourcesDirectory)/infrastructure:"
+          ls -l $(Build.SourcesDirectory)/infrastructure
+        displayName: 'Switch to source branch'
+
+      # Initialise and run terraform plan to check for components removed by the workspace deployment step
+      - script: |
+          echo "Initialising Terraform..."
+          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+
+          echo "Planning Terraform deployment..."
+          echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
+          terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}
+        displayName: 'Terraform Plan'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      # Run terraform apply to reinstate components removed by the workspace deployment step
+      - script: |
+          echo "Deploying Terraform..."
+          echo "##[command]terraform apply -input=false ${{ variables.planFileName }}"
+          terraform apply -input=false ${{ variables.planFileName }}
+        displayName: 'Terraform Apply'
+        workingDirectory: infrastructure
+        env:
+          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+      # Pause pipeline after Terraform deployment
+      - script: |
+          echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
+          echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
+          sleep ${{ variables.postDeploymentDelaySeconds }}
+        displayName: 'Post-Deployment Pause'
+
+      # Approve the data lake managed private endpoint if it has been reinstated
+      - task: AzurePowerShell@5
+        displayName: 'Approve Endpoint'
+        inputs:
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+          errorActionPreference: 'stop'
+          inline: |
+            $ResourceName = "$(data_lake_account_id)".Split("/")[-1]
+            $EndTime = (Get-Date).AddSeconds(120)
+            Write-Host "Checking private endpoint connections for $ResourceName..."
+            Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)"
+
+            $i = 0
+            Do {
+              $Endpoint = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)
+              Start-Sleep -Seconds 10
+              $i += 10
+              Write-Host "... [$i`s]"
+            } Until (($null -ne $Endpoint) -or ((Get-Date) -gt $EndTime))
+
+            If ($null -eq $Endpoint) {
+              Throw "Failed to find private endpoint connection for $ResourceName"
+            }
+
+            [PsCustomObject]@{
+              Name                  = $Endpoint.Name
+              Id                    = $Endpoint.Id
+              ProvisioningState     = $Endpoint.ProvisioningState
+              ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
+              ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
+            } | ConvertTo-Json
+
+            If ($EndpointStatus -ne "Approved") {
+              $ApprovalDescription = "Approved by Synapse Release pipeline"
+              Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
+              Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
+              $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
+
+              [PsCustomObject]@{
+                Name                  = $Approval.Name
+                Id                    = $Approval.Id
+                ProvisioningState     = $Approval.ProvisioningState
+                ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
+                ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
+              } | ConvertTo-Json
+            }
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
+
+      # Pause the dedicated SQL pool if it was previously resumed
+      - task: AzurePowerShell@5
+        condition: ne(variables['pause_sql_pool_name'], '')
+        displayName: 'Suspend SQL Pool'
+        inputs:
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+          errorActionPreference: 'stop'
+          inline: |
+            Write-Host "Suspending previously paused SQL pool $(pause_sql_pool_name)..."
+            Write-Host "##[command]Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
+            $Stop = Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
+            $Stop | Format-List 'SqlPoolName','Sku','Status'
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
+
+      # Re-enable triggers in the target Synapse Workspace
+      - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
+        condition: succeededOrFailed()
+        displayName: 'Enable Synapse Triggers'
+        inputs:
+          azureSubscription: ${{ variables.armServiceConnectionName }}
+          ResourceGroupName: $(data_resource_group_name)
+          WorkspaceName: $(synapse_workspace_name)
+
+      # Run an internal Synapse pipeline to create data lake databases
+      - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
+        displayName: 'Create Lake Databases'
+        inputs:
+          azureSubscription: ${{ variables.armServiceConnectionName }}
+          DatafactoryType: synapse
+          WorkspaceUrl: $(synapse_dev_endpoint)
+          PipelineFilter: ${{ variables.createLakeDatabasesPipeline }}
+
+      # Copy Terraform plan files to artifact directory
+      - task: CopyFiles@2
+        displayName: 'Create Terraform Artifacts'
+        inputs:
+          sourceFolder: infrastructure
+          contents: |
+            .terraform/**
+            .terraform.lock.hcl
+            *.tftpl
+            ${{ variables.planFileName }}
+          targetFolder: $(Build.ArtifactStagingDirectory)/terraform-plan
+
+      # Publish pipeline artifacts
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifacts'
+      variables:
+        data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
+        data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
+        data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
+        key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
+        service_bus_namespace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.service_bus_namespace_name'] ]
+        source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
+        synapse_dev_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dev_endpoint'] ]
+        synapse_dsql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dsql_endpoint'] ]
+        synapse_ssql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_ssql_endpoint'] ]
+        synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]

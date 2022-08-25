@@ -13,6 +13,8 @@ variables:
 - name: environment
   value: ${{ lower(parameters.environment) }}
 
+pr: none
+
 trigger:
   branches:
     include:
