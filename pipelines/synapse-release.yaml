@@ -71,7 +71,7 @@ stages:
           echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
 
-          echo "Retieving Terraform outputs from state file..."
+          echo "Retrieving Terraform outputs from state file..."
           echo "##[command]terraform output -json -no-color > ${{ variables.outputFileName }}"
           terraform output -json -no-color > ${{ variables.outputFileName }}
           ls -l ${{ variables.outputFileName }}
@@ -304,7 +304,7 @@ stages:
             } | ConvertTo-Json
 
             If ($EndpointStatus -ne "Approved") {
-              $ApprovalDescription = "Approved by Synapse Release pipeline"
+              $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
               Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
               Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
               $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription

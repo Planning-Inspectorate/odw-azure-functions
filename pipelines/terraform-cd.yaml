@@ -10,12 +10,20 @@ parameters:
 
 variables:
 - group: Terraform ${{ parameters.environment }}
+- name: armServiceConnectionName
+  value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
 - name: artifactName
   value: terraform-plan
 - name: environment
   value: ${{ lower(parameters.environment) }}
+- name: outputFileName
+  value: outputs.json
 - name: planFileName
   value: tfplan
+- name: postDeploymentDelaySeconds
+  value: 180
+- name: tfOutputDataLakeAccountId
+  value: data_lake_account_id
 
 pr: none
 
@@ -31,11 +39,14 @@ stages:
     - job: Plan
       displayName: Terraform Plan
       steps:
+      # Checkout repo
       - checkout: self
         displayName: 'Checkout'
 
+      # Login to Azure using Terraform service principal
       - script: |
-          echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]az login && az account set"
           az login \
             --service-principal \
             --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -43,12 +54,19 @@ stages:
             --tenant $(AZURE_TENANT_ID) \
           && az account set \
             --subscription $(SUBSCRIPTION_ID)
-          echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
+          echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+          echo "##[command]az account show"
           az account show
         displayName: 'Azure Login'
 
+      # Initialise and run terraform plan
       - script: |
+          echo "Initialising Terraform..."
+          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+
+          echo "Planning Terraform deployment..."
+          echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
           terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}
         displayName: 'Terraform Plan'
         workingDirectory: infrastructure
@@ -58,6 +76,7 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
+      # Copy Terraform plan files to artifact directory
       - task: CopyFiles@2
         displayName: 'Create Artifact'
         inputs:
@@ -69,6 +88,7 @@ stages:
             ${{ variables.planFileName }}
           targetFolder: $(Build.ArtifactStagingDirectory)
 
+      # Publish pipeline artifacts
       - publish: $(Build.ArtifactStagingDirectory)
         artifact: ${{ variables.artifactName }}
         displayName: 'Publish Artifact'
@@ -84,29 +104,37 @@ stages:
         runOnce:
           deploy:
             steps:
+            # Checkout repo
             - checkout: self
               displayName: 'Checkout'
 
+            # Download pipeline artifacts
             - download: current
               artifact: ${{ variables.artifactName }}
               displayName: 'Download Artifact'
 
+            # Verify terraform plan file
             - script: |
-                echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}"
+                echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}..."
+                echo "##[command][[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]"
 
                 if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
                   echo "##[warning]Failed to find Terraform Plan, skipping Terraform Apply"
                   echo "##vso[task.setvariable variable=skipApply]true"
                 else
-                  echo "Found ${{ variables.planFileName }} file"
+                  echo "Found ${{ variables.planFileName }} file..."
+                  ehco "##[command]chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}"
                   chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
                 fi
 
+                echo "##[command]ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}"
                 ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
               displayName: 'Verify Artifact'
 
+            # Login to Azure using Terraform service principal
             - script: |
-                echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+                echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+                echo "##[command]az login && az account set"
                 az login \
                   --service-principal \
                   --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -114,12 +142,19 @@ stages:
                   --tenant $(AZURE_TENANT_ID) \
                 && az account set \
                   --subscription $(SUBSCRIPTION_ID)
-                echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
+                echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+                echo "##[command]az account show"
                 az account show
               displayName: 'Azure Login'
 
+            # Run terraform apply using the plan file artifact
             - script: |
+                echo "Initialising Terraform..."
+                echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
                 terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+
+                echo "Deploying Terraform..."
+                echo "##[command]terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}"
                 terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
               condition: ne(variables['skipApply'], 'true')
               displayName: 'Terraform Apply'
@@ -129,3 +164,77 @@ stages:
                 ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
                 ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
                 ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+            # Pause pipeline after Terraform deployment
+            - script: |
+                echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
+                echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
+                sleep ${{ variables.postDeploymentDelaySeconds }}
+              displayName: 'Post-Deployment Pause'
+
+            # Retrieve the data lake Storage Account ID
+            - script: |
+                echo "Retrieving data lake account ID from state file..."
+                echo "##[command]terraform output -raw ${{ variables.tfOutputDataLakeAccountId }}"
+                ID=$(terraform output -raw ${{ variables.tfOutputDataLakeAccountId }})
+                echo $ID
+
+                echo "Setting pipeline variable..."
+                echo "##[command][task.setvariable variable=data_lake_account_id;isoutput=false]$ID"
+                echo "##vso[task.setvariable variable=data_lake_account_id;isoutput=false]$ID"
+              displayName: 'Terraform Output'
+              workingDirectory: infrastructure
+              env:
+                ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
+                ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+                ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
+                ARM_TENANT_ID: $(AZURE_TENANT_ID)
+
+            # Approve the data lake managed private endpoint if it has been reinstated
+            - task: AzurePowerShell@5
+              displayName: 'Approve Endpoint'
+              inputs:
+                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+                errorActionPreference: 'stop'
+                inline: |
+                  $ResourceName = "$(data_lake_account_id)".Split("/")[-1]
+                  $EndTime = (Get-Date).AddSeconds(120)
+                  Write-Host "Checking private endpoint connections for $ResourceName..."
+                  Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)"
+
+                  $i = 0
+                  Do {
+                    $Endpoint = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)
+                    Start-Sleep -Seconds 10
+                    $i += 10
+                    Write-Host "... [$i`s]"
+                  } Until (($null -ne $Endpoint) -or ((Get-Date) -gt $EndTime))
+
+                  If ($null -eq $Endpoint) {
+                    Throw "Failed to find private endpoint connection for $ResourceName"
+                  }
+
+                  [PsCustomObject]@{
+                    Name                  = $Endpoint.Name
+                    Id                    = $Endpoint.Id
+                    ProvisioningState     = $Endpoint.ProvisioningState
+                    ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
+                    ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
+                  } | ConvertTo-Json
+
+                  If ($EndpointStatus -ne "Approved") {
+                    $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
+                    Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
+                    Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
+                    $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
+
+                    [PsCustomObject]@{
+                      Name                  = $Approval.Name
+                      Id                    = $Approval.Id
+                      ProvisioningState     = $Approval.ProvisioningState
+                      ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
+                      ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
+                    } | ConvertTo-Json
+                  }
+                scriptType: inlineScript
+                TargetAzurePs: LatestVersion
