@@ -10,6 +10,8 @@ parameters:
 
 variables:
 - group: Terraform ${{ parameters.environment }}
+- name: armServiceConnectionName
+  value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
 - name: artifactName
   value: terraform-plan
 - name: environment
@@ -178,8 +180,8 @@ stages:
                 echo $ID
 
                 echo "Setting pipeline variable..."
-                echo "##[command][task.setvariable variable=${{ variables.tfOutputDataLakeAccountId }};isoutput=false]$ID"
-                echo "##vso[task.setvariable variable=${{ variables.tfOutputDataLakeAccountId }};isoutput=false]$ID"
+                echo "##[command][task.setvariable variable=data_lake_account_id;isoutput=false]$ID"
+                echo "##vso[task.setvariable variable=data_lake_account_id;isoutput=false]$ID"
               displayName: 'Terraform Output'
               workingDirectory: infrastructure
               env:
@@ -221,7 +223,7 @@ stages:
                   } | ConvertTo-Json
 
                   If ($EndpointStatus -ne "Approved") {
-                    $ApprovalDescription = "Approved by Synapse Release pipeline"
+                    $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
                     Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
                     Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
                     $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
