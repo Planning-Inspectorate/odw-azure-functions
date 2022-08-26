@@ -33,16 +33,25 @@ stages:
     jobs:
     - job: Validate
       steps:
+      # Checkout repo
       - checkout: self
         displayName: 'Checkout Repo'
 
+      # Install required packages
       - script: |
+          echo "Installing TFLint..."
+          echo "##[command]brew install tflint"
           brew install tflint
+
+          echo "Installing Checkov..."
+          echo "##[command]brew install checkov"
           brew install checkov
         displayName: 'Setup'
 
+      # Login to Azure using Terraform service principal
       - script: |
-          echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]az login && az account set"
           az login \
             --service-principal \
             --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -50,12 +59,16 @@ stages:
             --tenant $(AZURE_TENANT_ID) \
           && az account set \
             --subscription $(SUBSCRIPTION_ID)
-          echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
+          echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+          echo "##[command]az account show"
           az account show
         displayName: 'Azure Login'
 
+      # Run terraform init
       - script: |
-          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend
+          echo "Initialising Terraform..."
+          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
+          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
         displayName: 'Terraform Init'
         workingDirectory: infrastructure
         env:
@@ -64,17 +77,27 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
+      # Run terraform format
       - script: |
+          echo "Checking Terraform file formatting..."
+          echo "##[command]terraform fmt -check -recursive"
           terraform fmt -check -recursive
         displayName: 'Terraform Format'
         workingDirectory: infrastructure
 
+      # Run terraform validate
       - script: |
+          echo "Validating Terraform files..."
+          echo "##[command]terraform validate -no-color"
           terraform validate -no-color
         displayName: 'Terraform Validate'
         workingDirectory: infrastructure
 
+      # Run TFLint
       - script: |
+          echo "Running TFLint..."
+          echo "##[command]tflint --init --config $(Build.Repository.LocalPath)/.tflint.hcl --no-color --loglevel warn"
+          echo ""
           tflint \
             --init \
             --config $(Build.Repository.LocalPath)/.tflint.hcl \
@@ -94,6 +117,8 @@ stages:
         workingDirectory: infrastructure
 
       - script: |
+          echo "Running Checkov..."
+          echo "##[command]checkov --directory . --framework terraform"
           checkov \
             --directory . \
             --framework terraform \
