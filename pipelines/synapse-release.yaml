@@ -303,7 +303,7 @@ stages:
               ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
             } | ConvertTo-Json
 
-            If ($EndpointStatus -ne "Approved") {
+            If ($Endpoint.PrivateLinkServiceConnectionState.Status -ne "Approved") {
               $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
               Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
               Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
