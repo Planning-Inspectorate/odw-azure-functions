@@ -304,7 +304,7 @@ stages:
             } | ConvertTo-Json
 
             If ($EndpointStatus -ne "Approved") {
-              $ApprovalDescription = "Approved by Synapse Release pipeline"
+              $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
               Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
               Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
               $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
