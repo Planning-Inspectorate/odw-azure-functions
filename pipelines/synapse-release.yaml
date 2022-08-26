@@ -71,7 +71,7 @@ stages:
           echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
 
-          echo "Retieving Terraform outputs from state file..."
+          echo "Retrieving Terraform outputs from state file..."
           echo "##[command]terraform output -json -no-color > ${{ variables.outputFileName }}"
           terraform output -json -no-color > ${{ variables.outputFileName }}
           ls -l ${{ variables.outputFileName }}
