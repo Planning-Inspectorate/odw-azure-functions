@@ -31,11 +31,14 @@ stages:
     - job: Plan
       displayName: Terraform Plan
       steps:
+      # Checkout repo
       - checkout: self
         displayName: 'Checkout'
 
+      # Login to Azure using Terraform service principal
       - script: |
-          echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+          echo "##[command]az login && az account set"
           az login \
             --service-principal \
             --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -43,12 +46,19 @@ stages:
             --tenant $(AZURE_TENANT_ID) \
           && az account set \
             --subscription $(SUBSCRIPTION_ID)
-          echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
+          echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+          echo "##[command]az account show"
           az account show
         displayName: 'Azure Login'
 
+      # Initialise and run terraform plan
       - script: |
+          echo "Initialising Terraform..."
+          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
           terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+
+          echo "Planning Terraform deployment..."
+          echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
           terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}
         displayName: 'Terraform Plan'
         workingDirectory: infrastructure
@@ -58,6 +68,7 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
+      # Copy Terraform plan files to artifact directory
       - task: CopyFiles@2
         displayName: 'Create Artifact'
         inputs:
@@ -69,6 +80,7 @@ stages:
             ${{ variables.planFileName }}
           targetFolder: $(Build.ArtifactStagingDirectory)
 
+      # Publish pipeline artifacts
       - publish: $(Build.ArtifactStagingDirectory)
         artifact: ${{ variables.artifactName }}
         displayName: 'Publish Artifact'
@@ -84,29 +96,37 @@ stages:
         runOnce:
           deploy:
             steps:
+            # Checkout repo
             - checkout: self
               displayName: 'Checkout'
 
+            # Download pipeline artifacts
             - download: current
               artifact: ${{ variables.artifactName }}
               displayName: 'Download Artifact'
 
+            # Verify terraform plan file
             - script: |
-                echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}"
+                echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}..."
+                echo "##[command][[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]"
 
                 if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
                   echo "##[warning]Failed to find Terraform Plan, skipping Terraform Apply"
                   echo "##vso[task.setvariable variable=skipApply]true"
                 else
-                  echo "Found ${{ variables.planFileName }} file"
+                  echo "Found ${{ variables.planFileName }} file..."
+                  ehco "##[command]chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}"
                   chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
                 fi
 
+                echo "##[command]ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}"
                 ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
               displayName: 'Verify Artifact'
 
+            # Login to Azure using Terraform service principal
             - script: |
-                echo "##[command]Authenticating with service principal $(AZURE_SERVICE_PRINCIPAL_ID)"
+                echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
+                echo "##[command]az login && az account set"
                 az login \
                   --service-principal \
                   --username $(AZURE_SERVICE_PRINCIPAL_ID) \
@@ -114,12 +134,19 @@ stages:
                   --tenant $(AZURE_TENANT_ID) \
                 && az account set \
                   --subscription $(SUBSCRIPTION_ID)
-                echo "##[command]Subscription scope set to $(SUBSCRIPTION_ID)"
+                echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
+                echo "##[command]az account show"
                 az account show
               displayName: 'Azure Login'
 
+            # Run terraform apply using the plan file artifact
             - script: |
+                echo "Initialising Terraform..."
+                echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
                 terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+
+                echo "Deploying Terraform..."
+                echo "##[command]terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}"
                 terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
               condition: ne(variables['skipApply'], 'true')
               displayName: 'Terraform Apply'
