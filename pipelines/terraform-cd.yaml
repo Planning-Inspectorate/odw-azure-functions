@@ -70,7 +70,7 @@ stages:
 
       # Initialise and run terraform plan
       - script: |
-          echo "Initialising Terraform..."
+          echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
           echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
           terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
 
@@ -158,7 +158,7 @@ stages:
 
             # Run terraform apply using the plan file artifact
             - script: |
-                echo "Initialising Terraform..."
+                echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
                 echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
                 terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
 
