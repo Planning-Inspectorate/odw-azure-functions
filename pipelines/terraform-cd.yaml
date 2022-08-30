@@ -7,6 +7,13 @@ parameters:
     - Dev
     - Test
     - Prod
+  - name: region
+    displayName: Region
+    type: string
+    default: 'UK South'
+    values:
+    - 'UK South'
+    - 'UK West'
 
 variables:
 - group: Terraform ${{ parameters.environment }}
@@ -22,6 +29,8 @@ variables:
   value: tfplan
 - name: postDeploymentDelaySeconds
   value: 180
+- name: region
+  value: ${{ lower(replace(parameters.region,' ','-')) }}
 - name: tfOutputDataLakeAccountId
   value: data_lake_account_id
 
@@ -62,8 +71,8 @@ stages:
       # Initialise and run terraform plan
       - script: |
           echo "Initialising Terraform..."
-          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
-          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+          echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
+          terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
 
           echo "Planning Terraform deployment..."
           echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
@@ -150,8 +159,8 @@ stages:
             # Run terraform apply using the plan file artifact
             - script: |
                 echo "Initialising Terraform..."
-                echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
-                terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+                echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
+                terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
 
                 echo "Deploying Terraform..."
                 echo "##[command]terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}"
