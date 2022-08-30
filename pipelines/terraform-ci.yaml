@@ -7,11 +7,20 @@ parameters:
     - Dev
     - Test
     - Prod
+  - name: region
+    displayName: Region
+    type: string
+    default: 'UK South'
+    values:
+    - 'UK South'
+    - 'UK West'
 
 variables:
 - group: Terraform ${{ parameters.environment }}
 - name: environment
   value: ${{ lower(parameters.environment) }}
+- name: region
+  value: ${{ lower(replace(parameters.region,' ','-')) }}
 
 pr: none
 
@@ -66,9 +75,9 @@ stages:
 
       # Run terraform init
       - script: |
-          echo "Initialising Terraform..."
-          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
-          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+          echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
+          echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
+          terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
         displayName: 'Terraform Init'
         workingDirectory: infrastructure
         env:
