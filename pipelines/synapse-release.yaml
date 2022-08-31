@@ -6,6 +6,13 @@ parameters:
     values:
     - Test
     - Prod
+  - name: region
+    displayName: Region
+    type: string
+    default: 'UK South'
+    values:
+    - 'UK South'
+    - 'UK West'
 
 variables:
 - group: Terraform ${{ parameters.environment }}
@@ -13,18 +20,20 @@ variables:
   value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
 - name: artifactName
   value: synapse-release
+- name: createLakeDatabasesPipeline
+  value: pln_create_lake_databases
 - name: environment
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
   value: outputs.json
-- name: postDeploymentDelaySeconds
-  value: 180
 - name: planFileName
   value: tfplan
-- name: createLakeDatabasesPipeline
-  value: pln_create_lake_databases
+- name: postDeploymentDelaySeconds
+  value: 180
 - name: publishBranchName
   value: 'workspace_publish'
+- name: region
+  value: ${{ lower(replace(parameters.region,' ','-')) }}
 - name: sourceEnvironment
   value: 'dev'
 
@@ -67,9 +76,9 @@ stages:
 
       # Retrieve Terraform outputs for the target environment
       - script: |
-          echo "Initialising Terraform..."
-          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
-          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+          echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
+          echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
+          terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
 
           echo "Retrieving Terraform outputs from state file..."
           echo "##[command]terraform output -json -no-color > ${{ variables.outputFileName }}"
@@ -236,9 +245,9 @@ stages:
 
       # Initialise and run terraform plan to check for components removed by the workspace deployment step
       - script: |
-          echo "Initialising Terraform..."
-          echo "##[command]terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false"
-          terraform init -backend-config=./environments/${{ variables.environment }}.tfbackend -input=false
+          echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
+          echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
+          terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
 
           echo "Planning Terraform deployment..."
           echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
