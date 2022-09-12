@@ -213,37 +213,39 @@ stages:
 
                   $i = 0
                   Do {
-                    $Endpoint = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)
+                    $Endpoints = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)
                     Start-Sleep -Seconds 10
                     $i += 10
                     Write-Host "... [$i`s]"
-                  } Until (($null -ne $Endpoint) -or ((Get-Date) -gt $EndTime))
+                  } Until (($null -ne $Endpoints) -or ((Get-Date) -gt $EndTime))
 
-                  If ($null -eq $Endpoint) {
-                    Throw "Failed to find private endpoint connection for $ResourceName"
+                  If ($null -eq $Endpoints) {
+                    Throw "Failed to find private endpoint connections for $ResourceName"
                   }
 
-                  [PsCustomObject]@{
-                    Name                  = $Endpoint.Name
-                    Id                    = $Endpoint.Id
-                    ProvisioningState     = $Endpoint.ProvisioningState
-                    ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
-                    ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
-                  } | ConvertTo-Json
-
-                  If ($Endpoint.PrivateLinkServiceConnectionState.Status -ne "Approved") {
-                    $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
-                    Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
-                    Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
-                    $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
-
+                  Foreach ($Endpoint in $Endpoints) {
                     [PsCustomObject]@{
-                      Name                  = $Approval.Name
-                      Id                    = $Approval.Id
-                      ProvisioningState     = $Approval.ProvisioningState
-                      ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
-                      ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
+                      Name                  = $Endpoint.Name
+                      Id                    = $Endpoint.Id
+                      ProvisioningState     = $Endpoint.ProvisioningState
+                      ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
+                      ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
                     } | ConvertTo-Json
+
+                    If ($Endpoint.PrivateLinkServiceConnectionState.Status -ne "Approved") {
+                      $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
+                      Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
+                      Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
+                      $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
+
+                      [PsCustomObject]@{
+                        Name                  = $Approval.Name
+                        Id                    = $Approval.Id
+                        ProvisioningState     = $Approval.ProvisioningState
+                        ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
+                        ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
+                      } | ConvertTo-Json
+                    }
                   }
                 scriptType: inlineScript
                 TargetAzurePs: LatestVersion
