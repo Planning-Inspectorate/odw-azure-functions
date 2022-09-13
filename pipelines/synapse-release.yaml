@@ -185,8 +185,8 @@ stages:
                 errorActionPreference: 'stop'
                 inline: |
                   Write-Host "Checking resource locks..."
-                  Write-Host "##[command]Get-AzResourceLock -Scope $(SUBSCRIPTION_ID)"
-                  $ResourceLocks = Get-AzResourceLock -Scope $(SUBSCRIPTION_ID)
+                  Write-Host "##[command]Get-AzResourceLock -Scope /subscriptions/$(SUBSCRIPTION_ID)"
+                  $ResourceLocks = Get-AzResourceLock -Scope "/subscriptions/$(SUBSCRIPTION_ID)"
                   $ResourceLocks | ConvertTo-Json
 
                   Foreach ($Lock in $ResourceLocks) {
