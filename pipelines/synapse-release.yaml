@@ -160,6 +160,31 @@ stages:
             TemplateParametersForWorkspace.json
           targetFolder: $(Build.ArtifactStagingDirectory)/synapse-templates
 
+      # Unlock resources
+      - task: AzurePowerShell@5
+        displayName: 'Unlock Resources'
+        inputs:
+          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+          errorActionPreference: 'stop'
+          inline: |
+            Write-Host "Checking resource locks..."
+            Write-Host "##[command]Get-AzResourceLock -Scope $(SUBSCRIPTION_ID)"
+            $ResourceLocks = Get-AzResourceLock -Scope $(SUBSCRIPTION_ID)
+            $ResourceLocks | ConvertTo-Json
+
+            Foreach ($Lock in $ResourceLocks) {
+              Write-Host "Removing resource lock for $($Lock.ResourceType)/$($Lock.ResourceName)..."
+              Write-Host "##[command]Remove-AzResourceLock -LockId $($Lock.LockId)"
+              $Removed = Remove-AzResourceLock -LockId $($Lock.LockId) -Force
+
+              [PsCustomObject]@{
+                LockId      = $($Lock.LockId)
+                LockRemoved = $Removed
+              } | ConvertTo-Json
+            }
+          scriptType: inlineScript
+          TargetAzurePs: LatestVersion
+
       # Check if the dedicated SQL pool is currently paused
       - task: AzurePowerShell@5
         displayName: 'Check SQL Pool'
