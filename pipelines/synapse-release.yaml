@@ -42,7 +42,7 @@ pr: none
 trigger:
   branches:
     include:
-    - 'workspace_publish' # Cannot reference ${{ variables.publishBranchName }} here
+    - workspace_publish
 
 pool:
   vmImage: ubuntu-22.04
