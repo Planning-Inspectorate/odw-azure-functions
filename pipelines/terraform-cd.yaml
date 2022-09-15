@@ -27,6 +27,8 @@ variables:
   value: terraform-plan
 - name: environment
   value: ${{ lower(parameters.environment) }}
+- name: failoverDeployment
+  value: ${{ lower(parameters.failover_deployment) }}
 - name: outputFileName
   value: outputs.json
 - name: planFileName
@@ -109,7 +111,7 @@ stages:
           echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
           terraform plan \
             -var-file=./environments/${{ variables.environment }}.tfvars \
-            -var 'failover_deployment=${{ parameters.failover_deployment }}'
+            -var "failover_deployment=${{ variables.failoverDeployment }}" \
             -input=false \
             -out=${{ variables.planFileName }}
         displayName: 'Terraform Plan'
