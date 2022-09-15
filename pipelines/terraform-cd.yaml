@@ -7,6 +7,10 @@ parameters:
     - Dev
     - Test
     - Prod
+  - name: failover_deployment
+    displayName: 'Failover Deployment'
+    type: boolean
+    default: false
   - name: region
     displayName: Region
     type: string
@@ -97,11 +101,17 @@ stages:
       - script: |
           echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
           echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
-          terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
+          terraform init \
+            -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" \
+            -input=false
 
           echo "Planning Terraform deployment..."
           echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
-          terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}
+          terraform plan \
+            -var-file=./environments/${{ variables.environment }}.tfvars \
+            -var 'failover_deployment=${{ parameters.failover_deployment }}'
+            -input=false \
+            -out=${{ variables.planFileName }}
         displayName: 'Terraform Plan'
         workingDirectory: infrastructure
         env:
@@ -185,11 +195,14 @@ stages:
             - script: |
                 echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
                 echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
-                terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
+                terraform init \
+                  -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" \
+                  -input=false
 
                 echo "Deploying Terraform..."
                 echo "##[command]terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}"
-                terraform apply -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+                terraform apply \
+                  -input=false $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
               condition: ne(variables['skipApply'], 'true')
               displayName: 'Terraform Apply'
               workingDirectory: infrastructure
