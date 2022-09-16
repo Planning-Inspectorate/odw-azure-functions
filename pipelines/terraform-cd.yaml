@@ -39,6 +39,8 @@ variables:
   value: ${{ lower(replace(parameters.region,' ','-')) }}
 - name: tfOutputDataLakeAccountId
   value: data_lake_account_id
+- name: tfOutputDataLakeAccountIdFailover
+  value: data_lake_account_id_failover
 
 pr: none
 
@@ -225,12 +227,19 @@ stages:
             - script: |
                 echo "Retrieving data lake account ID from state file..."
                 echo "##[command]terraform output -raw ${{ variables.tfOutputDataLakeAccountId }}"
-                ID=$(terraform output -raw ${{ variables.tfOutputDataLakeAccountId }})
-                echo $ID
+                DATA_LAKE_PRIMARY_ID=$(terraform output -raw ${{ variables.tfOutputDataLakeAccountId }})
+                echo $DATA_LAKE_PRIMARY_ID
 
-                echo "Setting pipeline variable..."
-                echo "##[command][task.setvariable variable=data_lake_account_id;isoutput=false]$ID"
-                echo "##vso[task.setvariable variable=data_lake_account_id;isoutput=false]$ID"
+                echo "##[command]terraform output -raw ${{ variables.tfOutputDataLakeAccountIdFailover }}"
+                DATA_LAKE_SECONDARY_ID=$(terraform output -raw ${{ variables.tfOutputDataLakeAccountIdFailover }})
+                echo $DATA_LAKE_SECONDARY_ID
+
+                echo "Setting pipeline variables..."
+                echo "##[command][task.setvariable variable=data_lake_account_id;isoutput=false]$DATA_LAKE_PRIMARY_ID"
+                echo "##vso[task.setvariable variable=data_lake_account_id;isoutput=false]$DATA_LAKE_PRIMARY_ID"
+
+                echo "##[command][task.setvariable variable=data_lake_account_id_failover;isoutput=false]$DATA_LAKE_SECONDARY_ID"
+                echo "##vso[task.setvariable variable=data_lake_account_id_failover;isoutput=false]$DATA_LAKE_SECONDARY_ID"
               displayName: 'Terraform Output'
               workingDirectory: infrastructure
               env:
@@ -246,45 +255,52 @@ stages:
                 ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
                 errorActionPreference: 'stop'
                 inline: |
-                  $ResourceName = "$(data_lake_account_id)".Split("/")[-1]
-                  $EndTime = (Get-Date).AddSeconds(120)
-                  Write-Host "Checking private endpoint connections for $ResourceName..."
-                  Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)"
+                  $DataLakeIds = @(
+                    "$(data_lake_account_id)",
+                    "$(data_lake_account_id_failover)"
+                  )
 
-                  $i = 0
-                  Do {
-                    $Endpoints = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $(data_lake_account_id)
-                    Start-Sleep -Seconds 10
-                    $i += 10
-                    Write-Host "... [$i`s]"
-                  } Until (($null -ne $Endpoints) -or ((Get-Date) -gt $EndTime))
+                  Foreach ($Id in $DataLakeIds) {
+                    $ResourceName = $Id.Split("/")[-1]
+                    $EndTime = (Get-Date).AddSeconds(120)
+                    Write-Host "Checking private endpoint connections for $ResourceName..."
+                    Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $Id"
 
-                  If ($null -eq $Endpoints) {
-                    Throw "Failed to find private endpoint connections for $ResourceName"
-                  }
+                    $i = 0
+                    Do {
+                      $Endpoints = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $Id
+                      Start-Sleep -Seconds 10
+                      $i += 10
+                      Write-Host "... [$i`s]"
+                    } Until (($null -ne $Endpoints) -or ((Get-Date) -gt $EndTime))
 
-                  Foreach ($Endpoint in $Endpoints) {
-                    [PsCustomObject]@{
-                      Name                  = $Endpoint.Name
-                      Id                    = $Endpoint.Id
-                      ProvisioningState     = $Endpoint.ProvisioningState
-                      ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
-                      ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
-                    } | ConvertTo-Json
+                    If ($null -eq $Endpoints) {
+                      Throw "Failed to find private endpoint connections for $ResourceName"
+                    }
 
-                    If ($Endpoint.PrivateLinkServiceConnectionState.Status -ne "Approved") {
-                      $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
-                      Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
-                      Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
-                      $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
-
+                    Foreach ($Endpoint in $Endpoints) {
                       [PsCustomObject]@{
-                        Name                  = $Approval.Name
-                        Id                    = $Approval.Id
-                        ProvisioningState     = $Approval.ProvisioningState
-                        ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
-                        ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
+                        Name                  = $Endpoint.Name
+                        Id                    = $Endpoint.Id
+                        ProvisioningState     = $Endpoint.ProvisioningState
+                        ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
+                        ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
                       } | ConvertTo-Json
+
+                      If ($Endpoint.PrivateLinkServiceConnectionState.Status -ne "Approved") {
+                        $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
+                        Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
+                        Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
+                        $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
+
+                        [PsCustomObject]@{
+                          Name                  = $Approval.Name
+                          Id                    = $Approval.Id
+                          ProvisioningState     = $Approval.ProvisioningState
+                          ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
+                          ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
+                        } | ConvertTo-Json
+                      }
                     }
                   }
                 scriptType: inlineScript
