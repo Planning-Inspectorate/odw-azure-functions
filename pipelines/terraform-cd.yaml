@@ -11,13 +11,6 @@ parameters:
     displayName: 'Failover Deployment'
     type: boolean
     default: false
-  - name: region
-    displayName: Region
-    type: string
-    default: 'UK South'
-    values:
-    - 'UK South'
-    - 'UK West'
 
 variables:
 - group: Terraform ${{ parameters.environment }}
@@ -35,8 +28,6 @@ variables:
   value: tfplan
 - name: postDeploymentDelaySeconds
   value: 180
-- name: region
-  value: ${{ lower(replace(parameters.region,' ','-')) }}
 - name: tfOutputDataLakeAccountId
   value: data_lake_account_id
 - name: tfOutputDataLakeAccountIdFailover
@@ -103,10 +94,10 @@ stages:
 
       # Initialise and run terraform plan
       - script: |
-          echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
-          echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
+          echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
+          echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
           terraform init \
-            -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" \
+            -backend-config="key=${{ variables.environment }}.tfstate" \
             -input=false
 
           echo "Planning Terraform deployment..."
@@ -197,10 +188,10 @@ stages:
 
             # Run terraform apply using the plan file artifact
             - script: |
-                echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
-                echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
+                echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
+                echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
                 terraform init \
-                  -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" \
+                  -backend-config="key=${{ variables.environment }}.tfstate" \
                   -input=false
 
                 echo "Deploying Terraform..."

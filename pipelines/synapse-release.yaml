@@ -6,13 +6,6 @@ parameters:
     values:
     - Test
     - Prod
-  - name: region
-    displayName: Region
-    type: string
-    default: 'UK South'
-    values:
-    - 'UK South'
-    - 'UK West'
 
 variables:
 - group: Terraform ${{ parameters.environment }}
@@ -32,8 +25,6 @@ variables:
   value: 180
 - name: publishBranchName
   value: 'workspace_publish'
-- name: region
-  value: ${{ lower(replace(parameters.region,' ','-')) }}
 - name: sourceEnvironment
   value: 'dev'
 
@@ -76,9 +67,9 @@ stages:
 
       # Retrieve Terraform outputs for the target environment
       - script: |
-          echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
-          echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
-          terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
+          echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
+          echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
+          terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false
 
           echo "Retrieving Terraform outputs from state file..."
           echo "##[command]terraform output -json -no-color > ${{ variables.outputFileName }}"
@@ -287,9 +278,9 @@ stages:
 
             # Initialise and run terraform plan to check for components removed by the workspace deployment step
             - script: |
-                echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
-                echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
-                terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
+                echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
+                echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
+                terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false
 
                 echo "Planning Terraform deployment..."
                 echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
