@@ -306,35 +306,23 @@ stages:
                 ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
                 errorActionPreference: 'stop'
                 inline: |
-                  Write-Host "Checking for data resource group name..."
-                  Write-Host "##[command]terraform output -raw ${{ variables.tfOutputDataResourceGroupName }}"
-                  $GroupName = $(terraform output -raw ${{ variables.tfOutputDataResourceGroupName }})
-                  $GroupName
+                  $DataLakeIds = @(
+                    "$(data_lake_account_id)",
+                    "$(data_lake_account_id_failover)"
+                  )
 
-                  If ($null -eq $GroupName) {
-                    Write-Host "##[warning]Failed to find data resource group name from Terraform outputs"
+                  Foreach ($Id in $DataLakeIds) {
+                    $LockConfig = @{
+                      LockName  = "Prevent Deletion"
+                      LockLevel = "CanNotDelete"
+                      LockNotes = "Locked by $(Build.DefinitionName) pipeline"
+                      Scope     = $Id
+                    }
+
+                    Write-Host "Applying resource lock for $Id..."
+                    Write-Host "##[command]Set-AzResourceLock @LockConfig"
+                    $ResourceLock = Set-AzResourceLock @LockConfig -Force
+                    $ResourceLock | ConvertTo-Json
                   }
-
-                  Write-Host "Checking data resource group ID..."
-                  Write-Host "##[command]Get-AzResourceGroup -ResourceGroupName $GroupName"
-                  $Group = Get-AzResourceGroup -ResourceGroupName $GroupName
-                  $Group.ResourceId
-
-                  Write-Host "Applying resource lock for $($Group.ResourceId)..."
-                  $LockConfig = @{
-                    LockName  = "Prevent Deletion"
-                    LockLevel = "CanNotDelete"
-                    LockNotes = "Locked by $(Build.DefinitionName) pipeline"
-                    Scope     = $Group.ResourceId
-                  }
-                  Write-Host "##[command]Set-AzResourceLock @LockConfig"
-                  $ResourceLock = Set-AzResourceLock @LockConfig -Force
-
-                  [PsCustomObject]@{
-                    LockName  = $ResourceLock.Name
-                    LockId    = $ResourceLock.LockId
-                    LockLevel = $ResourceLock.Properties.level
-                    LockNotes = $ResourceLock.Properties.notes
-                  } | ConvertTo-Json
                 scriptType: inlineScript
                 TargetAzurePs: LatestVersion
