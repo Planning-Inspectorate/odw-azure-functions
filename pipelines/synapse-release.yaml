@@ -404,6 +404,34 @@ stages:
                 WorkspaceUrl: $(synapse_dev_endpoint)
                 PipelineFilter: ${{ variables.createLakeDatabasesPipeline }}
 
+            # Lock resources
+            - task: AzurePowerShell@5
+              displayName: 'Lock Resources'
+              inputs:
+                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+                errorActionPreference: 'stop'
+                inline: |
+                  $DataLakeIds = @(
+                    "$(data_lake_account_id)",
+                    "$(data_lake_account_id_failover)"
+                  )
+
+                  Foreach ($Id in $DataLakeIds) {
+                    $LockConfig = @{
+                      LockName  = "Prevent Deletion"
+                      LockLevel = "CanNotDelete"
+                      LockNotes = "Locked by $(Build.DefinitionName) pipeline"
+                      Scope     = $Id
+                    }
+
+                    Write-Host "Applying resource lock for $Id..."
+                    Write-Host "##[command]Set-AzResourceLock @LockConfig"
+                    $ResourceLock = Set-AzResourceLock @LockConfig -Force
+                    $ResourceLock | ConvertTo-Json
+                  }
+                scriptType: inlineScript
+                TargetAzurePs: LatestVersion
+
             # Copy Terraform plan files to artifact directory
             - task: CopyFiles@2
               displayName: 'Create Terraform Artifacts'
