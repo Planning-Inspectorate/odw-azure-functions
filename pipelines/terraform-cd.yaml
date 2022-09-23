@@ -32,8 +32,6 @@ variables:
   value: data_lake_account_id
 - name: tfOutputDataLakeAccountIdFailover
   value: data_lake_account_id_failover
-- name: tfOutputDataResourceGroupName
-  value: data_resource_group_name
 
 pr: none
 
