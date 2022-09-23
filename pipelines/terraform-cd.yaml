@@ -32,6 +32,8 @@ variables:
   value: data_lake_account_id
 - name: tfOutputDataLakeAccountIdFailover
   value: data_lake_account_id_failover
+- name: tfOutputDataResourceGroupName
+  value: data_resource_group_name
 
 pr: none
 
@@ -66,31 +68,6 @@ stages:
           echo "##[command]az account show"
           az account show
         displayName: 'Azure Login'
-
-      # Unlock resources
-      - task: AzurePowerShell@5
-        displayName: 'Unlock Resources'
-        inputs:
-          ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-          errorActionPreference: 'stop'
-          inline: |
-            Write-Host "Checking resource locks..."
-            Write-Host "##[command]Get-AzResourceLock -Scope /subscriptions/$(SUBSCRIPTION_ID)"
-            $ResourceLocks = Get-AzResourceLock -Scope "/subscriptions/$(SUBSCRIPTION_ID)"
-            $ResourceLocks | ConvertTo-Json
-
-            Foreach ($Lock in $ResourceLocks) {
-              Write-Host "Removing resource lock for $($Lock.ResourceType)/$($Lock.ResourceName)..."
-              Write-Host "##[command]Remove-AzResourceLock -LockId $($Lock.LockId)"
-              $Removed = Remove-AzResourceLock -LockId $($Lock.LockId) -Force
-
-              [PsCustomObject]@{
-                LockId      = $($Lock.LockId)
-                LockRemoved = $Removed
-              } | ConvertTo-Json
-            }
-          scriptType: inlineScript
-          TargetAzurePs: LatestVersion
 
       # Initialise and run terraform plan
       - script: |
@@ -185,6 +162,31 @@ stages:
                 echo "##[command]az account show"
                 az account show
               displayName: 'Azure Login'
+
+            # Unlock resources
+            - task: AzurePowerShell@5
+              displayName: 'Unlock Resources'
+              inputs:
+                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+                errorActionPreference: 'stop'
+                inline: |
+                  Write-Host "Checking resource locks..."
+                  Write-Host "##[command]Get-AzResourceLock -Scope /subscriptions/$(SUBSCRIPTION_ID)"
+                  $ResourceLocks = Get-AzResourceLock -Scope "/subscriptions/$(SUBSCRIPTION_ID)"
+                  $ResourceLocks | ConvertTo-Json
+
+                  Foreach ($Lock in $ResourceLocks) {
+                    Write-Host "Removing resource lock for $($Lock.ResourceType)/$($Lock.ResourceName)..."
+                    Write-Host "##[command]Remove-AzResourceLock -LockId $($Lock.LockId)"
+                    $Removed = Remove-AzResourceLock -LockId $($Lock.LockId) -Force
+
+                    [PsCustomObject]@{
+                      LockId      = $($Lock.LockId)
+                      LockRemoved = $Removed
+                    } | ConvertTo-Json
+                  }
+                scriptType: inlineScript
+                TargetAzurePs: LatestVersion
 
             # Run terraform apply using the plan file artifact
             - script: |
@@ -294,5 +296,45 @@ stages:
                       }
                     }
                   }
+                scriptType: inlineScript
+                TargetAzurePs: LatestVersion
+
+            # Lock resources
+            - task: AzurePowerShell@5
+              displayName: 'Lock Resources'
+              inputs:
+                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+                errorActionPreference: 'stop'
+                inline: |
+                  Write-Host "Checking for data resource group name..."
+                  Write-Host "##[command]terraform output -raw ${{ variables.tfOutputDataResourceGroupName }}"
+                  $GroupName = $(terraform output -raw ${{ variables.tfOutputDataResourceGroupName }})
+                  $GroupName
+
+                  If ($null -eq $GroupName) {
+                    Write-Host "##[warning]Failed to find data resource group name from Terraform outputs"
+                  }
+
+                  Write-Host "Checking data resource group ID..."
+                  Write-Host "##[command]Get-AzResourceGroup -ResourceGroupName $GroupName"
+                  $Group = Get-AzResourceGroup -ResourceGroupName $GroupName
+                  $Group.ResourceId
+
+                  Write-Host "Applying resource lock for $($Group.ResourceId)..."
+                  $LockConfig = @{
+                    LockName  = "Prevent Deletion"
+                    LockLevel = "CanNotDelete"
+                    LockNotes = "Locked by $(Build.DefinitionName) pipeline"
+                    Scope     = $Group.ResourceId
+                  }
+                  Write-Host "##[command]Set-AzResourceLock @LockConfig"
+                  $ResourceLock = Set-AzResourceLock @LockConfig -Force
+
+                  [PsCustomObject]@{
+                    LockName  = $ResourceLock.Name
+                    LockId    = $ResourceLock.LockId
+                    LockLevel = $ResourceLock.Properties.level
+                    LockNotes = $ResourceLock.Properties.notes
+                  } | ConvertTo-Json
                 scriptType: inlineScript
                 TargetAzurePs: LatestVersion
