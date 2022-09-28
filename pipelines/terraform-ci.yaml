@@ -39,6 +39,10 @@ stages:
 
       # Install required packages
       - script: |
+          echo "Enabling Homebrew package manager..."
+          echo "##[command]eval \"$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\""
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
           echo "Installing TFLint..."
           echo "##[command]brew install tflint"
           brew install tflint
