@@ -7,20 +7,13 @@ parameters:
     - Dev
     - Test
     - Prod
-  - name: region
-    displayName: Region
-    type: string
-    default: 'UK South'
-    values:
-    - 'UK South'
-    - 'UK West'
 
 variables:
 - group: Terraform ${{ parameters.environment }}
 - name: environment
   value: ${{ lower(parameters.environment) }}
-- name: region
-  value: ${{ lower(replace(parameters.region,' ','-')) }}
+- name: tfLintLogLevel
+  value: warn
 
 pr: none
 
@@ -49,12 +42,16 @@ stages:
       # Install required packages
       - script: |
           echo "Installing TFLint..."
-          echo "##[command]brew install tflint"
-          brew install tflint
+          echo "##[command]curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+          echo "##[command]tflint --version"
+          tflint -v
 
           echo "Installing Checkov..."
-          echo "##[command]brew install checkov"
-          brew install checkov
+          echo "##[command]pip3 install checkov"
+          pip3 install checkov
+          echo "##[command]checkov --version"
+          checkov --version
         displayName: 'Setup'
 
       # Login to Azure using Terraform service principal
@@ -75,9 +72,11 @@ stages:
 
       # Run terraform init
       - script: |
-          echo "Initialising Terraform using state file ${{ variables.region }}/${{ variables.environment }}.tfstate..."
-          echo "##[command]terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false"
-          terraform init -backend-config="key=${{ variables.region }}/${{ variables.environment }}.tfstate" -input=false
+          echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
+          echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
+          terraform init \
+            -backend-config="key=${{ variables.environment }}.tfstate" \
+            -input=false
         displayName: 'Terraform Init'
         workingDirectory: infrastructure
         env:
@@ -104,20 +103,22 @@ stages:
 
       # Run TFLint
       - script: |
-          echo "Running TFLint..."
-          echo "##[command]tflint --init --config $(Build.Repository.LocalPath)/.tflint.hcl --no-color --loglevel warn"
-          echo ""
+          TFLINT_LOG=${{ variables.tfLintLogLevel }}
+
+          echo "Initialising TFLint..."
+          echo "##[command]tflint --init --config $(Build.Repository.LocalPath)/.tflint.hcl --no-color"
           tflint \
             --init \
             --config $(Build.Repository.LocalPath)/.tflint.hcl \
-            --no-color \
-            --loglevel warn \
-          && tflint \
+            --no-color
+
+          echo "Running TFLint..."
+          echo "##[command]tflint --config $(Build.Repository.LocalPath)/.tflint.hcl --format compact --module --no-color"
+          tflint \
             --config $(Build.Repository.LocalPath)/.tflint.hcl \
             --format compact \
             --module \
-            --no-color \
-            --loglevel warn
+            --no-color
 
           if [[ $? -ne 0 ]]; then
             echo "##vso[task.logissue type=error]TFLint reported failures"
