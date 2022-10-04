@@ -104,14 +104,17 @@ stages:
       # Run TFLint
       - script: |
           TFLINT_LOG=${{ variables.tfLintLogLevel }}
-          echo "Running TFLint..."
+
+          echo "Initialising TFLint..."
           echo "##[command]tflint --init --config $(Build.Repository.LocalPath)/.tflint.hcl --no-color"
-          echo ""
           tflint \
             --init \
             --config $(Build.Repository.LocalPath)/.tflint.hcl \
             --no-color
-          && tflint \
+
+          echo "Running TFLint..."
+          echo "##[command]tflint --config $(Build.Repository.LocalPath)/.tflint.hcl --format compact --module --no-color"
+          tflint \
             --config $(Build.Repository.LocalPath)/.tflint.hcl \
             --format compact \
             --module \
