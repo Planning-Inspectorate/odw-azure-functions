@@ -249,6 +249,8 @@ stages:
                   workspaceName: $(synapse_workspace_name)
                   ls_dsql_connectionString: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=$(synapse_dsql_endpoint);Initial Catalog=@{linkedService().db_name}
                   ls_ssql_builtin_connectionString: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=$(synapse_ssql_endpoint);Initial Catalog=@{linkedService().db_name}
+                  ls_backup_destination_properties_typeProperties_url: $(data_lake_dfs_endpoint_failover)
+                  ls_backup_source_properties_typeProperties_url: $(data_lake_dfs_endpoint)
                   ls_kv_properties_typeProperties_baseUrl: $(key_vault_uri)
                   ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
                   ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
@@ -451,6 +453,7 @@ stages:
       variables:
         data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
         data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
+        data_lake_dfs_endpoint_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint_failover'] ]
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
         service_bus_namespace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.service_bus_namespace_name'] ]
