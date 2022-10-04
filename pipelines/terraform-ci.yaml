@@ -12,6 +12,8 @@ variables:
 - group: Terraform ${{ parameters.environment }}
 - name: environment
   value: ${{ lower(parameters.environment) }}
+- name: tfLintLogLevel
+  value: warn
 
 pr: none
 
@@ -101,20 +103,19 @@ stages:
 
       # Run TFLint
       - script: |
+          TFLINT_LOG=${{ variables.tfLintLogLevel }}
           echo "Running TFLint..."
-          echo "##[command]tflint --init --config $(Build.Repository.LocalPath)/.tflint.hcl --no-color --loglevel warn"
+          echo "##[command]tflint --init --config $(Build.Repository.LocalPath)/.tflint.hcl --no-color"
           echo ""
           tflint \
             --init \
             --config $(Build.Repository.LocalPath)/.tflint.hcl \
-            --no-color \
-            --loglevel warn \
+            --no-color
           && tflint \
             --config $(Build.Repository.LocalPath)/.tflint.hcl \
             --format compact \
             --module \
-            --no-color \
-            --loglevel warn
+            --no-color
 
           if [[ $? -ne 0 ]]; then
             echo "##vso[task.logissue type=error]TFLint reported failures"
