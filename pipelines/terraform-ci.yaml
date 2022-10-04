@@ -46,8 +46,8 @@ stages:
           tflint -v
 
           echo "Installing Checkov..."
-          echo "##[command]python3.7 -m pip install -U checkov"
-          python3.7 -m pip install -U checkov
+          echo "##[command]pip3 install checkov"
+          pip3 install checkov
           echo "##[command]checkov --version"
           checkov --version
         displayName: 'Setup'
