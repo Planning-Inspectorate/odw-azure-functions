@@ -109,6 +109,13 @@ stages:
         name: SetVariables
         workingDirectory: infrastructure
 
+  - stage: Debug
+    dependsOn: Output
+    displayName: Pipeline Debug ${{ parameters.environment }}
+    jobs:
+    - job: Debug
+      displayName: Pipeline Debug
+      steps:
       # Output variable values
       - script: |
           echo "data_lake_account_id: $(data_lake_account_id)"
@@ -125,9 +132,12 @@ stages:
           echo "synapse_ssql_endpoint: $(synapse_ssql_endpoint)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Variable Values'
+    variables:
+      - ${{ each var in stageDependencies.Output.Output.outputs }}:
+        - ${{ var }}
 
   - stage: Release
-    dependsOn: Output
+    dependsOn: Debug
     displayName: Synapse Release ${{ parameters.environment }}
     jobs:
     - deployment: Release
