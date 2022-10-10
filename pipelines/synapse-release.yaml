@@ -126,6 +126,23 @@ stages:
               displayName: 'Checkout'
               persistCredentials: true
 
+            # Output variable values
+            - script: |
+                echo $(data_lake_account_id)
+                echo $(data_lake_account_id_failover)
+                echo $(data_lake_dfs_endpoint)
+                echo $(data_lake_dfs_endpoint_name)
+                echo $(data_lake_dfs_endpoint_failover)
+                echo $(data_resource_group_name)
+                echo $(key_vault_uri)
+                echo $(service_bus_namespace_name)
+                echo $(source_workspace_name)
+                echo $(synapse_dev_endpoint)
+                echo $(synapse_dsql_endpoint)
+                echo $(synapse_ssql_endpoint)
+                echo $(synapse_workspace_name)
+              displayName: 'Variable Values'
+
             # Login to Azure using Terraform service principal
             - script: |
                 echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
