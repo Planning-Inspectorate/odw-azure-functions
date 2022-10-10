@@ -109,6 +109,23 @@ stages:
         name: SetVariables
         workingDirectory: infrastructure
 
+      # Output variable values
+      - script: |
+          echo "data_lake_account_id: $(data_lake_account_id)"
+          echo "data_lake_account_id_failover: $(data_lake_account_id_failover)"
+          echo "data_lake_account_name: $(data_lake_account_name)"
+          echo "data_lake_dfs_endpoint: $(data_lake_dfs_endpoint)"
+          echo "data_lake_dfs_endpoint_failover: $(data_lake_dfs_endpoint_failover)"
+          echo "data_resource_group_name: $(data_resource_group_name)"
+          echo "key_vault_uri: $(key_vault_uri)"
+          echo "service_bus_namespace_name: $(service_bus_namespace_name)"
+          echo "source_workspace_name: $(source_workspace_name)"
+          echo "synapse_dev_endpoint: $(synapse_dev_endpoint)"
+          echo "synapse_dsql_endpoint: $(synapse_dsql_endpoint)"
+          echo "synapse_ssql_endpoint: $(synapse_ssql_endpoint)"
+          echo "synapse_workspace_name: $(synapse_workspace_name)"
+        displayName: 'Variable Values'
+
   - stage: Release
     dependsOn: Output
     displayName: Synapse Release ${{ parameters.environment }}
@@ -125,23 +142,6 @@ stages:
               clean: true
               displayName: 'Checkout'
               persistCredentials: true
-
-            # Output variable values
-            - script: |
-                echo $(data_lake_account_id)
-                echo $(data_lake_account_id_failover)
-                echo $(data_lake_dfs_endpoint)
-                echo $(data_lake_dfs_endpoint_name)
-                echo $(data_lake_dfs_endpoint_failover)
-                echo $(data_resource_group_name)
-                echo $(key_vault_uri)
-                echo $(service_bus_namespace_name)
-                echo $(source_workspace_name)
-                echo $(synapse_dev_endpoint)
-                echo $(synapse_dsql_endpoint)
-                echo $(synapse_ssql_endpoint)
-                echo $(synapse_workspace_name)
-              displayName: 'Variable Values'
 
             # Login to Azure using Terraform service principal
             - script: |
@@ -272,7 +272,7 @@ stages:
                   ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
                   ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
                   ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
-                  chris_lake_db_properties_0_NewEntity_Source_Location: abfss://odw-harmonised@pinsstodwtestukswic3ai.dfs.core.windows.net/chris_lake_db
+                  chris_lake_db_properties_0_NewEntity_Source_Location: abfss://odw-harmonised@$(data_lake_account_name).dfs.core.windows.net/chris_lake_db
                 ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
                 ResourceGroupName: $(data_resource_group_name)
                 TargetWorkspaceName: $(synapse_workspace_name)
@@ -471,8 +471,8 @@ stages:
       variables:
         data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
         data_lake_account_id_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id_failover'] ]
+        data_lake_account_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_name'] ]
         data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
-        data_lake_dfs_endpoint_name: $[ split(stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'],'/')[2] ]
         data_lake_dfs_endpoint_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint_failover'] ]
         data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
         key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
