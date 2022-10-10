@@ -272,7 +272,7 @@ stages:
                   ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
                   ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
                   ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
-                  chris_lake_db_properties_0_NewEntity_Source_Location: abfss://odw-harmonised@$(data_lake_dfs_endpoint_name)/chris_lake_db
+                  chris_lake_db_properties_0_NewEntity_Source_Location: abfss://odw-harmonised@pinsstodwtestukswic3ai.dfs.core.windows.net/chris_lake_db
                 ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
                 ResourceGroupName: $(data_resource_group_name)
                 TargetWorkspaceName: $(synapse_workspace_name)
