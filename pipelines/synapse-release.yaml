@@ -231,7 +231,7 @@ stages:
                   echo "##vso[task.setvariable variable=skipApply]true"
                 else
                   echo "Found ${{ variables.overridesFileName }} file..."
-                  ehco "##[command]chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}"
+                  echo "##[command]chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}"
                   chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
                 fi
 
@@ -342,10 +342,10 @@ stages:
                   ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
                   ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
                   ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
-                ParametersFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/$(source_workspace_name)/TemplateParametersForWorkspace.json'
+                ParametersFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.overridesFileName }}'
                 ResourceGroupName: $(data_resource_group_name)
                 TargetWorkspaceName: $(synapse_workspace_name)
-                TemplateFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/$(source_workspace_name)/TemplateForWorkspace.json'
+                TemplateFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/TemplateForWorkspace.json'
 
             # Pause pipeline after Synapse Workspace deployment
             - script: |
