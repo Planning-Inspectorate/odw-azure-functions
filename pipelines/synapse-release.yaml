@@ -191,6 +191,10 @@ stages:
         displayName: 'Override Parameters File'
         workingDirectory: pipelines/scripts
 
+      # Publish pipeline artifacts
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifacts'
       variables:
         data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
         data_lake_account_id_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id_failover'] ]
