@@ -148,7 +148,7 @@ stages:
           contents: |
             TemplateForWorkspace.json
             TemplateParametersForWorkspace.json
-          targetFolder: $(Build.ArtifactStagingDirectory)/synapse-templates
+          targetFolder: $(Build.ArtifactStagingDirectory)
 
       # Switch back to the source repo branch
       - script: |
@@ -171,7 +171,7 @@ stages:
           Write-Host "##[command]ls -l $FilePath"
           ls -l $FilePath
         displayName: 'Override Parameters File'
-        workingDirectory: $(Build.ArtifactStagingDirectory)/synapse-templates
+        workingDirectory: $(Build.ArtifactStagingDirectory)
 
       # # Pre-Override Replacement
       # - powershell: |
