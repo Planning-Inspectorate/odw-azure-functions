@@ -48,7 +48,7 @@ $ParametersOverridesFile = [PSCustomObject]@{
   '$schema'      = $ParametersFile.'$schema'
   contentVersion = $ParametersFile.contentVersion
   parameters     = $ParameterOverridesHash
-} | ConvertTo-Json
+} | ConvertTo-Json -Depth 10
 
 # Save template parameter override file
 $ParametersOverridesFile | Out-File -FilePath "$TemplateParameterFilePath/$OverrideParameterFileName"
