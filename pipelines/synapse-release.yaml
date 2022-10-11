@@ -163,20 +163,32 @@ stages:
 
       # Pre-Override Replacement
       - powershell: |
-          $FilePath  = "$(Build.ArtifactStagingDirectory)/synapse-templates"
-          $Overrides = @{
-            "${{ variables.devDataLakeName }}" = "$(data_lake_account_name)"
-          }
-
-          Write-Host "Generating overrided parameters file..."
-          Write-Host "##[command]Replace-SynapseTemplateParameters -TemplateParameterFilePath $FilePath -Overrides $Overrides -OverrideParameterFileName ${{ variables.overridesFileName }}"
-          ./Replace-SynapseTemplateParameters.ps1 -TemplateParameterFilePath $FilePath -Overrides $Overrides -OverrideParameterFileName ${{ variables.overridesFileName }}
+          Write-Host "Updating data lake account name parameters..."
+          Write-Host "##[command](Get-Content .\TemplateParametersForWorkspace.json).Replace('${{ variables.devDataLakeName }}','$(data_lake_account_name)') | Out-File ${{ variables.overridesFileName }}"
+          (Get-Content .\TemplateParametersForWorkspace.json).Replace('${{ variables.devDataLakeName }}','$(data_lake_account_name)') | Out-File ${{ variables.overridesFileName }}
 
           Write-Host "`nListing artifacts directory..."
           Write-Host "##[command]ls -l $FilePath"
           ls -l $FilePath
         displayName: 'Override Parameters File'
-        workingDirectory: pipelines/scripts
+        workingDirectory: $(Build.ArtifactStagingDirectory)/synapse-templates
+
+      # # Pre-Override Replacement
+      # - powershell: |
+      #     $FilePath  = "$(Build.ArtifactStagingDirectory)/synapse-templates"
+      #     $Overrides = @{
+      #       "${{ variables.devDataLakeName }}" = "$(data_lake_account_name)"
+      #     }
+
+      #     Write-Host "Generating overrided parameters file..."
+      #     Write-Host "##[command]Replace-SynapseTemplateParameters -TemplateParameterFilePath $FilePath -Overrides $Overrides -OverrideParameterFileName ${{ variables.overridesFileName }}"
+      #     ./Replace-SynapseTemplateParameters.ps1 -TemplateParameterFilePath $FilePath -Overrides $Overrides -OverrideParameterFileName ${{ variables.overridesFileName }}
+
+      #     Write-Host "`nListing artifacts directory..."
+      #     Write-Host "##[command]ls -l $FilePath"
+      #     ls -l $FilePath
+      #   displayName: 'Override Parameters File'
+      #   workingDirectory: pipelines/scripts
 
       # Publish pipeline artifacts
       - publish: $(Build.ArtifactStagingDirectory)
