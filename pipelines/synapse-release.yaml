@@ -182,12 +182,13 @@ stages:
       - publish: $(Build.ArtifactStagingDirectory)
         artifact: ${{ variables.artifactName }}
         displayName: 'Publish Artifacts'
+
       variables:
         data_lake_account_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_name'] ]
         source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
 
   - stage: Release
-    dependsOn: Prep
+    dependsOn: [ Output, Prep ]
     displayName: Synapse Release ${{ parameters.environment }}
     jobs:
     - deployment: Release
@@ -491,6 +492,7 @@ stages:
             - publish: $(Build.ArtifactStagingDirectory)
               artifact: ${{ variables.artifactName }}
               displayName: 'Publish Artifacts'
+
       variables:
         data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
         data_lake_account_id_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id_failover'] ]
