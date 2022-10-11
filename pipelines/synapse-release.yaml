@@ -15,10 +15,14 @@ variables:
   value: synapse-release
 - name: createLakeDatabasesPipeline
   value: pln_create_lake_databases
+- name: devDataLakeName
+  value: pinsstodwdevuks9h80mb
 - name: environment
   value: ${{ lower(parameters.environment) }}
 - name: outputFileName
   value: outputs.json
+- name: overridesFileName
+  value: TemplateParameterOverridesForWorkspace.json
 - name: planFileName
   value: tfplan
 - name: postDeploymentDelaySeconds
@@ -109,33 +113,16 @@ stages:
         name: SetVariables
         workingDirectory: infrastructure
 
-  - stage: Debug
+  - stage: Prep
     dependsOn: Output
-    displayName: Pipeline Debug ${{ parameters.environment }}
+    displayName: Pre-Release ${{ parameters.environment }}
     jobs:
-    - job: Debug
-      displayName: Pipeline Debug
+    - job: Prep
+      displayName: Prepare Workspace Files
       steps:
       # Checkout repo
       - checkout: self
         displayName: 'Checkout'
-
-      # Output variable values
-      - script: |
-          echo "data_lake_account_id: $(data_lake_account_id)"
-          echo "data_lake_account_id_failover: $(data_lake_account_id_failover)"
-          echo "data_lake_account_name: $(data_lake_account_name)"
-          echo "data_lake_dfs_endpoint: $(data_lake_dfs_endpoint)"
-          echo "data_lake_dfs_endpoint_failover: $(data_lake_dfs_endpoint_failover)"
-          echo "data_resource_group_name: $(data_resource_group_name)"
-          echo "key_vault_uri: $(key_vault_uri)"
-          echo "service_bus_namespace_name: $(service_bus_namespace_name)"
-          echo "source_workspace_name: $(source_workspace_name)"
-          echo "synapse_dev_endpoint: $(synapse_dev_endpoint)"
-          echo "synapse_dsql_endpoint: $(synapse_dsql_endpoint)"
-          echo "synapse_ssql_endpoint: $(synapse_ssql_endpoint)"
-          echo "synapse_workspace_name: $(synapse_workspace_name)"
-        displayName: 'Variable Values'
 
       # Switch to the Synapse Workspace publish repo branch
       - powershell: |
@@ -178,14 +165,14 @@ stages:
       - powershell: |
           $FilePath  = "$(Build.ArtifactStagingDirectory)/synapse-templates"
           $Overrides = @{
-            'pinsstodwdevuks9h80mb' = "$(data_lake_account_name)"
+            "${{ variables.devDataLakeName }}" = "$(data_lake_account_name)"
           }
 
           Write-Host "Generating overrided parameters file..."
-          Write-Host "##[command]Replace-SynapseTemplateParameters -TemplateParameterFilePath $FilePath -Overrides $Overrides"
-          ./Replace-SynapseTemplateParameters.ps1 -TemplateParameterFilePath $FilePath -Overrides $Overrides
+          Write-Host "##[command]Replace-SynapseTemplateParameters -TemplateParameterFilePath $FilePath -Overrides $Overrides -OverrideParameterFileName ${{ variables.overridesFileName }}"
+          ./Replace-SynapseTemplateParameters.ps1 -TemplateParameterFilePath $FilePath -Overrides $Overrides -OverrideParameterFileName ${{ variables.overridesFileName }}
 
-          Write-Host "Listing artifacts directory..."
+          Write-Host "`nListing artifacts directory..."
           Write-Host "##[command]ls -l $FilePath"
           ls -l $FilePath
         displayName: 'Override Parameters File'
@@ -196,22 +183,11 @@ stages:
         artifact: ${{ variables.artifactName }}
         displayName: 'Publish Artifacts'
       variables:
-        data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
-        data_lake_account_id_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id_failover'] ]
         data_lake_account_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_name'] ]
-        data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
-        data_lake_dfs_endpoint_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint_failover'] ]
-        data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
-        key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
-        service_bus_namespace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.service_bus_namespace_name'] ]
         source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
-        synapse_dev_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dev_endpoint'] ]
-        synapse_dsql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dsql_endpoint'] ]
-        synapse_ssql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_ssql_endpoint'] ]
-        synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]
 
   - stage: Release
-    dependsOn: Debug
+    dependsOn: Prep
     displayName: Synapse Release ${{ parameters.environment }}
     jobs:
     - deployment: Release
@@ -242,32 +218,6 @@ stages:
                 echo "##[command]az account show"
                 az account show
               displayName: 'Azure Login'
-
-            # Switch to the Synapse Workspace publish repo branch
-            - powershell: |
-                $SourceBranch = "$(Build.SourceBranch)" -replace "refs/heads/", ""
-                Write-Host "Exporting current branch name $SourceBranch..."
-                Write-Host "##[command][task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
-                Write-Host "##vso[task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
-
-                Write-Host "Switching to ${{ variables.publishBranchName }} branch..."
-                Write-Host "##[command]git checkout ${{ variables.publishBranchName }}"
-                git checkout ${{ variables.publishBranchName }}
-
-                Write-Host "Listing source Synapse Workspace directory..."
-                Write-Host "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
-                ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
-              displayName: 'Switch to ${{ variables.publishBranchName }}'
-
-            # Copy Synapse Workspace ARM template files to artifact directory
-            - task: CopyFiles@2
-              displayName: 'Create Release Artifacts'
-              inputs:
-                sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
-                contents: |
-                  TemplateForWorkspace.json
-                  TemplateParametersForWorkspace.json
-                targetFolder: $(Build.ArtifactStagingDirectory)/synapse-templates
 
             # Unlock resources
             - task: AzurePowerShell@5
@@ -357,7 +307,7 @@ stages:
                   ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
                   ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
                   chris_lake_db_properties_0_NewEntity_Source_Location: abfss://odw-harmonised@$(data_lake_account_name).dfs.core.windows.net/chris_lake_db
-                ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
+                ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/${{ variables.overridesFileName }}'
                 ResourceGroupName: $(data_resource_group_name)
                 TargetWorkspaceName: $(synapse_workspace_name)
                 TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
@@ -368,17 +318,6 @@ stages:
                 echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
                 sleep ${{ variables.postDeploymentDelaySeconds }}
               displayName: 'Post-Deployment Pause'
-
-            # Switch back to the source repo branch
-            - script: |
-                echo "Switching to $(source_branch) branch..."
-                echo "##[command]git checkout $(source_branch)"
-                git checkout $(source_branch)
-
-                echo "Listing root Terraform directory..."
-                echo "##[command]ls -l $(Build.SourcesDirectory)/infrastructure:"
-                ls -l $(Build.SourcesDirectory)/infrastructure
-              displayName: 'Switch to source branch'
 
             # Initialise and run terraform plan to check for components removed by the workspace deployment step
             - script: |
