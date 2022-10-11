@@ -22,7 +22,7 @@ variables:
 - name: outputFileName
   value: outputs.json
 - name: overridesFileName
-  value: TemplateParameterOverridesForWorkspace.json
+  value: TemplateParametersForWorkspace.json
 - name: planFileName
   value: tfplan
 - name: postDeploymentDelaySeconds
@@ -164,8 +164,8 @@ stages:
       # Pre-Override Replacement
       - powershell: |
           Write-Host "Updating data lake account name parameters..."
-          Write-Host "##[command](Get-Content .\TemplateParametersForWorkspace.json).Replace('${{ variables.devDataLakeName }}','$(data_lake_account_name)') | Out-File ${{ variables.overridesFileName }}"
-          (Get-Content .\TemplateParametersForWorkspace.json).Replace('${{ variables.devDataLakeName }}','$(data_lake_account_name)') | Out-File ${{ variables.overridesFileName }}
+          Write-Host "##[command](Get-Content .\TemplateParametersForWorkspace.json).Replace('${{ variables.devDataLakeName }}','$(data_lake_account_name)') | Out-File ${{ variables.overridesFileName }} -Force"
+          (Get-Content .\TemplateParametersForWorkspace.json).Replace('${{ variables.devDataLakeName }}','$(data_lake_account_name)') | Out-File ${{ variables.overridesFileName }} -Force
 
           Write-Host "`nListing artifacts directory..."
           Write-Host "##[command]ls -l $FilePath"
