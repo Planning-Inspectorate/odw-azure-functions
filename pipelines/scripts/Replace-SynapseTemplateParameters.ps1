@@ -33,11 +33,11 @@ Foreach ($K in $Overrides.GetEnumerator()) {
   Foreach ($P in $ParameterList) {
     If ($P.Value -like "*$($F)*") {
       $ParameterOverridesHash[$P.Name] = [PsCustomObject]@{
-        Value = $P.Value.Replace($F,$R)
+        value = $P.Value.Replace($F,$R)
       }
     } Else {
       $ParameterOverridesHash[$P.Name] = [PsCustomObject]@{
-        Value = $P.Value
+        value = $P.Value
       }
     }
   }
