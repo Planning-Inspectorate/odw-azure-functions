@@ -221,6 +221,24 @@ stages:
               artifact: ${{ variables.artifactName }}
               displayName: 'Download Artifact'
 
+            # Verify pipeline artifacts
+            - script: |
+                echo "Searching for ${{ variables.overridesFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}..."
+                echo "##[command][[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]"
+
+                if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
+                  echo "##[warning]Failed to find template files, skipping Synapse Release"
+                  echo "##vso[task.setvariable variable=skipApply]true"
+                else
+                  echo "Found ${{ variables.overridesFileName }} file..."
+                  ehco "##[command]chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}"
+                  chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
+                fi
+
+                echo "##[command]ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}"
+                ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
+              displayName: 'Verify Artifact'
+
             # Login to Azure using Terraform service principal
             - script: |
                 echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
@@ -324,10 +342,10 @@ stages:
                   ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
                   ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
                   ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
-                ParametersFile: TemplateParametersForWorkspace.json
+                ParametersFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/$(source_workspace_name)/TemplateParametersForWorkspace.json'
                 ResourceGroupName: $(data_resource_group_name)
                 TargetWorkspaceName: $(synapse_workspace_name)
-                TemplateFile: TemplateForWorkspace.json
+                TemplateFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/$(source_workspace_name)/TemplateForWorkspace.json'
 
             # Pause pipeline after Synapse Workspace deployment
             - script: |
