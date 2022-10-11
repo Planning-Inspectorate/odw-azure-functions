@@ -116,6 +116,10 @@ stages:
     - job: Debug
       displayName: Pipeline Debug
       steps:
+      # Checkout repo
+      - checkout: self
+        displayName: 'Checkout'
+
       # Output variable values
       - script: |
           echo "data_lake_account_id: $(data_lake_account_id)"
@@ -132,9 +136,75 @@ stages:
           echo "synapse_ssql_endpoint: $(synapse_ssql_endpoint)"
           echo "synapse_workspace_name: $(synapse_workspace_name)"
         displayName: 'Variable Values'
-    variables:
-      - ${{ each var in stageDependencies.Output.Output.outputs }}:
-        - ${{ var }}
+
+      # Switch to the Synapse Workspace publish repo branch
+      - powershell: |
+          $SourceBranch = "$(Build.SourceBranch)" -replace "refs/heads/", ""
+          Write-Host "Exporting current branch name $SourceBranch..."
+          Write-Host "##[command][task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
+          Write-Host "##vso[task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
+
+          Write-Host "Switching to ${{ variables.publishBranchName }} branch..."
+          Write-Host "##[command]git checkout ${{ variables.publishBranchName }}"
+          git checkout ${{ variables.publishBranchName }}
+
+          Write-Host "Listing source Synapse Workspace directory..."
+          Write-Host "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
+          ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
+        displayName: 'Switch to ${{ variables.publishBranchName }}'
+
+      # Copy Synapse Workspace ARM template files to artifact directory
+      - task: CopyFiles@2
+        displayName: 'Create Release Artifacts'
+        inputs:
+          sourceFolder: $(Build.SourcesDirectory)/$(source_workspace_name)
+          contents: |
+            TemplateForWorkspace.json
+            TemplateParametersForWorkspace.json
+          targetFolder: $(Build.ArtifactStagingDirectory)/synapse-templates
+
+      # Switch back to the source repo branch
+      - script: |
+          echo "Switching to $(source_branch) branch..."
+          echo "##[command]git checkout $(source_branch)"
+          git checkout $(source_branch)
+
+          echo "Listing root Terraform directory..."
+          echo "##[command]ls -l $(Build.SourcesDirectory):"
+          ls -l $(Build.SourcesDirectory)
+        displayName: 'Switch to source branch'
+
+      # Pre-Override Replacement
+      - powershell: |
+          $FilePath  = "$(Build.ArtifactStagingDirectory)/synapse-templates"
+          $Overrides = @{
+            'pinsstodwdevuks9h80mb' = "$(data_lake_account_name)"
+          }
+
+          Write-Host "Generating overrided parameters file..."
+          Write-Host "##[command]Replace-SynapseTemplateParameters -TemplateParameterFilePath $FilePath -Overrides $Overrides"
+          ./Replace-SynapseTemplateParameters.ps1 -TemplateParameterFilePath $FilePath -Overrides $Overrides
+
+          Write-Host "Listing artifacts directory..."
+          Write-Host "##[command]ls -l $FilePath"
+          ls -l $FilePath
+        displayName: 'Override Parameters File'
+        workingDirectory: pipelines/scripts
+
+      variables:
+        data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
+        data_lake_account_id_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id_failover'] ]
+        data_lake_account_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_name'] ]
+        data_lake_dfs_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint'] ]
+        data_lake_dfs_endpoint_failover: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_dfs_endpoint_failover'] ]
+        data_resource_group_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_resource_group_name'] ]
+        key_vault_uri: $[ stageDependencies.Output.Output.outputs['SetVariables.key_vault_uri'] ]
+        service_bus_namespace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.service_bus_namespace_name'] ]
+        source_workspace_name: $[ replace(stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'], '${{ variables.environment }}', '${{ variables.sourceEnvironment }}') ]
+        synapse_dev_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dev_endpoint'] ]
+        synapse_dsql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_dsql_endpoint'] ]
+        synapse_ssql_endpoint: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_ssql_endpoint'] ]
+        synapse_workspace_name: $[ stageDependencies.Output.Output.outputs['SetVariables.synapse_workspace_name'] ]
 
   - stage: Release
     dependsOn: Debug
