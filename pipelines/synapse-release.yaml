@@ -190,10 +190,10 @@ stages:
       #   displayName: 'Override Parameters File'
       #   workingDirectory: pipelines/scripts
 
-      # # Publish pipeline artifacts
-      # - publish: $(Build.ArtifactStagingDirectory)
-      #   artifact: ${{ variables.artifactName }}
-      #   displayName: 'Publish Artifacts'
+      # Publish pipeline artifacts
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifacts'
 
       variables:
         data_lake_account_name: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_name'] ]
@@ -215,6 +215,11 @@ stages:
               clean: true
               displayName: 'Checkout'
               persistCredentials: true
+
+            # Download pipeline artifacts
+            - download: current
+              artifact: ${{ variables.artifactName }}
+              displayName: 'Download Artifact'
 
             # Login to Azure using Terraform service principal
             - script: |
@@ -319,10 +324,10 @@ stages:
                   ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
                   ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
                   ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
-                ParametersFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateParametersForWorkspace.json'
+                ParametersFile: TemplateParametersForWorkspace.json
                 ResourceGroupName: $(data_resource_group_name)
                 TargetWorkspaceName: $(synapse_workspace_name)
-                TemplateFile: '$(Build.SourcesDirectory)/$(source_workspace_name)/TemplateForWorkspace.json'
+                TemplateFile: TemplateForWorkspace.json
 
             # Pause pipeline after Synapse Workspace deployment
             - script: |
