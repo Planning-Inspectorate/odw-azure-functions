@@ -31,11 +31,14 @@ Foreach ($K in $Overrides.GetEnumerator()) {
   $F = $K.Name
   $R = $K.Value
   Foreach ($P in $ParameterList) {
+    Write-Host "$($P.Name): " -NoNewLine
     If ($P.Value -like "*$($F)*") {
+      Write-Host "Overriding $($P.Value) with $($P.Value.Replace($F,$R))"
       $ParameterOverridesHash[$P.Name] = [PsCustomObject]@{
         value = $P.Value.Replace($F,$R)
       }
     } Else {
+      Write-Host "No override required"
       $ParameterOverridesHash[$P.Name] = [PsCustomObject]@{
         value = $P.Value
       }
