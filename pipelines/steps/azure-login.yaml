@@ -1,0 +1,28 @@
+parameters:
+  - name: servicePrincipalId
+    type: string
+  - name: servicePrincipalSecret
+    type: string
+  - name: subscriptionId
+    type: string
+  - name: tenantId
+    type: string
+
+steps:
+  - script: |
+      echo "Authenticating with service principal: ${{ parameters.servicePrincipalId }}"
+      echo "##[command]az login --service-principal"
+      az login \
+        --service-principal \
+        --username ${{ parameters.servicePrincipalId }} \
+        --password ${{ parameters.servicePrincipalSecret }} \
+        --tenant ${{ parameters.tenantId }}
+
+      echo "Setting subscription context: ${{ parameters.subscriptionId }}"
+      echo "##[command]az account set --subscription ${{ parameters.subscriptionId }}"
+      az account set \
+        --subscription ${{ parameters.subscriptionId }}
+
+      echo "##[command]az account show"
+      az account show
+    displayName: 'Azure Login'
