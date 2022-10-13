@@ -296,11 +296,9 @@ stages:
                 TemplateFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/TemplateForWorkspace.json'
 
             # Pause pipeline after Synapse Workspace deployment
-            - script: |
-                echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
-                echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
-                sleep ${{ variables.postDeploymentDelaySeconds }}
-              displayName: 'Post-Deployment Pause'
+            - template: steps/pause-pipeline.yaml
+              parameters:
+                delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
             # Initialise and run terraform plan to check for components removed by the workspace deployment step
             - script: |
@@ -333,11 +331,9 @@ stages:
                 ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
             # Pause pipeline after Terraform deployment
-            - script: |
-                echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
-                echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
-                sleep ${{ variables.postDeploymentDelaySeconds }}
-              displayName: 'Post-Deployment Pause'
+            - template: steps/pause-pipeline.yaml
+              parameters:
+                delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
             # Approve the data lake managed private endpoint if it has been reinstated
             - task: AzurePowerShell@5

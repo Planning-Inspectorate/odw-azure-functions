@@ -173,11 +173,9 @@ stages:
                 ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
             # Pause pipeline after Terraform deployment
-            - script: |
-                echo "Pausing pipeline for ${{ variables.postDeploymentDelaySeconds }} seconds..."
-                echo "##[command]sleep ${{ variables.postDeploymentDelaySeconds }}"
-                sleep ${{ variables.postDeploymentDelaySeconds }}
-              displayName: 'Post-Deployment Pause'
+            - template: steps/pause-pipeline.yaml
+              parameters:
+                delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
             # Retrieve the data lake Storage Account ID
             - script: |
