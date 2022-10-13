@@ -54,20 +54,12 @@ stages:
         displayName: 'Checkout'
 
       # Login to Azure using Terraform service principal
-      - script: |
-          echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
-          echo "##[command]az login && az account set"
-          az login \
-            --service-principal \
-            --username $(AZURE_SERVICE_PRINCIPAL_ID) \
-            --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
-            --tenant $(AZURE_TENANT_ID) \
-          && az account set \
-            --subscription $(SUBSCRIPTION_ID)
-          echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
-          echo "##[command]az account show"
-          az account show
-        displayName: 'Azure Login'
+      - template: steps/azure-login.yaml
+        parameters:
+          servicePrincipalId: $(AZURE_SERVICE_PRINCIPAL_ID)
+          servicePrincipalSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          subscriptionId: $(SUBSCRIPTION_ID)
+          tenantId: $(AZURE_TENANT_ID)
 
       # Retrieve Terraform outputs for the target environment
       - script: |
@@ -223,20 +215,12 @@ stages:
               displayName: 'Verify Artifact'
 
             # Login to Azure using Terraform service principal
-            - script: |
-                echo "Authenticating with service principal: $(AZURE_SERVICE_PRINCIPAL_ID)"
-                echo "##[command]az login && az account set"
-                az login \
-                  --service-principal \
-                  --username $(AZURE_SERVICE_PRINCIPAL_ID) \
-                  --password $(AZURE_SERVICE_PRINCIPAL_SECRET) \
-                  --tenant $(AZURE_TENANT_ID) \
-                && az account set \
-                  --subscription $(SUBSCRIPTION_ID)
-                echo "Subscription scope set to: $(SUBSCRIPTION_ID)"
-                echo "##[command]az account show"
-                az account show
-              displayName: 'Azure Login'
+            - template: steps/azure-login.yaml
+              parameters:
+                servicePrincipalId: $(AZURE_SERVICE_PRINCIPAL_ID)
+                servicePrincipalSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+                subscriptionId: $(SUBSCRIPTION_ID)
+                tenantId: $(AZURE_TENANT_ID)
 
             # Unlock resources
             - task: AzurePowerShell@5
