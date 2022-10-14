@@ -10,6 +10,8 @@ parameters:
   - name: environment
     type: string
     default: dev
+  - name: workingDirectory
+    type: string
 
 steps:
   - script: |
@@ -19,7 +21,7 @@ steps:
         -backend-config="key=${{ parameters.environment }}.tfstate" \
         -input=false
     displayName: 'Terraform Init'
-    workingDirectory: infrastructure
+    workingDirectory: ${{ parameters.workingDirectory }}
     env:
       ARM_CLIENT_ID: ${{ parameters.armClientId }}
       ARM_CLIENT_SECRET: ${{ parameters.armClientSecret }}
