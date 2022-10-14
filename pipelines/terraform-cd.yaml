@@ -22,8 +22,8 @@ variables:
   value: ${{ lower(parameters.environment) }}
 - name: failoverDeployment
   value: ${{ lower(parameters.failover_deployment) }}
-- name: outputFileName
-  value: outputs.json
+- name: outputsFileName
+  value: tfoutputs.json
 - name: planFileName
   value: tfplan
 - name: postDeploymentDelaySeconds
@@ -175,6 +175,23 @@ stages:
             - template: steps/pause-pipeline.yaml
               parameters:
                 delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
+
+            # Get Terraform outputs
+            - template: steps/terraform-outputs.yaml
+              parameters:
+                armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
+                armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+                armSubscriptionId: $(SUBSCRIPTION_ID)
+                armTenantId: $(AZURE_TENANT_ID)
+                outputsFileName: ${{ variables.outputsFileName }}
+                workingDirectory: infrastructure
+
+            # Convert Terraform outputs to local pipeline variables
+            - template: steps/terraform-outputs-to-variables.yaml
+              parameters:
+                multiStageVariables: false
+                outputsFileName: ${{ variables.outputsFileName }}
+                workingDirectory: infrastructure
 
             # Retrieve the data lake Storage Account ID
             - script: |
