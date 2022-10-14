@@ -40,19 +40,8 @@ stages:
         displayName: 'Checkout Repo'
 
       # Install required packages
-      - script: |
-          echo "Installing TFLint..."
-          echo "##[command]curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
-          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
-          echo "##[command]tflint --version"
-          tflint -v
-
-          echo "Installing Checkov..."
-          echo "##[command]pip3 install checkov"
-          pip3 install checkov
-          echo "##[command]checkov --version"
-          checkov --version
-        displayName: 'Setup'
+      - template: steps/install-tflint.yaml
+      - template: steps/install-checkov.yaml
 
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml

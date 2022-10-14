@@ -1,0 +1,12 @@
+variables:
+  - name: uri
+    value: https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh
+
+steps:
+  - script: |
+      echo "Installing TFLint..."
+      echo "##[command]curl -s ${{ variables.uri }} | bash"
+      curl -s ${{ variables.uri }} | bash
+      echo "##[command]tflint --version"
+      tflint -v
+    displayName: 'Install TFLint'
