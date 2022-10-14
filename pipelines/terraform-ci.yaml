@@ -12,8 +12,6 @@ variables:
 - group: Terraform ${{ parameters.environment }}
 - name: environment
   value: ${{ lower(parameters.environment) }}
-- name: tfLintLogLevel
-  value: warn
 
 pr: none
 
