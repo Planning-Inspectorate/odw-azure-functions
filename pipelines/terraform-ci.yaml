@@ -57,6 +57,7 @@ stages:
           armSubscriptionId: $(SUBSCRIPTION_ID)
           armTenantId: $(AZURE_TENANT_ID)
           environment: ${{ variables.environment }}
+          workingDirectory: infrastructure
 
       # Run Terraform format
       - template: steps/terraform-format.yaml
