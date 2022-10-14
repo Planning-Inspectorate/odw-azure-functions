@@ -119,22 +119,10 @@ stages:
               displayName: 'Download Artifact'
 
             # Verify terraform plan file
-            - script: |
-                echo "Searching for ${{ variables.planFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}..."
-                echo "##[command][[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]"
-
-                if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
-                  echo "##[warning]Failed to find Terraform Plan, skipping Terraform Apply"
-                  echo "##vso[task.setvariable variable=skipApply]true"
-                else
-                  echo "Found ${{ variables.planFileName }} file..."
-                  ehco "##[command]chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}"
-                  chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
-                fi
-
-                echo "##[command]ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}"
-                ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
-              displayName: 'Verify Artifact'
+            - template: steps/verify-artifact.yaml
+              parameters:
+                artifactFileName: ${{ variables.planFileName }}
+                artifactFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}
 
             # Login to Azure using Terraform service principal
             - template: steps/azure-login.yaml
