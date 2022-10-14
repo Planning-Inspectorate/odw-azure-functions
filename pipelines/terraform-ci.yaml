@@ -82,15 +82,8 @@ stages:
           configFilePath: $(Build.Repository.LocalPath)/.tflint.hcl
           workingDirectory: infrastructure
 
-      - script: |
-          echo "Running Checkov..."
-          echo "##[command]checkov --directory . --framework terraform"
-          checkov \
-            --directory . \
-            --framework terraform \
-
-          if [[ $? -ne 0 ]]; then
-            echo "##vso[task.logissue type=error]Checkov reported failures"
-          fi
-        displayName: 'Checkov Validate'
-        workingDirectory: infrastructure
+      # Run Checkov
+      - template: steps/checkov-validate.yaml
+        parameters:
+          framework: terraform
+          workingDirectory: infrastructure
