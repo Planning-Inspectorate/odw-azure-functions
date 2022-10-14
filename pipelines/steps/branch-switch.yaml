@@ -1,6 +1,8 @@
 parameters:
   - name: branchName
     type: string
+  - name: showDirectory
+    type: string
 
 steps:
   - powershell: |
@@ -9,6 +11,6 @@ steps:
       git checkout ${{ parameters.branchName }}
 
       Write-Host "Listing source Synapse Workspace directory..."
-      Write-Host "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
-      ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
-    displayName: 'Switch to ${{ parameters.branchName }}'
+      Write-Host "##[command]ls -l ${{ parameters.showDirectory }}:"
+      ls -l ${{ parameters.showDirectory }}
+    displayName: 'Switch Branch'
