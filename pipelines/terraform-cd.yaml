@@ -59,28 +59,26 @@ stages:
           subscriptionId: $(SUBSCRIPTION_ID)
           tenantId: $(AZURE_TENANT_ID)
 
-      # Initialise and run terraform plan
-      - script: |
-          echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
-          echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
-          terraform init \
-            -backend-config="key=${{ variables.environment }}.tfstate" \
-            -input=false
+      # Run terraform init
+      - template: steps/terraform-init.yaml
+        parameters:
+          armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
+          armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          armSubscriptionId: $(SUBSCRIPTION_ID)
+          armTenantId: $(AZURE_TENANT_ID)
+          environment: ${{ variables.environment }}
 
-          echo "Planning Terraform deployment..."
-          echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
-          terraform plan \
-            -var-file=./environments/${{ variables.environment }}.tfvars \
-            -var "failover_deployment=${{ variables.failoverDeployment }}" \
-            -input=false \
-            -out=${{ variables.planFileName }}
-        displayName: 'Terraform Plan'
-        workingDirectory: infrastructure
-        env:
-          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+      # Run Terraform plan
+      - template: steps/terraform-plan.yaml
+        parameters:
+          armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
+          armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          armSubscriptionId: $(SUBSCRIPTION_ID)
+          armTenantId: $(AZURE_TENANT_ID)
+          environment: ${{ variables.environment }}
+          failoverDeployment: ${{ variables.failoverDeployment }}
+          planFileName: ${{ variables.planFileName }}
+          workingDirectory: infrastructure
 
       # Copy Terraform plan files to artifact directory
       - task: CopyFiles@2
