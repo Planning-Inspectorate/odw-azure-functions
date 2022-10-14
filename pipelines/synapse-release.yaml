@@ -204,19 +204,10 @@ stages:
                 ToggleOn: false
 
             # Resume the dedicated SQL pool if it was in a paused state
-            - task: AzurePowerShell@5
-              condition: ne(variables['pause_sql_pool_name'], '')
-              displayName: 'Resume SQL Pool'
-              inputs:
-                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-                errorActionPreference: 'stop'
-                inline: |
-                  Write-Host "Resuming paused SQL pool $(pause_sql_pool_name)..."
-                  Write-Host "##[command]Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
-                  $Start = Resume-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
-                  $Start | Format-List 'SqlPoolName','Sku','Status'
-                scriptType: inlineScript
-                TargetAzurePs: LatestVersion
+            - template: steps/synapse-sql-pool-resume.yaml
+              parameters:
+                armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+                synapseWorkspaceName: $(synapse_workspace_name)
 
             # Deploy Synapse Workspace artifacts from the source Workspace to the target Workspace
             - task: Synapse workspace deployment@2
