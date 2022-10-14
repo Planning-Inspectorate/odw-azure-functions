@@ -11,7 +11,7 @@ steps:
     env:
       RESOURCE_IDS: ${{ join(';', parameters.resourceIds) }}
     inputs:
-      ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
+      ConnectedServiceNameARM: ${{ parameters.armServiceConnectionName }}
       errorActionPreference: 'stop'
       inline: |
         If ([String]::IsNullOrEmpty($env:RESOURCE_IDS) -eq $false) {
