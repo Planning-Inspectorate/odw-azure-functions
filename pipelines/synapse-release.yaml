@@ -19,8 +19,8 @@ variables:
   value: pinsstodwdevuks9h80mb
 - name: environment
   value: ${{ lower(parameters.environment) }}
-- name: outputFileName
-  value: outputs.json
+- name: outputsFileName
+  value: tfoutputs.json
 - name: overridesFileName
   value: TemplateParametersForWorkspace.json
 - name: planFileName
