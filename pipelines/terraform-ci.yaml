@@ -66,40 +66,21 @@ stages:
           ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
-      # Run terraform format
+      # Run Terraform format
       - template: steps/terraform-format.yaml
         parameters:
           workingDirectory: infrastructure
 
-      # Run terraform validate
+      # Run Terraform validate
       - template: steps/terraform-validate.yaml
         parameters:
           workingDirectory: infrastructure
 
       # Run TFLint
-      - script: |
-          TFLINT_LOG=${{ variables.tfLintLogLevel }}
-
-          echo "Initialising TFLint..."
-          echo "##[command]tflint --init --config $(Build.Repository.LocalPath)/.tflint.hcl --no-color"
-          tflint \
-            --init \
-            --config $(Build.Repository.LocalPath)/.tflint.hcl \
-            --no-color
-
-          echo "Running TFLint..."
-          echo "##[command]tflint --config $(Build.Repository.LocalPath)/.tflint.hcl --format compact --module --no-color"
-          tflint \
-            --config $(Build.Repository.LocalPath)/.tflint.hcl \
-            --format compact \
-            --module \
-            --no-color
-
-          if [[ $? -ne 0 ]]; then
-            echo "##vso[task.logissue type=error]TFLint reported failures"
-          fi
-        displayName: 'TFLint Validate'
-        workingDirectory: infrastructure
+      - template: steps/terraform-lint.yaml
+        parameters:
+          configFilePath: $(Build.Repository.LocalPath)/.tflint.hcl
+          workingDirectory: infrastructure
 
       - script: |
           echo "Running Checkov..."

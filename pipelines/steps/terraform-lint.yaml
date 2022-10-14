@@ -1,0 +1,33 @@
+parameters:
+  - name: configFilePath
+    type: string
+  - name: logLevel
+    type: string
+    default: warn
+  - name: workingDirectory
+    type: string
+
+steps:
+  - script: |
+      TFLINT_LOG=${{ parameters.logLevel }}
+
+      echo "Initialising TFLint..."
+      echo "##[command]tflint --init --config ${{ parameters.configFilePath }} --no-color"
+      tflint \
+        --init \
+        --config ${{ parameters.configFilePath }} \
+        --no-color
+
+      echo "Running TFLint..."
+      echo "##[command]tflint --config ${{ parameters.configFilePath }} --format compact --module --no-color"
+      tflint \
+        --config ${{ parameters.configFilePath }} \
+        --format compact \
+        --module \
+        --no-color
+
+      if [[ $? -ne 0 ]]; then
+        echo "##vso[task.logissue type=error]TFLint reported failures"
+      fi
+    displayName: 'TFLint Validate'
+    workingDirectory: ${{ parameters.workingDirectory }}
