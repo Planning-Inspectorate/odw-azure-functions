@@ -273,19 +273,10 @@ stages:
                 - $(data_lake_account_id_failover)
 
             # Pause the dedicated SQL pool if it was previously resumed
-            - task: AzurePowerShell@5
-              condition: ne(variables['pause_sql_pool_name'], '')
-              displayName: 'Suspend SQL Pool'
-              inputs:
-                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-                errorActionPreference: 'stop'
-                inline: |
-                  Write-Host "Suspending previously paused SQL pool $(pause_sql_pool_name)..."
-                  Write-Host "##[command]Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)"
-                  $Stop = Suspend-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name) -Name $(pause_sql_pool_name)
-                  $Stop | Format-List 'SqlPoolName','Sku','Status'
-                scriptType: inlineScript
-                TargetAzurePs: LatestVersion
+            - template: steps/synapse-sql-pool-pause.yaml
+              parameters:
+                armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+                synapseWorkspaceName: $(synapse_workspace_name)
 
             # Re-enable triggers in the target Synapse Workspace
             - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
