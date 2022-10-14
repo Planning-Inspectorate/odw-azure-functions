@@ -160,7 +160,7 @@ stages:
                 workingDirectory: infrastructure
 
             # Pause pipeline after Terraform deployment
-            - template: steps/pause-pipeline.yaml
+            - template: steps/pause.yaml
               parameters:
                 delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
