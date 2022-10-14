@@ -43,19 +43,10 @@ stages:
 
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
-        parameters:
-          servicePrincipalId: $(AZURE_SERVICE_PRINCIPAL_ID)
-          servicePrincipalSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          subscriptionId: $(SUBSCRIPTION_ID)
-          tenantId: $(AZURE_TENANT_ID)
 
       # Run terraform init
       - template: steps/terraform-init.yaml
         parameters:
-          armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
-          armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          armSubscriptionId: $(SUBSCRIPTION_ID)
-          armTenantId: $(AZURE_TENANT_ID)
           environment: ${{ variables.environment }}
           workingDirectory: infrastructure
 

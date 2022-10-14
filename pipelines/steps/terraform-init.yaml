@@ -1,12 +1,16 @@
 parameters:
   - name: armClientId
     type: string
+    default: $(AZURE_SERVICE_PRINCIPAL_ID)
   - name: armClientSecret
     type: string
+    default: $(AZURE_SERVICE_PRINCIPAL_SECRET)
   - name: armSubscriptionId
     type: string
+    default: $(SUBSCRIPTION_ID)
   - name: armTenantId
     type: string
+    default: $(AZURE_TENANT_ID)
   - name: environment
     type: string
     default: dev

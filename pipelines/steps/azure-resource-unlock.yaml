@@ -3,6 +3,7 @@ parameters:
     type: string
   - name: subscriptionId
     type: string
+    default: $(SUBSCRIPTION_ID)
 
 steps:
   - task: AzurePowerShell@5
