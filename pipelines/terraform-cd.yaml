@@ -53,29 +53,16 @@ stages:
 
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
-        parameters:
-          servicePrincipalId: $(AZURE_SERVICE_PRINCIPAL_ID)
-          servicePrincipalSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          subscriptionId: $(SUBSCRIPTION_ID)
-          tenantId: $(AZURE_TENANT_ID)
 
       # Run terraform init
       - template: steps/terraform-init.yaml
         parameters:
-          armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
-          armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          armSubscriptionId: $(SUBSCRIPTION_ID)
-          armTenantId: $(AZURE_TENANT_ID)
           environment: ${{ variables.environment }}
           workingDirectory: infrastructure
 
       # Run Terraform plan
       - template: steps/terraform-plan.yaml
         parameters:
-          armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
-          armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          armSubscriptionId: $(SUBSCRIPTION_ID)
-          armTenantId: $(AZURE_TENANT_ID)
           environment: ${{ variables.environment }}
           failoverDeployment: ${{ variables.failoverDeployment }}
           planFileName: ${{ variables.planFileName }}
@@ -126,35 +113,21 @@ stages:
 
             # Login to Azure using Terraform service principal
             - template: steps/azure-login.yaml
-              parameters:
-                servicePrincipalId: $(AZURE_SERVICE_PRINCIPAL_ID)
-                servicePrincipalSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                subscriptionId: $(SUBSCRIPTION_ID)
-                tenantId: $(AZURE_TENANT_ID)
 
             # Unlock resources
             - template: steps/azure-resource-unlock.yaml
               parameters:
                 armServiceConnectionName: ${{ variables.armServiceConnectionName }}
-                subscriptionId: $(SUBSCRIPTION_ID)
 
             # Run Terraform init
             - template: steps/terraform-init.yaml
               parameters:
-                armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
-                armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                armSubscriptionId: $(SUBSCRIPTION_ID)
-                armTenantId: $(AZURE_TENANT_ID)
                 environment: ${{ variables.environment }}
                 workingDirectory: infrastructure
 
             # Run Terraform apply
             - template: steps/terraform-apply.yaml
               parameters:
-                armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
-                armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                armSubscriptionId: $(SUBSCRIPTION_ID)
-                armTenantId: $(AZURE_TENANT_ID)
                 environment: ${{ variables.environment }}
                 planFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
                 workingDirectory: infrastructure
@@ -167,10 +140,6 @@ stages:
             # Get Terraform outputs
             - template: steps/terraform-outputs.yaml
               parameters:
-                armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
-                armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                armSubscriptionId: $(SUBSCRIPTION_ID)
-                armTenantId: $(AZURE_TENANT_ID)
                 outputsFileName: ${{ variables.outputsFileName }}
                 workingDirectory: infrastructure
 

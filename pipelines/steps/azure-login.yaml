@@ -1,12 +1,16 @@
 parameters:
   - name: servicePrincipalId
     type: string
+    default: $(AZURE_SERVICE_PRINCIPAL_ID)
   - name: servicePrincipalSecret
     type: string
+    default: $(AZURE_SERVICE_PRINCIPAL_SECRET)
   - name: subscriptionId
     type: string
+    default: $(SUBSCRIPTION_ID)
   - name: tenantId
     type: string
+    default: $(AZURE_TENANT_ID)
 
 steps:
   - script: |
