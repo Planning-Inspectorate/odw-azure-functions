@@ -14,7 +14,7 @@ steps:
         echo "##vso[task.setvariable variable=skipApply]true"
       else
         echo "Found ${{ parameters.artifactFileName }} file..."
-        ehco "##[command]chmod -R +x ${{ parameters.artifactFilePath }}"
+        echo "##[command]chmod -R +x ${{ parameters.artifactFilePath }}"
         chmod -R +x ${{ parameters.artifactFilePath }}
       fi
 
