@@ -67,12 +67,9 @@ stages:
           ARM_TENANT_ID: $(AZURE_TENANT_ID)
 
       # Run terraform format
-      - script: |
-          echo "Checking Terraform file formatting..."
-          echo "##[command]terraform fmt -check -recursive"
-          terraform fmt -check -recursive
-        displayName: 'Terraform Format'
-        workingDirectory: infrastructure
+      - template: steps/terraform-format.yaml
+        parameters:
+          workingDirectory: infrastructure
 
       # Run terraform validate
       - script: |
