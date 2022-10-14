@@ -72,12 +72,9 @@ stages:
           workingDirectory: infrastructure
 
       # Run terraform validate
-      - script: |
-          echo "Validating Terraform files..."
-          echo "##[command]terraform validate -no-color"
-          terraform validate -no-color
-        displayName: 'Terraform Validate'
-        workingDirectory: infrastructure
+      - template: steps/terraform-validate.yaml
+        parameters:
+          workingDirectory: infrastructure
 
       # Run TFLint
       - script: |
