@@ -193,88 +193,13 @@ stages:
                 outputsFileName: ${{ variables.outputsFileName }}
                 workingDirectory: infrastructure
 
-            # Retrieve the data lake Storage Account ID
-            - script: |
-                echo "Retrieving data lake account ID from state file..."
-                echo "##[command]terraform output -raw ${{ variables.tfOutputDataLakeAccountId }}"
-                DATA_LAKE_PRIMARY_ID=$(terraform output -raw ${{ variables.tfOutputDataLakeAccountId }})
-                echo $DATA_LAKE_PRIMARY_ID
-
-                echo "##[command]terraform output -raw ${{ variables.tfOutputDataLakeAccountIdFailover }}"
-                DATA_LAKE_SECONDARY_ID=$(terraform output -raw ${{ variables.tfOutputDataLakeAccountIdFailover }})
-                echo $DATA_LAKE_SECONDARY_ID
-
-                echo "Setting pipeline variables..."
-                echo "##[command][task.setvariable variable=data_lake_account_id;isoutput=false]$DATA_LAKE_PRIMARY_ID"
-                echo "##vso[task.setvariable variable=data_lake_account_id;isoutput=false]$DATA_LAKE_PRIMARY_ID"
-
-                echo "##[command][task.setvariable variable=data_lake_account_id_failover;isoutput=false]$DATA_LAKE_SECONDARY_ID"
-                echo "##vso[task.setvariable variable=data_lake_account_id_failover;isoutput=false]$DATA_LAKE_SECONDARY_ID"
-              displayName: 'Terraform Output'
-              workingDirectory: infrastructure
-              env:
-                ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-                ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-                ARM_TENANT_ID: $(AZURE_TENANT_ID)
-
             # Approve the data lake managed private endpoint if it has been reinstated
-            - task: AzurePowerShell@5
-              displayName: 'Approve Endpoint'
-              inputs:
-                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-                errorActionPreference: 'stop'
-                inline: |
-                  $DataLakeIds = @(
-                    "$(data_lake_account_id)",
-                    "$(data_lake_account_id_failover)"
-                  )
-
-                  Foreach ($Id in $DataLakeIds) {
-                    $ResourceName = $Id.Split("/")[-1]
-                    $EndTime = (Get-Date).AddSeconds(120)
-                    Write-Host "Checking private endpoint connections for $ResourceName..."
-                    Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $Id"
-
-                    $i = 0
-                    Do {
-                      $Endpoints = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $Id
-                      Start-Sleep -Seconds 10
-                      $i += 10
-                      Write-Host "... [$i`s]"
-                    } Until (($null -ne $Endpoints) -or ((Get-Date) -gt $EndTime))
-
-                    If ($null -eq $Endpoints) {
-                      Throw "Failed to find private endpoint connections for $ResourceName"
-                    }
-
-                    Foreach ($Endpoint in $Endpoints) {
-                      [PsCustomObject]@{
-                        Name                  = $Endpoint.Name
-                        Id                    = $Endpoint.Id
-                        ProvisioningState     = $Endpoint.ProvisioningState
-                        ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
-                        ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
-                      } | ConvertTo-Json
-
-                      If ($Endpoint.PrivateLinkServiceConnectionState.Status -ne "Approved") {
-                        $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
-                        Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
-                        Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
-                        $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
-
-                        [PsCustomObject]@{
-                          Name                  = $Approval.Name
-                          Id                    = $Approval.Id
-                          ProvisioningState     = $Approval.ProvisioningState
-                          ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
-                          ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
-                        } | ConvertTo-Json
-                      }
-                    }
-                  }
-                scriptType: inlineScript
-                TargetAzurePs: LatestVersion
+            - template: steps/azure-private-endpoint-approval.yaml
+              parameters:
+                armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+                resourceIds:
+                - $(data_lake_account_id)
+                - $(data_lake_account_id_failover)
 
             # Lock resources
             - template: steps/azure-resource-lock.yaml
