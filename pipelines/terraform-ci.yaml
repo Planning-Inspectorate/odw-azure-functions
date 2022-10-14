@@ -69,7 +69,7 @@ stages:
           workingDirectory: infrastructure
 
       # Run TFLint
-      - template: steps/terraform-lint.yaml
+      - template: steps/tflint-validate.yaml
         parameters:
           configFilePath: $(Build.Repository.LocalPath)/.tflint.hcl
           workingDirectory: infrastructure
