@@ -189,23 +189,10 @@ stages:
                 armServiceConnectionName: ${{ variables.armServiceConnectionName }}
 
             # Check if the dedicated SQL pool is currently paused
-            - task: AzurePowerShell@5
-              displayName: 'Check SQL Pool'
-              inputs:
-                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-                errorActionPreference: 'stop'
-                inline: |
-                  Write-Host "Checking Synapse SQL pool..."
-                  Write-Host "##[command]Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)"
-                  $Pool = Get-AzSynapseSqlPool -WorkspaceName $(synapse_workspace_name)
-                  $Pool | Format-List 'SqlPoolName','Sku','Status'
-                  If ($Pool.Status -eq 'Paused') {
-                    Write-Host "Synapse SQL pool $($Pool.SqlPoolName) will be temporarily resumed for release..."
-                    Write-Host "##vso[task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
-                    Write-Host "##[command][task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
-                  }
-                scriptType: inlineScript
-                TargetAzurePs: LatestVersion
+            - template: steps/synapse-sql-pool-check.yaml
+              parameters:
+                armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+                synapseWorkspaceName: $(synapse_workspace_name)
 
             # Disable triggers in the target Synapse Workspace
             - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
