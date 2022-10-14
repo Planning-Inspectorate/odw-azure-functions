@@ -16,7 +16,7 @@ steps:
       inline: |
         If ([String]::IsNullOrEmpty($env:RESOURCE_IDS) -eq $false) {
           $ResourceIds = $env:RESOURCE_IDS -split ";"
-          Write-Host "Checking private endpoint connection requests for resources:"
+          Write-Host "Selected Resources:"
           $ResourceIds
 
           Foreach ($Id in $ResourceIds) {
