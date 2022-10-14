@@ -55,55 +55,33 @@ stages:
 
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
+
+      # Run Terraform init
+      - template: steps/terraform-init.yaml
         parameters:
-          servicePrincipalId: $(AZURE_SERVICE_PRINCIPAL_ID)
-          servicePrincipalSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          subscriptionId: $(SUBSCRIPTION_ID)
-          tenantId: $(AZURE_TENANT_ID)
+          environment: ${{ variables.environment }}
+          workingDirectory: infrastructure
 
-      # Retrieve Terraform outputs for the target environment
-      - script: |
-          echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
-          echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
-          terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false
+      # Get Terraform outputs
+      - template: steps/terraform-outputs.yaml
+        parameters:
+          outputsFileName: ${{ variables.outputsFileName }}
+          workingDirectory: infrastructure
 
-          echo "Retrieving Terraform outputs from state file..."
-          echo "##[command]terraform output -json -no-color > ${{ variables.outputFileName }}"
-          terraform output -json -no-color > ${{ variables.outputFileName }}
-          ls -l ${{ variables.outputFileName }}
-        displayName: 'Terraform Output'
-        workingDirectory: infrastructure
-        env:
-          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+      # Run Terraform plan
+      - template: steps/terraform-plan.yaml
+        parameters:
+          environment: ${{ variables.environment }}
+          failoverDeployment: ${{ variables.failoverDeployment }}
+          planFileName: ${{ variables.planFileName }}
+          workingDirectory: infrastructure
 
-      # Run Terraform Plan to check pending infrastructure changes prior to approval
-      - script: |
-          echo "Planning Terraform deployment..."
-          echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false"
-          terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false
-        displayName: 'Terraform Plan'
-        workingDirectory: infrastructure
-        env:
-          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-          ARM_TENANT_ID: $(AZURE_TENANT_ID)
-
-      # Convert Terraform outputs to pipeline variables
-      - powershell: |
-          Write-Host "Parsing Terraform outputs..."
-          Write-Host "##[command]Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json"
-          $Output = Get-Content ${{ variables.outputFileName }} | ConvertFrom-Json
-
-          Write-Host "Setting variables..."
-          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##[command][task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
-          $Output | Get-Member -MemberType 'NoteProperty' | ForEach-Object { $Var = $Output.($_.Name); Write-Host "##vso[task.setvariable variable=$($_.Name);isoutput=true;issecret=$($Var.Sensitive)]$($Var.Value)" }
-        displayName: 'Set Variables'
-        name: SetVariables
-        workingDirectory: infrastructure
+      # Convert Terraform outputs to global pipeline variables
+      - template: steps/terraform-outputs-to-variables.yaml
+        parameters:
+          multiStageVariables: true
+          outputsFileName: ${{ variables.outputsFileName }}
+          workingDirectory: infrastructure
 
   - stage: Prep
     dependsOn: Output
@@ -196,37 +174,19 @@ stages:
               artifact: ${{ variables.artifactName }}
               displayName: 'Download Artifact'
 
-            # Verify pipeline artifacts
-            - script: |
-                echo "Searching for ${{ variables.overridesFileName }} in $(Pipeline.Workspace)/${{ variables.artifactName }}..."
-                echo "##[command][[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]"
-
-                if [[ ! -d "$(Pipeline.Workspace)/${{ variables.artifactName }}" ]]; then
-                  echo "##[warning]Failed to find template files, skipping Synapse Release"
-                  echo "##vso[task.setvariable variable=skipApply]true"
-                else
-                  echo "Found ${{ variables.overridesFileName }} file..."
-                  echo "##[command]chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}"
-                  chmod -R +x $(Pipeline.Workspace)/${{ variables.artifactName }}
-                fi
-
-                echo "##[command]ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}"
-                ls -l $(Pipeline.Workspace)/${{ variables.artifactName }}
-              displayName: 'Verify Artifact'
+            # Verify terraform plan file
+            - template: steps/verify-artifact.yaml
+              parameters:
+                artifactFileName: ${{ variables.overridesFileName }}
+                artifactFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}
 
             # Login to Azure using Terraform service principal
             - template: steps/azure-login.yaml
-              parameters:
-                servicePrincipalId: $(AZURE_SERVICE_PRINCIPAL_ID)
-                servicePrincipalSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                subscriptionId: $(SUBSCRIPTION_ID)
-                tenantId: $(AZURE_TENANT_ID)
 
             # Unlock resources
             - template: steps/azure-resource-unlock.yaml
               parameters:
                 armServiceConnectionName: ${{ variables.armServiceConnectionName }}
-                subscriptionId: $(SUBSCRIPTION_ID)
 
             # Check if the dedicated SQL pool is currently paused
             - task: AzurePowerShell@5
@@ -300,35 +260,26 @@ stages:
               parameters:
                 delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
-            # Initialise and run terraform plan to check for components removed by the workspace deployment step
-            - script: |
-                echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
-                echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
-                terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false
+            # Run terraform init
+            - template: steps/terraform-init.yaml
+              parameters:
+                environment: ${{ variables.environment }}
+                workingDirectory: infrastructure
 
-                echo "Planning Terraform deployment..."
-                echo "##[command]terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}"
-                terraform plan -var-file=./environments/${{ variables.environment }}.tfvars -input=false -out=${{ variables.planFileName }}
-              displayName: 'Terraform Plan'
-              workingDirectory: infrastructure
-              env:
-                ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-                ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-                ARM_TENANT_ID: $(AZURE_TENANT_ID)
+            # Run Terraform plan
+            - template: steps/terraform-plan.yaml
+              parameters:
+                environment: ${{ variables.environment }}
+                failoverDeployment: ${{ variables.failoverDeployment }}
+                planFileName: ${{ variables.planFileName }}
+                workingDirectory: infrastructure
 
-            # Run terraform apply to reinstate components removed by the workspace deployment step
-            - script: |
-                echo "Deploying Terraform..."
-                echo "##[command]terraform apply -input=false ${{ variables.planFileName }}"
-                terraform apply -input=false ${{ variables.planFileName }}
-              displayName: 'Terraform Apply'
-              workingDirectory: infrastructure
-              env:
-                ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-                ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-                ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-                ARM_TENANT_ID: $(AZURE_TENANT_ID)
+            # Run Terraform apply
+            - template: steps/terraform-apply.yaml
+              parameters:
+                environment: ${{ variables.environment }}
+                planFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+                workingDirectory: infrastructure
 
             # Pause pipeline after Terraform deployment
             - template: steps/pause-pipeline.yaml
@@ -336,62 +287,12 @@ stages:
                 delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
             # Approve the data lake managed private endpoint if it has been reinstated
-            - task: AzurePowerShell@5
-              displayName: 'Approve Endpoint'
-              inputs:
-                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-                errorActionPreference: 'stop'
-                inline: |
-                  $DataLakeIds = @(
-                    "$(data_lake_account_id)",
-                    "$(data_lake_account_id_failover)"
-                  )
-
-                  Foreach ($Id in $DataLakeIds) {
-                    $ResourceName = $Id.Split("/")[-1]
-                    $EndTime = (Get-Date).AddSeconds(120)
-                    Write-Host "Checking private endpoint connections for $ResourceName..."
-                    Write-Host "##[command]Get-AzPrivateEndpointConnection -PrivateLinkResourceId $Id"
-
-                    $i = 0
-                    Do {
-                      $Endpoints = Get-AzPrivateEndpointConnection -PrivateLinkResourceId $Id
-                      Start-Sleep -Seconds 10
-                      $i += 10
-                      Write-Host "... [$i`s]"
-                    } Until (($null -ne $Endpoints) -or ((Get-Date) -gt $EndTime))
-
-                    If ($null -eq $Endpoints) {
-                      Throw "Failed to find private endpoint connections for $ResourceName"
-                    }
-
-                    Foreach ($Endpoint in $Endpoints) {
-                      [PsCustomObject]@{
-                        Name                  = $Endpoint.Name
-                        Id                    = $Endpoint.Id
-                        ProvisioningState     = $Endpoint.ProvisioningState
-                        ConnectionState       = $Endpoint.PrivateLinkServiceConnectionState.Status
-                        ConnectionDescription = $Endpoint.PrivateLinkServiceConnectionState.Description
-                      } | ConvertTo-Json
-
-                      If ($Endpoint.PrivateLinkServiceConnectionState.Status -ne "Approved") {
-                        $ApprovalDescription = "Approved by $(Build.DefinitionName) pipeline"
-                        Write-Host "Approving private endpoint connection $($Endpoint.Name)..."
-                        Write-Host "##[command]Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription"
-                        $Approval = Approve-AzPrivateEndpointConnection -ResourceId $Endpoint.Id -Description $ApprovalDescription
-
-                        [PsCustomObject]@{
-                          Name                  = $Approval.Name
-                          Id                    = $Approval.Id
-                          ProvisioningState     = $Approval.ProvisioningState
-                          ConnectionState       = $Approval.PrivateLinkServiceConnectionState.Status
-                          ConnectionDescription = $Approval.PrivateLinkServiceConnectionState.Description
-                        } | ConvertTo-Json
-                      }
-                    }
-                  }
-                scriptType: inlineScript
-                TargetAzurePs: LatestVersion
+            - template: steps/azure-private-endpoint-approval.yaml
+              parameters:
+                armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+                resourceIds:
+                - $(data_lake_account_id)
+                - $(data_lake_account_id_failover)
 
             # Pause the dedicated SQL pool if it was previously resumed
             - task: AzurePowerShell@5
@@ -427,32 +328,12 @@ stages:
                 PipelineFilter: ${{ variables.createLakeDatabasesPipeline }}
 
             # Lock resources
-            - task: AzurePowerShell@5
-              displayName: 'Lock Resources'
-              inputs:
-                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-                errorActionPreference: 'stop'
-                inline: |
-                  $DataLakeIds = @(
-                    "$(data_lake_account_id)",
-                    "$(data_lake_account_id_failover)"
-                  )
-
-                  Foreach ($Id in $DataLakeIds) {
-                    $LockConfig = @{
-                      LockName  = "Prevent Deletion"
-                      LockLevel = "CanNotDelete"
-                      LockNotes = "Locked by $(Build.DefinitionName) pipeline"
-                      Scope     = $Id
-                    }
-
-                    Write-Host "Applying resource lock for $Id..."
-                    Write-Host "##[command]Set-AzResourceLock @LockConfig"
-                    $ResourceLock = Set-AzResourceLock @LockConfig -Force
-                    $ResourceLock | ConvertTo-Json
-                  }
-                scriptType: inlineScript
-                TargetAzurePs: LatestVersion
+            - template: steps/azure-resource-lock.yaml
+              parameters:
+                armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+                resourceIds:
+                - $(data_lake_account_id)
+                - $(data_lake_account_id_failover)
 
       variables:
         data_lake_account_id: $[ stageDependencies.Output.Output.outputs['SetVariables.data_lake_account_id'] ]
