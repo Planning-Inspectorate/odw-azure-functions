@@ -217,7 +217,7 @@ stages:
                 TemplateFile: '$(Pipeline.Workspace)/${{ variables.artifactName }}/TemplateForWorkspace.json'
 
             # Pause pipeline after Synapse Workspace deployment
-            - template: steps/pause-pipeline.yaml
+            - template: steps/pause.yaml
               parameters:
                 delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
@@ -243,7 +243,7 @@ stages:
                 workingDirectory: infrastructure
 
             # Pause pipeline after Terraform deployment
-            - template: steps/pause-pipeline.yaml
+            - template: steps/pause.yaml
               parameters:
                 delayInSeconds: ${{ variables.postDeploymentDelaySeconds }}
 
