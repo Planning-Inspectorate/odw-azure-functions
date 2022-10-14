@@ -50,19 +50,13 @@ stages:
           tenantId: $(AZURE_TENANT_ID)
 
       # Run terraform init
-      - script: |
-          echo "Initialising Terraform using state file ${{ variables.environment }}.tfstate..."
-          echo "##[command]terraform init -backend-config="key=${{ variables.environment }}.tfstate" -input=false"
-          terraform init \
-            -backend-config="key=${{ variables.environment }}.tfstate" \
-            -input=false
-        displayName: 'Terraform Init'
-        workingDirectory: infrastructure
-        env:
-          ARM_CLIENT_ID: $(AZURE_SERVICE_PRINCIPAL_ID)
-          ARM_CLIENT_SECRET: $(AZURE_SERVICE_PRINCIPAL_SECRET)
-          ARM_SUBSCRIPTION_ID: $(SUBSCRIPTION_ID)
-          ARM_TENANT_ID: $(AZURE_TENANT_ID)
+      - template: steps/terraform-init.yaml
+        parameters:
+          armClientId: $(AZURE_SERVICE_PRINCIPAL_ID)
+          armClientSecret: $(AZURE_SERVICE_PRINCIPAL_SECRET)
+          armSubscriptionId: $(SUBSCRIPTION_ID)
+          armTenantId: $(AZURE_TENANT_ID)
+          environment: ${{ variables.environment }}
 
       # Run Terraform format
       - template: steps/terraform-format.yaml
