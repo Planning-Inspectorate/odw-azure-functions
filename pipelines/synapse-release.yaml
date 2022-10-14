@@ -94,10 +94,15 @@ stages:
       - checkout: self
         displayName: 'Checkout'
 
+      # Set source branch
+      - template: steps/branch-set-source.yaml
+        parameters:
+          branchName: $(Build.SourceBranch)
+
       # Switch to the Synapse Workspace publish branch
       - template: steps/branch-switch.yaml
         parameters:
-          branchName:  ${{ variables.publishBranchName }}
+          branchName: ${{ variables.publishBranchName }}
 
       # Copy Synapse Workspace ARM template files to artifact directory
       - task: CopyFiles@2
@@ -109,16 +114,10 @@ stages:
             TemplateParametersForWorkspace.json
           targetFolder: $(Build.ArtifactStagingDirectory)
 
-      # Switch back to the source repo branch
-      - script: |
-          echo "Switching to $(source_branch) branch..."
-          echo "##[command]git checkout $(source_branch)"
-          git checkout $(source_branch)
-
-          echo "Listing root Terraform directory..."
-          echo "##[command]ls -l $(Build.SourcesDirectory):"
-          ls -l $(Build.SourcesDirectory)
-        displayName: 'Switch to source branch'
+     # Switch back to the source branch
+      - template: steps/branch-switch.yaml
+        parameters:
+          branchName: $(source_branch)
 
       # Pre-Override Replacement
       - powershell: |

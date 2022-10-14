@@ -4,11 +4,6 @@ parameters:
 
 steps:
   - powershell: |
-      $SourceBranch = "$(Build.SourceBranch)" -replace "refs/heads/", ""
-      Write-Host "Exporting current branch name $SourceBranch..."
-      Write-Host "##[command][task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
-      Write-Host "##vso[task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
-
       Write-Host "Switching to ${{ parameters.branchName }} branch..."
       Write-Host "##[command]git checkout ${{ parameters.branchName }}"
       git checkout ${{ parameters.branchName }}
