@@ -1,0 +1,25 @@
+parameters:
+  - name: overrideFind
+    type: string
+  - name: overrideReplace
+    type: string
+  - name: templateParametersFileName
+    type: string
+    default: TemplateParametersForWorkspace.json
+  - name: templateParametersOverridesFileName
+    type: string
+    default: TemplateParametersForWorkspace.json
+  - name: workingDirectory
+    type: string
+
+steps:
+  - powershell: |
+      Write-Host "Updating data lake account name parameters..."
+      Write-Host "##[command](Get-Content .\${{ parameters.templateParametersFileName }}).Replace('${{ parameters.overrideFind }}','${{ parameters.overrideReplace }}') | Out-File ${{ variables.overridesFileName }} -Force"
+      (Get-Content .\${{ parameters.templateParametersFileName }}).Replace('${{ parameters.overrideFind }}','${{ parameters.overrideReplace }}') | Out-File ${{ variables.overridesFileName }} -Force
+
+      Write-Host "Listing artifacts directory..."
+      Write-Host "##[command]ls -l $FilePath"
+      ls -l $FilePath
+    displayName: 'Override Parameters File'
+    workingDirectory: ${{ parameters.workingDirectory }}
