@@ -277,29 +277,9 @@ stages:
                 TargetAzurePs: LatestVersion
 
             # Lock resources
-            - task: AzurePowerShell@5
-              displayName: 'Lock Resources'
-              inputs:
-                ConnectedServiceNameARM: ${{ variables.armServiceConnectionName }}
-                errorActionPreference: 'stop'
-                inline: |
-                  $DataLakeIds = @(
-                    "$(data_lake_account_id)",
-                    "$(data_lake_account_id_failover)"
-                  )
-
-                  Foreach ($Id in $DataLakeIds) {
-                    $LockConfig = @{
-                      LockName  = "Prevent Deletion"
-                      LockLevel = "CanNotDelete"
-                      LockNotes = "Locked by $(Build.DefinitionName) pipeline"
-                      Scope     = $Id
-                    }
-
-                    Write-Host "Applying resource lock for $Id..."
-                    Write-Host "##[command]Set-AzResourceLock @LockConfig"
-                    $ResourceLock = Set-AzResourceLock @LockConfig -Force
-                    $ResourceLock | ConvertTo-Json
-                  }
-                scriptType: inlineScript
-                TargetAzurePs: LatestVersion
+            - template: steps/azure-resource-lock.yaml
+              parameters:
+                armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+                resourceIds:
+                - $(data_lake_account_id)
+                - $(data_lake_account_id_failover)
