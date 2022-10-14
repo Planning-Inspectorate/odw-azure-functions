@@ -94,21 +94,10 @@ stages:
       - checkout: self
         displayName: 'Checkout'
 
-      # Switch to the Synapse Workspace publish repo branch
-      - powershell: |
-          $SourceBranch = "$(Build.SourceBranch)" -replace "refs/heads/", ""
-          Write-Host "Exporting current branch name $SourceBranch..."
-          Write-Host "##[command][task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
-          Write-Host "##vso[task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
-
-          Write-Host "Switching to ${{ variables.publishBranchName }} branch..."
-          Write-Host "##[command]git checkout ${{ variables.publishBranchName }}"
-          git checkout ${{ variables.publishBranchName }}
-
-          Write-Host "Listing source Synapse Workspace directory..."
-          Write-Host "##[command]ls -l $(Build.SourcesDirectory)/$(source_workspace_name):"
-          ls -l $(Build.SourcesDirectory)/$(source_workspace_name)
-        displayName: 'Switch to ${{ variables.publishBranchName }}'
+      # Switch to the Synapse Workspace publish branch
+      - template: steps/branch-switch.yaml
+        parameters:
+          branchName:  ${{ variables.publishBranchName }}
 
       # Copy Synapse Workspace ARM template files to artifact directory
       - task: CopyFiles@2
