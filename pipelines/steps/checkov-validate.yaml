@@ -1,0 +1,19 @@
+parameters:
+  - name: framework
+    type: string
+  - name: workingDirectory
+    type: string
+
+steps:
+  - script: |
+      echo "Running Checkov..."
+      echo "##[command]checkov --directory . --framework ${{ parameters.framework }}"
+      checkov \
+        --directory . \
+        --framework ${{ parameters.framework }} \
+
+      if [[ $? -ne 0 ]]; then
+        echo "##vso[task.logissue type=error]Checkov reported failures"
+      fi
+    displayName: 'Checkov Validate'
+    workingDirectory: ${{ parameters.workingDirectory }}
