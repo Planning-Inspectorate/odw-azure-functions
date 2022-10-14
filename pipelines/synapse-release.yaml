@@ -231,7 +231,6 @@ stages:
             - template: steps/terraform-plan.yaml
               parameters:
                 environment: ${{ variables.environment }}
-                failoverDeployment: ${{ variables.failoverDeployment }}
                 planFileName: ${{ variables.planFileName }}
                 workingDirectory: infrastructure
 
