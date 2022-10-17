@@ -240,7 +240,7 @@ stages:
             - template: steps/terraform-apply.yaml
               parameters:
                 environment: ${{ variables.environment }}
-                planFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+                planFilePath: ${{ variables.planFileName }}
                 workingDirectory: infrastructure
 
             # Pause pipeline after Terraform deployment
