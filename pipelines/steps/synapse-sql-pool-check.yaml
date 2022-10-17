@@ -14,7 +14,7 @@ steps:
         Write-Host "Checking Synapse SQL pool..."
         Write-Host "##[command]Get-AzSynapseSqlPool -WorkspaceName ${{ parameters.synapseWorkspaceName }}"
         $Pool = Get-AzSynapseSqlPool -WorkspaceName ${{ parameters.synapseWorkspaceName }}
-        $Pool | Format-List 'SqlPoolName','Sku','Status'
+        $Pool | Format-List 'SqlPoolName','Sku','Status' | ConvertTo-Json
         If ($Pool.Status -eq 'Paused') {
           Write-Host "Synapse SQL pool $($Pool.SqlPoolName) will be temporarily resumed for release..."
           Write-Host "##vso[task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
