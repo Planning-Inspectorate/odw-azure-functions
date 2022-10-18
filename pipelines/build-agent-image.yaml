@@ -1,0 +1,53 @@
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: Dev
+    values:
+    - Dev
+    - Test
+    - Prod
+  - name: failover_deployment
+    displayName: 'Failover Deployment'
+    type: boolean
+    default: false
+
+variables:
+  - group: Terraform ${{ parameters.environment }}
+  - name: armServiceConnectionName
+    value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
+  - name: resourceGroupName
+    value: pins-rg-devops-odw-test-global
+
+pr: none
+
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Build
+    displayName: Packer Build ${{ parameters.environment }}
+    jobs:
+    - job: Build
+      displayName: Packer Build
+      steps:
+      # Checkout repo
+      - checkout: self
+        displayName: 'Checkout'
+
+      # Login to Azure using Terraform service principal
+      - template: steps/azure-login.yaml
+
+      # Create agent resource group
+      - template: steps/devops-agent-group.yaml
+        parameters:
+          armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+          resourceGroupName: ${{ variables.resourceGroupName }}
+
+      # Build Azure DevOps agent image
+      - template: steps/devops-agent-build.yaml
+        parameters:
+          resourceGroupName: ${{ variables.resourceGroupName }}
+          workingDirectory: infrastructure/agents
