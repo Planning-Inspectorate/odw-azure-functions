@@ -18,12 +18,13 @@ parameters:
 
 
 steps:
-  - script: packer build .
+  - script: |
+      packer build \
+      -var "resource_group_name=${{ parameters.resourceGroupName }}" .
     displayName: Packer Build
     env:
       PKR_VAR_client_id: ${{ parameters.armClientId }}
       PKR_VAR_client_secret: ${{ parameters.armClientSecret }}
-      PKR_VAR_resource_group_name: ${{ variables.resourceGroupName }}
       PKR_VAR_subscription_id: ${{ parameters.armSubscriptionId }}
       PKR_VAR_tenant_id:  ${{ parameters.armTenantId }}
     workingDirectory: ${{ parameters.workingDirectory }}
