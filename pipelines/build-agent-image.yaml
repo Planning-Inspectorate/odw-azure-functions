@@ -140,6 +140,13 @@ stages:
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
 
+      # Debug step
+      - script: |
+          echo "##[debug]=== DEBUG ==="
+          echo "##[debug]devops_agent_pool_resource_group_name: $(devops_agent_pool_resource_group_name)"
+          echo "##[debug]============="
+        displayName: 'Debug'
+
       # Build Azure DevOps agent image
       - template: steps/devops-agent-build.yaml
         parameters:
