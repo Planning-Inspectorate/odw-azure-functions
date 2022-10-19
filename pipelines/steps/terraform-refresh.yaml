@@ -11,16 +11,30 @@ parameters:
   - name: armTenantId
     type: string
     default: $(AZURE_TENANT_ID)
+  - name: deployAgentPool
+    type: boolean
+    default: false
+  - name: environment
+    type: string
+    default: dev
+  - name: failoverDeployment
+    type: boolean
+    default: false
   - name: workingDirectory
     type: string
 
 steps:
   - script: |
       echo "Refreshing Terraform..."
-      echo "##[command]terraform apply -refresh-only -input=false"
+      echo "##[command]terraform apply -refresh-only -var-file=./environments/${{ parameters.environment }}.tfvars \
+      -var deploy_agent_pool=${{ lower(parameters.deployAgentPool) }} -var failover_deployment=${{ lower(parameters.failoverDeployment) }} \
+      -input=false"
       terraform apply \
-        -refresh-only
-        -input=false
+        -refresh-only \
+        -var-file=./environments/${{ parameters.environment }}.tfvars \
+        -var "deploy_agent_pool=${{ lower(parameters.deployAgentPool) }}" \
+        -var "failover_deployment=${{ lower(parameters.failoverDeployment) }}" \
+        -input=false \
     displayName: 'Terraform Refresh'
     workingDirectory: ${{ parameters.workingDirectory }}
     env:
