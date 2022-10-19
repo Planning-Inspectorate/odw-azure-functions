@@ -23,9 +23,10 @@ parameters:
   - name: planFileName
     type: string
     default: tfplan
-  - name: planTargetResourceName
+  - name: planTargetModuleName
     type: string
-    default: module.devops_agent_pool
+  - name: planTargetOutputName
+    type: string
   - name: workingDirectory
     type: string
 
@@ -37,7 +38,8 @@ steps:
         -var-file=./environments/${{ parameters.environment }}.tfvars \
         -var "deploy_agent_pool=${{ lower(parameters.deployAgentPool) }}" \
         -var "failover_deployment=${{ lower(parameters.failoverDeployment) }}" \
-        -target=${{ parameters.planTargetResourceName }} \
+        -target=${{ parameters.planTargetModuleName }} \
+        -target=${{ parameters.planTargetOutputName }} \
         -input=false \
         -out=${{ parameters.planFileName }}
     displayName: 'Terraform Plan'
