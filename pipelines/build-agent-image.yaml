@@ -16,8 +16,14 @@ variables:
   - group: Terraform ${{ parameters.environment }}
   - name: armServiceConnectionName
     value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
-  - name: resourceGroupName
-    value: pins-rg-devops-odw-test-global
+  - name: environment
+    value: ${{ lower(parameters.environment) }}
+  - name: failoverDeployment
+    value: ${{ lower(parameters.failover_deployment) }}
+  - name: outputsFileName
+    value: tfoutputs.json
+  - name: planFileName
+    value: tfplan
 
 pr: none
 
@@ -27,7 +33,98 @@ pool:
   vmImage: ubuntu-latest
 
 stages:
+  - stage: Plan
+    displayName: Terraform Plan ${{ parameters.environment }}
+    jobs:
+    - job: Plan
+      displayName: Terraform Plan
+      steps:
+      # Checkout repo
+      - checkout: self
+        displayName: 'Checkout'
+
+      # Login to Azure using Terraform service principal
+      - template: steps/azure-login.yaml
+
+      # Run Terraform init
+      - template: steps/terraform-init.yaml
+        parameters:
+          environment: ${{ variables.environment }}
+          workingDirectory: infrastructure
+
+      # Run targetted Terraform plan to deploy VNET and resource group
+      - template: steps/devops-agent-plan.yaml
+        parameters:
+          deployAgentPool: false
+          environment: ${{ variables.environment }}
+          failoverDeployment: ${{ variables.failoverDeployment }}
+          planFileName: ${{ variables.planFileName }}
+          planTargetResourceName: module.devops_agent_pool
+          workingDirectory: infrastructure
+
+      # Copy Terraform plan files to artifact directory
+      - task: CopyFiles@2
+        displayName: 'Create Artifact'
+        inputs:
+          sourceFolder: infrastructure
+          contents: |
+            .terraform/**
+            .terraform.lock.hcl
+            *.tftpl
+            ${{ variables.planFileName }}
+          targetFolder: $(Build.ArtifactStagingDirectory)
+
+      # Publish pipeline artifacts
+      - publish: $(Build.ArtifactStagingDirectory)
+        artifact: ${{ variables.artifactName }}
+        displayName: 'Publish Artifact'
+
+  - stage: Apply
+    dependsOn: Plan
+    displayName: Terraform Apply ${{ parameters.environment }}
+    jobs:
+    - deployment: Apply
+      displayName: Terraform Apply
+      environment: ${{ parameters.environment }}
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            # Checkout repo
+            - checkout: self
+              displayName: 'Checkout'
+
+            # Login to Azure using Terraform service principal
+            - template: steps/azure-login.yaml
+
+            # Run Terraform init
+            - template: steps/terraform-init.yaml
+              parameters:
+                environment: ${{ variables.environment }}
+                workingDirectory: infrastructure
+
+            # Run Terraform apply
+            - template: steps/terraform-apply.yaml
+              parameters:
+                environment: ${{ variables.environment }}
+                planFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+                workingDirectory: infrastructure
+
+            # Get Terraform outputs
+            - template: steps/terraform-outputs.yaml
+              parameters:
+                outputsFileName: ${{ variables.outputsFileName }}
+                workingDirectory: infrastructure
+
+            # Convert Terraform outputs to global pipeline variables
+            - template: steps/terraform-outputs-to-variables.yaml
+              parameters:
+                multiStageVariables: true
+                outputsFileName: ${{ variables.outputsFileName }}
+                workingDirectory: infrastructure
+
   - stage: Build
+    dependsOn: Apply
     displayName: Packer Build ${{ parameters.environment }}
     jobs:
     - job: Build
@@ -40,14 +137,8 @@ stages:
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
 
-      # Create agent resource group
-      - template: steps/devops-agent-group.yaml
-        parameters:
-          armServiceConnectionName: ${{ variables.armServiceConnectionName }}
-          resourceGroupName: ${{ variables.resourceGroupName }}
-
       # Build Azure DevOps agent image
       - template: steps/devops-agent-build.yaml
         parameters:
-          resourceGroupName: ${{ variables.resourceGroupName }}
+          resourceGroupName: $(devops_agent_pool_resource_group_name)
           workingDirectory: infrastructure/agents
