@@ -64,23 +64,6 @@ stages:
           planTargetResourceName: module.devops_agent_pool
           workingDirectory: infrastructure
 
-      # Copy Terraform plan files to artifact directory
-      - task: CopyFiles@2
-        displayName: 'Create Artifact'
-        inputs:
-          sourceFolder: infrastructure
-          contents: |
-            .terraform/**
-            .terraform.lock.hcl
-            *.tftpl
-            ${{ variables.planFileName }}
-          targetFolder: $(Build.ArtifactStagingDirectory)
-
-      # Publish pipeline artifacts
-      - publish: $(Build.ArtifactStagingDirectory)
-        artifact: ${{ variables.artifactName }}
-        displayName: 'Publish Artifact'
-
   - stage: Apply
     dependsOn: Plan
     displayName: Terraform Apply ${{ parameters.environment }}
@@ -96,17 +79,6 @@ stages:
             - checkout: self
               displayName: 'Checkout'
 
-            # Download pipeline artifacts
-            - download: current
-              artifact: ${{ variables.artifactName }}
-              displayName: 'Download Artifact'
-
-            # Verify terraform plan file
-            - template: steps/verify-artifact.yaml
-              parameters:
-                artifactFileName: ${{ variables.planFileName }}
-                artifactFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}
-
             # Login to Azure using Terraform service principal
             - template: steps/azure-login.yaml
 
@@ -116,11 +88,21 @@ stages:
                 environment: ${{ variables.environment }}
                 workingDirectory: infrastructure
 
+            # Re-run Terraform plan to avoid managed agent version mismatch
+            - template: steps/devops-agent-plan.yaml
+              parameters:
+                deployAgentPool: false
+                environment: ${{ variables.environment }}
+                failoverDeployment: ${{ variables.failoverDeployment }}
+                planFileName: ${{ variables.planFileName }}
+                planTargetResourceName: module.devops_agent_pool
+                workingDirectory: infrastructure
+
             # Run Terraform apply
             - template: steps/terraform-apply.yaml
               parameters:
                 environment: ${{ variables.environment }}
-                planFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}/${{ variables.planFileName }}
+                planFilePath: ${{ variables.planFileName }}
                 workingDirectory: infrastructure
 
             # Get Terraform outputs
