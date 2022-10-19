@@ -61,8 +61,7 @@ stages:
           environment: ${{ variables.environment }}
           failoverDeployment: ${{ variables.failoverDeployment }}
           planFileName: ${{ variables.planFileName }}
-          planTargetModuleName: module.devops_agent_pool
-          planTargetOutputName: output.devops_agent_pool_resource_group_name
+          planTargetResourceName: module.devops_agent_pool
           workingDirectory: infrastructure
 
   - stage: Apply
@@ -96,8 +95,7 @@ stages:
                 environment: ${{ variables.environment }}
                 failoverDeployment: ${{ variables.failoverDeployment }}
                 planFileName: ${{ variables.planFileName }}
-                planTargetModuleName: module.devops_agent_pool
-                planTargetOutputName: output.devops_agent_pool_resource_group_name
+                planTargetResourceName: module.devops_agent_pool
                 workingDirectory: infrastructure
 
             # Run Terraform apply
@@ -105,6 +103,11 @@ stages:
               parameters:
                 environment: ${{ variables.environment }}
                 planFilePath: ${{ variables.planFileName }}
+                workingDirectory: infrastructure
+
+            # Run Terraform refresh to regenerate outputs from targetted apply
+            - template: steps/terraform-refresh.yaml
+              parameters:
                 workingDirectory: infrastructure
 
             # Get Terraform outputs
