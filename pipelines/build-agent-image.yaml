@@ -108,6 +108,9 @@ stages:
             # Run Terraform refresh to regenerate outputs from targetted apply
             - template: steps/terraform-refresh.yaml
               parameters:
+                deployAgentPool: false
+                environment: ${{ variables.environment }}
+                failoverDeployment: ${{ variables.failoverDeployment }}
                 workingDirectory: infrastructure
 
             # Get Terraform outputs
