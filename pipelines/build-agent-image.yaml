@@ -16,6 +16,8 @@ variables:
   - group: Terraform ${{ parameters.environment }}
   - name: armServiceConnectionName
     value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
+  - name: artifactName
+    value: terraform-plan
   - name: environment
     value: ${{ lower(parameters.environment) }}
   - name: failoverDeployment
@@ -93,6 +95,17 @@ stages:
             # Checkout repo
             - checkout: self
               displayName: 'Checkout'
+
+            # Download pipeline artifacts
+            - download: current
+              artifact: ${{ variables.artifactName }}
+              displayName: 'Download Artifact'
+
+            # Verify terraform plan file
+            - template: steps/verify-artifact.yaml
+              parameters:
+                artifactFileName: ${{ variables.planFileName }}
+                artifactFilePath: $(Pipeline.Workspace)/${{ variables.artifactName }}
 
             # Login to Azure using Terraform service principal
             - template: steps/azure-login.yaml
