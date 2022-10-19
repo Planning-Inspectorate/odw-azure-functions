@@ -105,27 +105,6 @@ stages:
                 planFilePath: ${{ variables.planFileName }}
                 workingDirectory: infrastructure
 
-            # Run Terraform refresh to regenerate outputs from targetted apply
-            - template: steps/terraform-refresh.yaml
-              parameters:
-                deployAgentPool: false
-                environment: ${{ variables.environment }}
-                failoverDeployment: ${{ variables.failoverDeployment }}
-                workingDirectory: infrastructure
-
-            # Get Terraform outputs
-            - template: steps/terraform-outputs.yaml
-              parameters:
-                outputsFileName: ${{ variables.outputsFileName }}
-                workingDirectory: infrastructure
-
-            # Convert Terraform outputs to global pipeline variables
-            - template: steps/terraform-outputs-to-variables.yaml
-              parameters:
-                multiStageVariables: true
-                outputsFileName: ${{ variables.outputsFileName }}
-                workingDirectory: infrastructure
-
   - stage: Build
     dependsOn: Apply
     displayName: Packer Build ${{ parameters.environment }}
@@ -143,15 +122,12 @@ stages:
       # Debug step
       - script: |
           echo "##[debug]=== DEBUG ==="
-          echo "##[debug]devops_agent_pool_resource_group_name: $(devops_agent_pool_resource_group_name)"
+          echo "##[debug]agent_pool_group_name: $(AGENT_POOL_GROUP_NAME)"
           echo "##[debug]============="
         displayName: 'Debug'
 
       # Build Azure DevOps agent image
       - template: steps/devops-agent-build.yaml
         parameters:
-          resourceGroupName: $(devops_agent_pool_resource_group_name)
+          resourceGroupName: $(AGENT_POOL_GROUP_NAME)
           workingDirectory: infrastructure/agents
-
-      variables:
-        devops_agent_pool_resource_group_name: $[ stageDependencies.Apply.Apply.outputs['SetVariables.devops_agent_pool_resource_group_name'] ]
