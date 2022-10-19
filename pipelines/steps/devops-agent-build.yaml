@@ -11,6 +11,8 @@ parameters:
   - name: armTenantId
     type: string
     default: $(AZURE_TENANT_ID)
+  - name: imageName
+    type: string
   - name: resourceGroupName
     type: string
   - name: workingDirectory
@@ -23,6 +25,7 @@ steps:
     env:
       PKR_VAR_client_id: ${{ parameters.armClientId }}
       PKR_VAR_client_secret: ${{ parameters.armClientSecret }}
+      PKR_VAR_image_name: ${{ parameters.imageName }}
       PKR_VAR_resource_group_name: ${{ parameters.resourceGroupName }}
       PKR_VAR_subscription_id: ${{ parameters.armSubscriptionId }}
       PKR_VAR_tenant_id:  ${{ parameters.armTenantId }}

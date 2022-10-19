@@ -22,6 +22,8 @@ variables:
     value: ${{ lower(parameters.environment) }}
   - name: failoverDeployment
     value: ${{ lower(parameters.failover_deployment) }}
+  - name: imageName
+    value: ${{ format('devops-agents-{0:yyyyMMdd}', pipeline.startTime }}
   - name: outputsFileName
     value: tfoutputs.json
   - name: planFileName
@@ -119,15 +121,9 @@ stages:
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
 
-      # Debug step
-      - script: |
-          echo "##[debug]=== DEBUG ==="
-          echo "##[debug]agent_pool_group_name: $(AGENT_POOL_GROUP_NAME)"
-          echo "##[debug]============="
-        displayName: 'Debug'
-
       # Build Azure DevOps agent image
       - template: steps/devops-agent-build.yaml
         parameters:
+          imageName: ${{ variables.imageName }}
           resourceGroupName: $(AGENT_POOL_GROUP_NAME)
           workingDirectory: infrastructure/agents
