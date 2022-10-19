@@ -61,7 +61,8 @@ stages:
           environment: ${{ variables.environment }}
           failoverDeployment: ${{ variables.failoverDeployment }}
           planFileName: ${{ variables.planFileName }}
-          planTargetResourceName: module.devops_agent_pool
+          planTargetModuleName: module.devops_agent_pool
+          planTargetOutputName: output.devops_agent_pool_resource_group_name
           workingDirectory: infrastructure
 
   - stage: Apply
@@ -95,7 +96,8 @@ stages:
                 environment: ${{ variables.environment }}
                 failoverDeployment: ${{ variables.failoverDeployment }}
                 planFileName: ${{ variables.planFileName }}
-                planTargetResourceName: module.devops_agent_pool
+                planTargetModuleName: module.devops_agent_pool
+                planTargetOutputName: output.devops_agent_pool_resource_group_name
                 workingDirectory: infrastructure
 
             # Run Terraform apply
