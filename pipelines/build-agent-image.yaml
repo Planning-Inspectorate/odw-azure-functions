@@ -38,10 +38,10 @@ pool:
 
 stages:
   - stage: Plan
-    displayName: Terraform Plan ${{ parameters.environment }}
+    displayName: Underlay Plan ${{ parameters.environment }}
     jobs:
     - job: Plan
-      displayName: Terraform Plan
+      displayName: Underlay Plan
       steps:
       # Checkout repo
       - checkout: self
@@ -68,10 +68,10 @@ stages:
 
   - stage: Apply
     dependsOn: Plan
-    displayName: Terraform Apply ${{ parameters.environment }}
+    displayName: Underlay Apply ${{ parameters.environment }}
     jobs:
     - deployment: Apply
-      displayName: Terraform Apply
+      displayName: Underlay Apply
       environment: ${{ parameters.environment }}
       strategy:
         runOnce:
@@ -109,10 +109,10 @@ stages:
 
   - stage: Build
     dependsOn: Apply
-    displayName: Packer Build ${{ parameters.environment }}
+    displayName: Image Build ${{ parameters.environment }}
     jobs:
     - job: Build
-      displayName: Packer Build
+      displayName: Image Build
       steps:
       # Checkout repo
       - checkout: self
