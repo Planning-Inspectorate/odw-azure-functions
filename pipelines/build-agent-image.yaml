@@ -145,3 +145,6 @@ stages:
         parameters:
           resourceGroupName: $(devops_agent_pool_resource_group_name)
           workingDirectory: infrastructure/agents
+
+      variables:
+        devops_agent_pool_resource_group_name: $[ stageDependencies.Apply.Apply.outputs['SetVariables.devops_agent_pool_resource_group_name'] ]
