@@ -19,6 +19,10 @@ parameters:
 
 steps:
   - script: |
+      echo "Checking Terraform version..."
+      echo "##[command]terraform -v"
+      terraform -v
+
       echo "Initialising Terraform using state file ${{ parameters.environment }}.tfstate..."
       echo "##[command]terraform init -backend-config="key=${{ parameters.environment }}.tfstate" -input=false"
       terraform init \
