@@ -123,7 +123,7 @@ stages:
       - template: steps/devops-agent-build.yaml
         parameters:
           resourceGroupName: $(AGENT_POOL_GROUP_NAME)
-          workingDirectory: infrastructure/agents
+          workingDirectory: infrastructure/configuration/devops-agents
 
   - stage: Pool_Plan
     dependsOn: Build
