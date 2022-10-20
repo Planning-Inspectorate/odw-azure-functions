@@ -45,13 +45,6 @@ stages:
       - checkout: self
         displayName: 'Checkout'
 
-      # Debug
-      - task: Bash@3
-        displayName: 'Debug Environment Variables'
-        inputs:
-          targetType: 'inline'
-          script: echo $(imageName)
-
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
 
@@ -123,15 +116,6 @@ stages:
       - checkout: self
         displayName: 'Checkout'
 
-      # Debug
-      - task: Bash@3
-        displayName: 'Debug Environment Variables'
-        inputs:
-          targetType: 'inline'
-          script: |
-            env | sort
-            echo $(imageName)
-
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
 
@@ -140,3 +124,74 @@ stages:
         parameters:
           resourceGroupName: $(AGENT_POOL_GROUP_NAME)
           workingDirectory: infrastructure/agents
+
+  - stage: Pool_Plan
+    dependsOn: Build
+    displayName: Agent Pool Plan ${{ parameters.environment }}
+    jobs:
+    - job: Pool_Plan
+      displayName: Agent Pool Plan
+      steps:
+      # Checkout repo
+      - checkout: self
+        displayName: 'Checkout'
+
+      # Login to Azure using Terraform service principal
+      - template: steps/azure-login.yaml
+
+      # Run Terraform init
+      - template: steps/terraform-init.yaml
+        parameters:
+          environment: ${{ variables.environment }}
+          workingDirectory: infrastructure
+
+      # Run targetted Terraform plan to deploy VNET and resource group
+      - template: steps/devops-agent-plan.yaml
+        parameters:
+          deployAgentPool: true
+          environment: ${{ variables.environment }}
+          failoverDeployment: ${{ variables.failoverDeployment }}
+          planFileName: ${{ variables.planFileName }}
+          planTargetResourceName: module.devops_agent_pool
+          workingDirectory: infrastructure
+
+  - stage: Pool_Apply
+    dependsOn: Pool_Plan
+    displayName: Agent Pool Apply ${{ parameters.environment }}
+    jobs:
+    - deployment: Pool_Apply
+      displayName: Agent Pool Apply
+      environment: ${{ parameters.environment }}
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            # Checkout repo
+            - checkout: self
+              displayName: 'Checkout'
+
+            # Login to Azure using Terraform service principal
+            - template: steps/azure-login.yaml
+
+            # Run Terraform init
+            - template: steps/terraform-init.yaml
+              parameters:
+                environment: ${{ variables.environment }}
+                workingDirectory: infrastructure
+
+            # Re-run Terraform plan to avoid managed agent version mismatch
+            - template: steps/devops-agent-plan.yaml
+              parameters:
+                deployAgentPool: true
+                environment: ${{ variables.environment }}
+                failoverDeployment: ${{ variables.failoverDeployment }}
+                planFileName: ${{ variables.planFileName }}
+                planTargetResourceName: module.devops_agent_pool
+                workingDirectory: infrastructure
+
+            # Run Terraform apply
+            - template: steps/terraform-apply.yaml
+              parameters:
+                environment: ${{ variables.environment }}
+                planFilePath: ${{ variables.planFileName }}
+                workingDirectory: infrastructure
