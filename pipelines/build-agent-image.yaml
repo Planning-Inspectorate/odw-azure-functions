@@ -22,8 +22,6 @@ variables:
     value: ${{ lower(parameters.environment) }}
   - name: failoverDeployment
     value: ${{ lower(parameters.failover_deployment) }}
-  - name: imageName
-    value: ${{ format('devops-agents-{0:yyyyMMdd}', pipeline.startTime }}
   - name: outputsFileName
     value: tfoutputs.json
   - name: planFileName
@@ -46,6 +44,13 @@ stages:
       # Checkout repo
       - checkout: self
         displayName: 'Checkout'
+
+      # Debug
+      - task: Bash@3
+        displayName: 'Debug Environment Variables'
+        inputs:
+          targetType: 'inline'
+          script: echo $(imageName)
 
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
@@ -118,12 +123,20 @@ stages:
       - checkout: self
         displayName: 'Checkout'
 
+      # Debug
+      - task: Bash@3
+        displayName: 'Debug Environment Variables'
+        inputs:
+          targetType: 'inline'
+          script: |
+            env | sort
+            echo $(imageName)
+
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
 
       # Build Azure DevOps agent image
       - template: steps/devops-agent-build.yaml
         parameters:
-          imageName: ${{ variables.imageName }}
           resourceGroupName: $(AGENT_POOL_GROUP_NAME)
           workingDirectory: infrastructure/agents
