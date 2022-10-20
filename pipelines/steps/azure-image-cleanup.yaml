@@ -20,7 +20,7 @@ steps:
 
         If ($Images.Count -gt 0) {
           Write-Host "Found $($Images.Count) old images:"
-          $Images | ConvertTo-Json
+          $Images | ConvertTo-Json -Depth 10
 
           Foreach ($Image in $Images) {
             Write-Host "Removing image $($Image.Name)..."
