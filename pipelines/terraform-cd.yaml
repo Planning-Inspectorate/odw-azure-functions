@@ -34,7 +34,7 @@ pr: none
 trigger: none
 
 pool:
-  vmImage: ubuntu-22.04
+  name: pins-agent-pool-odw-test-uks
 
 stages:
   - stage: Plan
