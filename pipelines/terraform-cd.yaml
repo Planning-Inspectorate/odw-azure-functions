@@ -22,8 +22,6 @@ variables:
   value: ${{ lower(parameters.environment) }}
 - name: failoverDeployment
   value: ${{ lower(parameters.failover_deployment) }}
-- name: firewallRulesSecureFileName
-  value: allowed_ip_addresses.json
 - name: outputsFileName
   value: tfoutputs.json
 - name: planFileName
