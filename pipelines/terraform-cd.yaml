@@ -52,12 +52,6 @@ stages:
       - checkout: self
         displayName: 'Checkout'
 
-      # Download firewall rule configuration file
-      - template: steps/download-secure-file.yaml
-        parameters:
-          secureFileName: ${{ variables.firewallRulesSecureFileName }}
-          workingDirectory: infrastructure/configuration/firewall-rules
-
       # Login to Azure using Terraform service principal
       - template: steps/azure-login.yaml
 
@@ -107,12 +101,6 @@ stages:
             # Checkout repo
             - checkout: self
               displayName: 'Checkout'
-
-            # Download firewall rule configuration file
-            - template: steps/download-secure-file.yaml
-              parameters:
-                secureFileName: ${{ variables.firewallRulesSecureFileName }}
-                workingDirectory: infrastructure/configuration/firewall-rules
 
             # Download pipeline artifacts
             - download: current
