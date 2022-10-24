@@ -26,6 +26,11 @@ variables:
   value: tfoutputs.json
 - name: planFileName
   value: tfplan
+- name: poolName
+  ${{ if eq(parameters.failover_deployment, false) }}:
+    value: ${{ format('pins-agent-pool-odw-{0}-uks', lower(parameters.environment)) }}
+  ${{ if eq(parameters.failover_deployment, true) }}:
+    value: ${{ format('pins-agent-pool-odw-{0}-ukw', lower(parameters.environment)) }}
 - name: postDeploymentDelaySeconds
   value: 180
 
@@ -39,7 +44,7 @@ stages:
     jobs:
     - job: Plan
       displayName: Terraform Plan
-      pool: pins-agent-pool-odw-${{ variables.environment }}-uks
+      pool: ${{ variables.poolName }}
       steps:
       # Checkout repo
       - checkout: self
@@ -86,7 +91,7 @@ stages:
     - deployment: Apply
       displayName: Terraform Apply
       environment: ${{ parameters.environment }}
-      pool: pins-agent-pool-odw-${{ variables.environment }}-uks
+      pool: ${{ variables.poolName }}
       strategy:
         runOnce:
           deploy:
