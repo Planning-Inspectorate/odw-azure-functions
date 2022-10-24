@@ -33,15 +33,13 @@ pr: none
 
 trigger: none
 
-pool:
-  name: pins-agent-pool-odw-test-uks
-
 stages:
   - stage: Plan
     displayName: Terraform Plan ${{ parameters.environment }}
     jobs:
     - job: Plan
       displayName: Terraform Plan
+      pool: pins-agent-pool-odw-${{ variables.environment }}-uks
       steps:
       # Checkout repo
       - checkout: self
@@ -88,6 +86,7 @@ stages:
     - deployment: Apply
       displayName: Terraform Apply
       environment: ${{ parameters.environment }}
+      pool: pins-agent-pool-odw-${{ variables.environment }}-uks
       strategy:
         runOnce:
           deploy:
