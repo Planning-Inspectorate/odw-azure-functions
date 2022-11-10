@@ -10,10 +10,27 @@ steps:
       echo "##[command]checkov --directory . --framework ${{ parameters.framework }}"
       checkov \
         --directory . \
+        --framework ${{ parameters.framework }}
+
+      checkov \
+        --directory . \
         --framework ${{ parameters.framework }} \
+        --output junitxml > $(System.DefaultWorkingDirectory)/checkov_report.xml
 
       if [[ $? -ne 0 ]]; then
         echo "##vso[task.logissue type=error]Checkov reported failures"
       fi
     displayName: 'Checkov Validate'
     workingDirectory: ${{ parameters.workingDirectory }}
+
+  - task: PublishTestResults@2
+    displayName: Publish Checkov Results
+    condition: succeededOrFailed()
+    inputs:
+      failTaskOnFailedTests: false
+      mergeTestResults: false
+      publishRunAttachments: true
+      searchFolder: $(System.DefaultWorkingDirectory)
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**/*checkov_report.xml'
+      testRunTitle: Checkov Results
