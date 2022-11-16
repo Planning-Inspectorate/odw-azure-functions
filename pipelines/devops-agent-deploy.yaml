@@ -14,6 +14,11 @@ parameters:
 
 variables:
   - group: Terraform ${{ parameters.environment }}
+  - name: agentPoolGroupName
+    ${{ if eq(parameters.failover_deployment, false) }}:
+      value: $(AGENT_POOL_GROUP_NAME)
+    ${{ if eq(parameters.failover_deployment, true) }}:
+      value: $(AGENT_POOL_GROUP_NAME_FAILOVER)
   - name: armServiceConnectionName
     value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
   - name: artifactName
@@ -22,10 +27,20 @@ variables:
     value: ${{ lower(parameters.environment) }}
   - name: failoverDeployment
     value: ${{ lower(parameters.failover_deployment) }}
+  - name: location
+    ${{ if eq(parameters.failover_deployment, false) }}:
+      value: "UK South"
+    ${{ if eq(parameters.failover_deployment, true) }}:
+      value: "UK West"
   - name: outputsFileName
     value: tfoutputs.json
   - name: planFileName
     value: tfplan
+  - name: planTargetResourceName
+    ${{ if eq(parameters.failover_deployment, false) }}:
+      value: module.devops_agent_pool
+    ${{ if eq(parameters.failover_deployment, true) }}:
+      value: module.devops_agent_pool_failover
 
 pr: none
 
@@ -61,7 +76,7 @@ stages:
           environment: ${{ variables.environment }}
           failoverDeployment: ${{ variables.failoverDeployment }}
           planFileName: ${{ variables.planFileName }}
-          planTargetResourceName: module.devops_agent_pool
+          planTargetResourceName: ${{ variables.planTargetResourceName }}
           workingDirectory: infrastructure
 
   - stage: Apply
@@ -95,7 +110,7 @@ stages:
                 environment: ${{ variables.environment }}
                 failoverDeployment: ${{ variables.failoverDeployment }}
                 planFileName: ${{ variables.planFileName }}
-                planTargetResourceName: module.devops_agent_pool
+                planTargetResourceName: ${{ variables.planTargetResourceName }}
                 workingDirectory: infrastructure
 
             # Run Terraform apply
@@ -122,14 +137,15 @@ stages:
       # Build Azure DevOps agent image
       - template: steps/devops-agent-build.yaml
         parameters:
-          resourceGroupName: $(AGENT_POOL_GROUP_NAME)
+          location: ${{ variables.location }}
+          resourceGroupName: ${{ variables.agentPoolGroupName }}
           workingDirectory: infrastructure/configuration/devops-agents
 
       # Clean-up old images
       - template: steps/azure-image-cleanup.yaml
         parameters:
           armServiceConnectionName: ${{ variables.armServiceConnectionName }}
-          resourceGroupName: $(AGENT_POOL_GROUP_NAME)
+          resourceGroupName: ${{ variables.agentPoolGroupName }}
 
   - stage: Pool_Plan
     dependsOn: Build
@@ -158,7 +174,7 @@ stages:
           environment: ${{ variables.environment }}
           failoverDeployment: ${{ variables.failoverDeployment }}
           planFileName: ${{ variables.planFileName }}
-          planTargetResourceName: module.devops_agent_pool
+          planTargetResourceName: ${{ variables.planTargetResourceName }}
           workingDirectory: infrastructure
 
   - stage: Pool_Apply
@@ -192,7 +208,7 @@ stages:
                 environment: ${{ variables.environment }}
                 failoverDeployment: ${{ variables.failoverDeployment }}
                 planFileName: ${{ variables.planFileName }}
-                planTargetResourceName: module.devops_agent_pool
+                planTargetResourceName: ${{ variables.planTargetResourceName }}
                 workingDirectory: infrastructure
 
             # Run Terraform apply
