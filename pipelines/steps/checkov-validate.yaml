@@ -19,6 +19,7 @@ steps:
 
       if [[ $? -ne 0 ]]; then
         echo "##vso[task.logissue type=error]Checkov reported failures"
+        exit 1
       fi
     displayName: 'Checkov Validate'
     workingDirectory: ${{ parameters.workingDirectory }}

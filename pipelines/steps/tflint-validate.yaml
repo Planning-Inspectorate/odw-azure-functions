@@ -28,6 +28,7 @@ steps:
 
       if [[ $? -ne 0 ]]; then
         echo "##vso[task.logissue type=error]TFLint reported failures"
+        exit 1
       fi
     displayName: 'TFLint Validate'
     workingDirectory: ${{ parameters.workingDirectory }}
