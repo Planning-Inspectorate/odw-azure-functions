@@ -25,7 +25,7 @@ variables:
 - name: artifactName
   value: synapse-release
 - name: createLakeDatabasesPipeline
-  value: pln_create_lake_databases
+  value: pln_initial_end_to_end
 - name: devDataLakeName
   value: pinsstodwdevuks9h80mb
 - name: environment
@@ -311,7 +311,7 @@ stages:
 
             # Run an internal Synapse pipeline to create data lake databases
             - task: liprec.vsts-publish-adf.trigger-adf-pipeline.trigger-adf-pipeline@2
-              displayName: 'Create Lake Databases'
+              displayName: 'Run initial end to end process'
               inputs:
                 azureSubscription: ${{ variables.armServiceConnectionName }}
                 DatafactoryType: synapse
