@@ -11,6 +11,9 @@ parameters:
   - name: armTenantId
     type: string
     default: $(AZURE_TENANT_ID)
+  - name: odtSubscriptionId
+    type: string
+    default: $(ODT_SUBSCRIPTION_ID)
   - name: environment
     type: string
     default: dev
@@ -30,6 +33,7 @@ steps:
       terraform plan \
         -var-file=./environments/${{ parameters.environment }}.tfvars \
         -var "failover_deployment=${{ lower(parameters.failoverDeployment) }}" \
+        -var "odt_subscription_id=${{ lower(parameters.odtSubscriptionId) }}" \
         -input=false \
         -out=${{ parameters.planFileName }}
     displayName: 'Terraform Plan'
