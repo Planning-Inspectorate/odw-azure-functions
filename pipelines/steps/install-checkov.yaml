@@ -2,7 +2,7 @@ steps:
   - script: |
       echo "Installing Checkov..."
       echo "##[command]pip3 install checkov"
-      pip3 install checkov
+      pip3 install checkov==2.3.303
       echo "##[command]checkov --version"
       checkov --version
     displayName: 'Install Checkov'
