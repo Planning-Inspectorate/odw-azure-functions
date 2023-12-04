@@ -1,0 +1,7 @@
+pydantic
+azure-identity
+azure-functions
+azure-servicebus
+azure-storage-blob
+sourcery
+ruff
