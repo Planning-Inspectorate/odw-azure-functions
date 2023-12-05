@@ -6,7 +6,7 @@ Azure Function code to read messages from Azure Service Bus and send them to Azu
 import azure.functions as func
 import logging
 from servicebus_funcs import send_to_storage
-import model_service_user, model_nsip
+import model_service_user, model_nsip_project
 import config
 
 _app = func.FunctionApp()
@@ -27,8 +27,9 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info("FUNCTION STARTED...")
 
+    _CURRENT_DATE = config.CURRENT_DATE
     _UTC_TIMESTAMP = config.UTC_TIMESTAMP
-    _FILENAME = f"messages_{config.SERVICE_USER_TOPIC}_{_UTC_TIMESTAMP}.json"
+    _FILENAME = f"{config.SERVICE_USER_TOPIC}/{_CURRENT_DATE}/{config.SERVICE_USER_TOPIC}_{_UTC_TIMESTAMP}.json"
 
     try:
         send_to_storage(
@@ -46,9 +47,9 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse()
 
 
-@_app.function_name("nsip")
-@_app.route(route="nsip", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def nsip(req: func.HttpRequest) -> func.HttpResponse:
+@_app.function_name("nsipproject")
+@_app.route(route="nsipproject", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -61,8 +62,11 @@ def nsip(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info("FUNCTION STARTED...")
 
+    _CURRENT_DATE = config.CURRENT_DATE
     _UTC_TIMESTAMP = config.UTC_TIMESTAMP
-    _FILENAME = f"messages_{config.NSIP_TOPIC}_{_UTC_TIMESTAMP}.json"
+    _FILENAME = (
+        f"{config.NSIP_TOPIC}/{_CURRENT_DATE}/{config.NSIP_TOPIC}_{_UTC_TIMESTAMP}.json"
+    )
 
     try:
         send_to_storage(
@@ -70,7 +74,7 @@ def nsip(req: func.HttpRequest) -> func.HttpResponse:
             credential=config.CREDENTIAL,
             container=config.CONTAINER,
             filename=_FILENAME,
-            data=model_nsip.model(),
+            data=model_nsip_project.model(),
         )
 
     except Exception as e:
