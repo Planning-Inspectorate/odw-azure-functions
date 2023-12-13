@@ -2,11 +2,10 @@
 Azure Function code to read messages from Azure Service Bus and send them to Azure Storage
 """
 
-
 import azure.functions as func
 import logging
 from servicebus_funcs import send_to_storage
-import model_service_user, model_nsip_project
+import validation_nsip_project, validation_service_user
 import config
 
 _app = func.FunctionApp()
@@ -33,11 +32,11 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         send_to_storage(
-            account_url=config.STORAGE,
+            account_url=config.STORAGE_DEV,
             credential=config.CREDENTIAL,
             container=config.CONTAINER,
             filename=_FILENAME,
-            data=model_service_user.model(),
+            data=validation_service_user.validate(),
         )
 
     except Exception as e:
@@ -64,17 +63,15 @@ def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
 
     _CURRENT_DATE = config.CURRENT_DATE
     _UTC_TIMESTAMP = config.UTC_TIMESTAMP
-    _FILENAME = (
-        f"{config.NSIP_TOPIC}/{_CURRENT_DATE}/{config.NSIP_TOPIC}_{_UTC_TIMESTAMP}.json"
-    )
+    _FILENAME = f"{config.NSIP_PROJECT_TOPIC}/{_CURRENT_DATE}/{config.NSIP_PROJECT_TOPIC}_{_UTC_TIMESTAMP}.json"
 
     try:
         send_to_storage(
-            account_url=config.STORAGE,
+            account_url=config.STORAGE_DEV,
             credential=config.CREDENTIAL,
             container=config.CONTAINER,
             filename=_FILENAME,
-            data=model_nsip_project.model(),
+            data=validation_nsip_project.validate(),
         )
 
     except Exception as e:
