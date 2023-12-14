@@ -6,7 +6,12 @@ import azure.functions as func
 import logging
 from servicebus_funcs import send_to_storage
 import validation_nsip_project, validation_service_user
-import config
+from set_environment import current_config, config
+import var_funcs
+
+_STORAGE = current_config['storage_account']
+_CONTAINER = current_config['storage_container']
+_CREDENTIAL = var_funcs.CREDENTIAL
 
 _app = func.FunctionApp()
 
@@ -26,15 +31,16 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info("FUNCTION STARTED...")
 
-    _CURRENT_DATE = config.CURRENT_DATE
-    _UTC_TIMESTAMP = config.UTC_TIMESTAMP
-    _FILENAME = f"{config.SERVICE_USER_TOPIC}/{_CURRENT_DATE}/{config.SERVICE_USER_TOPIC}_{_UTC_TIMESTAMP}.json"
+    _ENTITY = config['global']['service-user-entity']
+    _CURRENT_DATE = var_funcs.CURRENT_DATE
+    _UTC_TIMESTAMP = var_funcs.UTC_TIMESTAMP
+    _FILENAME = f"{_ENTITY}/{_CURRENT_DATE}/{_ENTITY}_{_UTC_TIMESTAMP}.json"
 
     try:
         send_to_storage(
-            account_url=config.STORAGE_DEV,
-            credential=config.CREDENTIAL,
-            container=config.CONTAINER,
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
             filename=_FILENAME,
             data=validation_service_user.validate(),
         )
@@ -61,15 +67,16 @@ def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info("FUNCTION STARTED...")
 
-    _CURRENT_DATE = config.CURRENT_DATE
-    _UTC_TIMESTAMP = config.UTC_TIMESTAMP
-    _FILENAME = f"{config.NSIP_PROJECT_TOPIC}/{_CURRENT_DATE}/{config.NSIP_PROJECT_TOPIC}_{_UTC_TIMESTAMP}.json"
+    _ENTITY = config['global']['nsip-project-entity']
+    _CURRENT_DATE = var_funcs.CURRENT_DATE
+    _UTC_TIMESTAMP = var_funcs.UTC_TIMESTAMP
+    _FILENAME = f"{_ENTITY}/{_CURRENT_DATE}/{_ENTITY}_{_UTC_TIMESTAMP}.json"
 
     try:
         send_to_storage(
-            account_url=config.STORAGE_DEV,
-            credential=config.CREDENTIAL,
-            container=config.CONTAINER,
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
             filename=_FILENAME,
             data=validation_nsip_project.validate(),
         )
