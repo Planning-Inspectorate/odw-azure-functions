@@ -1,0 +1,23 @@
+dev:
+  storage_account: "https://pinsstodwdevuks9h80mb.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-dev-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-dev-uks-b9rt9m.servicebus.windows.net"
+
+
+preprod:
+  storage_account: "https://pinsstodwtestukswic3ai.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-test-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-test-uks-hk2zun.servicebus.windows.net"
+
+prod: 
+  storage_account: "https://pinsstodwprodukson83nw.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-prod-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-prod-uks-mwzecc.servicebus.windows.net"
+
+global:
+  service-user-entity: "service-user"
+  nsip-project-entity: "nsip-project"
+  max_message_count: 1000

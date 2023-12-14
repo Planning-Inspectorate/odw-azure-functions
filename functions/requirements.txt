@@ -6,3 +6,4 @@ azure-storage-blob
 sourcery
 ruff
 datamodel-code-generator
+pyyaml
