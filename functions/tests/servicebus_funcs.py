@@ -29,7 +29,6 @@ def get_messages(
         topic (str): The name of the topic.
         subscription (str): The name of the subscription.
         max_message_count (int): The maximum number of messages to retrieve.
-        max_wait_time (int): The maximum wait time in seconds.
 
     Returns:
         list: A list of messages retrieved from the topic subscription.
@@ -67,6 +66,7 @@ def get_messages(
     print(f"{len(messages)} messages received from topic")
 
     return messages
+
 
 def send_to_storage(
     account_url: str,
