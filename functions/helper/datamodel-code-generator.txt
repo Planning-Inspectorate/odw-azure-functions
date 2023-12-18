@@ -1,3 +1,0 @@
-Command line tool to generate a pydantic model from a json schema
-
-datamodel-codegen --input "{input file path}" --output {output file} --input-file-type jsonschema --output-model-type pydantic_v2.BaseModel --use-standard-collections --use-union-operator --use-field-description --target-python-version 3.11 --use-schema-description
