@@ -29,6 +29,8 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
+    import var_funcs
+
     logging.info("FUNCTION STARTED...")
 
     _ENTITY = config['global']['service-user-entity']
@@ -65,6 +67,8 @@ def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
+    import var_funcs
+    
     logging.info("FUNCTION STARTED...")
 
     _ENTITY = config['global']['nsip-project-entity']
