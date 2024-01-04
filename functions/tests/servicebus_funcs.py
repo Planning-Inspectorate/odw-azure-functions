@@ -55,8 +55,7 @@ def get_messages(
 
         with subscription_receiver:
             received_msgs = subscription_receiver.receive_messages(
-                max_message_count,
-                max_wait_time
+                max_message_count, max_wait_time
             )
             for message in received_msgs:
                 message_body = json.loads(str(message))
