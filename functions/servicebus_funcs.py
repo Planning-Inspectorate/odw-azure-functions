@@ -96,7 +96,7 @@ def send_to_storage(
         account_url (str): The URL of the Azure Blob Storage account.
         credential: The credential object for authentication.
         container (str): The name of the container in Azure Blob Storage.
-        filename (str): The name of the file to upload.
+        entity (str): The name of the entity, e.g. service-user, nsip-project
         data: The data to be uploaded.
 
     Returns:
