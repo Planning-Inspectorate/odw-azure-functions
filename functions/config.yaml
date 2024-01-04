@@ -18,7 +18,19 @@ prod:
   servicebus_namespace_odw: "pins-sb-odw-prod-uks-mwzecc.servicebus.windows.net"
 
 global:
+  odt-schemas-repo: "https://github.com/Planning-Inspectorate/data-model/tree/main/schemas"
   service-user-entity: "service-user"
   nsip-project-entity: "nsip-project"
+  employee-entity: "employee"
+  interested-party-entity: "interested-party"
+  nsip-document-entity: "nsip-document"
+  nsip-exam-timetable-submission-entity: "nsip-exam-timetable-submission"
+  nsip-exam-timetable-entity: "nsip-exam-timetable"
+  nsip-project-update-entity: "nsip-project-update"
+  nsip-representation-entity: "nsip-representation"
+  nsip-subscription-entity: "nsip-subscription"
+  nsip-s51-advice-entity: "nsip-s51-advice"
+  case-schedule-entity: "case-schedule"
   max_message_count: 1000
   max_wait_time: 5
+  success_response: "Function executed successfully"
