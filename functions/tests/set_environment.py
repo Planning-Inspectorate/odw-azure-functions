@@ -16,11 +16,11 @@ Functions:
 
 import yaml
 
-CURRENT_ENVIRONMENT = 'dev'
-ENV_CONFIG_FILE = 'config.yaml'
+CURRENT_ENVIRONMENT = "dev"
+ENV_CONFIG_FILE = "config.yaml"
+
 
 def load_config(file_path: str) -> dict:
-
     """
     Loads a configuration file and returns the parsed configuration.
 
@@ -31,12 +31,12 @@ def load_config(file_path: str) -> dict:
         dict: The parsed configuration.
     """
 
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         config = yaml.safe_load(file)
     return config
 
-def get_environment_config(config: dict, environment: str) -> dict:
 
+def get_environment_config(config: dict, environment: str) -> dict:
     """
     Retrieves the configuration for a specific environment from the parsed configuration.
 
@@ -55,7 +55,10 @@ def get_environment_config(config: dict, environment: str) -> dict:
     if environment in config:
         return config[environment]
     else:
-        raise ValueError(f"Environment '{environment}' not found in the configuration file.")
+        raise ValueError(
+            f"Environment '{environment}' not found in the configuration file."
+        )
+
 
 config = load_config(ENV_CONFIG_FILE)
 

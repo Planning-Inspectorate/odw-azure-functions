@@ -10,16 +10,19 @@ from azure.servicebus import ServiceBusClient
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 import json
+from validate import validate
+from pydantic import BaseModel
 
 
-def get_messages(
+def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
     topic: str,
     subscription: str,
     max_message_count: int,
     max_wait_time: int,
-) -> list:
+    model: BaseModel,
+) -> list | str:
     """
     Retrieve messages from a Service Bus topic subscription.
 
@@ -30,6 +33,7 @@ def get_messages(
         subscription (str): The name of the subscription.
         max_message_count (int): The maximum number of messages to retrieve.
         max_wait_time (int): The maximum wait time in seconds.
+        model (BaseModel): The pydantic model to validate against.
 
     Returns:
         list: A list of messages retrieved from the topic subscription.
@@ -44,7 +48,6 @@ def get_messages(
     )
 
     print("Servicebus client created")
-
     print("Creating receiver object...")
 
     with servicebus_client:
@@ -56,23 +59,34 @@ def get_messages(
 
         with subscription_receiver:
             received_msgs = subscription_receiver.receive_messages(
-                max_message_count,
-                max_wait_time
+                max_message_count, max_wait_time
             )
             for message in received_msgs:
                 message_body = json.loads(str(message))
                 messages.append(message_body)
-                subscription_receiver.complete_message(message)
 
-    print(f"{len(messages)} messages received from topic")
+            try:
+                if messages:
+                    print("Validating message data...")
+                    validate(messages, model)
+                    for message in received_msgs:
+                        subscription_receiver.complete_message(message)
+                    print("Messages validated and completed")
+                    return messages
+                else:
+                    print("No messages to validate")
+            except Exception as e:
+                for message in received_msgs:
+                    subscription_receiver.abandon_message(message)
+                print("Error - abandoning messages - sending to dead letter queue")
+                raise e
 
-    return messages
 
 def send_to_storage(
     account_url: str,
     credential: DefaultAzureCredential,
     container: str,
-    filename: str,
+    entity: str,
     data: list[list | dict],
 ) -> None:
     """
@@ -88,23 +102,22 @@ def send_to_storage(
     Returns:
         None
     """
+    from var_funcs import current_date, current_time
 
-    print("Creating blob service client...")
+    _CURRENT_DATE = current_date()
+    _CURRENT_TIME = current_time()
+    _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
 
-    blob_service_client = BlobServiceClient(account_url, credential)
-
-    print("Blob service client created")
-
-    blob_client = blob_service_client.get_blob_client(container, blob=filename)
-
-    print("Converting data to json format...")
-
-    json_data = json.dumps(data)
-
-    print("Data converted to json")
-
-    print("Uploading file to storage...")
-
-    blob_client.upload_blob(json_data, overwrite=True)
-
-    print(f"JSON file '{filename}' uploaded to Azure Blob Storage.")
+    if data:
+        print("Creating blob service client...")
+        blob_service_client = BlobServiceClient(account_url, credential)
+        print("Blob service client created")
+        blob_client = blob_service_client.get_blob_client(container, blob=_FILENAME)
+        print("Converting data to json format...")
+        json_data = json.dumps(data)
+        print("Data converted to json")
+        print("Uploading file to storage...")
+        blob_client.upload_blob(json_data, overwrite=True)
+        print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
+    else:
+        print("No messages to process")
