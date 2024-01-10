@@ -31,7 +31,7 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_service_user import ServiceUser
+    from pins_data_model.models.model_service_user import ServiceUser
 
     _ENTITY = config["global"]["service-user-entity"]
     _MODEL = ServiceUser
@@ -76,7 +76,7 @@ def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_nsip_project import NsipProject
+    from pins_data_model.models.model_nsip_project import NsipProject
 
     _ENTITY = config["global"]["nsip-project-entity"]
     _MODEL = NsipProject
@@ -121,7 +121,7 @@ def employee(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_employee import Employee
+    from pins_data_model.models.model_employee import Employee
 
     _ENTITY = config["global"]["employee-entity"]
     _MODEL = Employee
@@ -157,48 +157,6 @@ def employee(req: func.HttpRequest) -> func.HttpResponse:
 @_app.route(
     route="interestedparty", methods=["get"], auth_level=func.AuthLevel.FUNCTION
 )
-def interestedparty(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    from model_interested_party import InterestedParty
-
-    _ENTITY = config["global"]["interested-party-entity"]
-    _MODEL = InterestedParty
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            model=_MODEL,
-        )
-        send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_ENTITY,
-            data=_data,
-        )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE}", status_code=200)
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if "MessageInstances" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
 
 @_app.function_name("nsipdocument")
 @_app.route(route="nsipdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
@@ -213,7 +171,7 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_nsip_document import NsipDocument
+    from pins_data_model.models.model_nsip_document import NsipDocument
 
     _ENTITY = config["global"]["nsip-document-entity"]
     _MODEL = NsipDocument
@@ -244,56 +202,6 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
-
-@_app.function_name("nsipexamtimetablesubmission")
-@_app.route(
-    route="nsipexamtimetablesubmission",
-    methods=["get"],
-    auth_level=func.AuthLevel.FUNCTION,
-)
-def nsipexamtimetablesubmission(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    from model_nsip_exam_timetable_submission import NsipExamTimetableSubmission
-
-    _ENTITY = config["global"]["nsip-exam-timetable-submission-entity"]
-    _MODEL = NsipExamTimetableSubmission
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            model=_MODEL,
-        )
-        send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_ENTITY,
-            data=_data,
-        )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE}", status_code=200)
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if "MessageInstances" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
 @_app.function_name("nsipexamtimetable")
 @_app.route(
     route="nsipexamtimetable", methods=["get"], auth_level=func.AuthLevel.FUNCTION
@@ -309,7 +217,7 @@ def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_nsip_exam_timetable import ExaminationTimetable
+    from pins_data_model.models.model_nsip_exam_timetable import ExaminationTimetable
 
     _ENTITY = config["global"]["nsip-exam-timetable-entity"]
     _MODEL = ExaminationTimetable
@@ -356,7 +264,7 @@ def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_nsip_project_update import NsipProjectUpdate
+    from pins_data_model.models.model_nsip_project_update import NsipProjectUpdate
 
     _ENTITY = config["global"]["nsip-project-update-entity"]
     _MODEL = NsipProjectUpdate
@@ -403,7 +311,7 @@ def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_nsip_representation import Representation
+    from pins_data_model.models.model_nsip_representation import Representation
 
     _ENTITY = config["global"]["nsip-representation-entity"]
     _MODEL = Representation
@@ -450,7 +358,7 @@ def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_nsip_subscription import NsipSubscription
+    from pins_data_model.models.model_nsip_subscription import NsipSubscription
 
     _ENTITY = config["global"]["nsip-subscription-entity"]
     _MODEL = NsipSubscription
@@ -495,7 +403,7 @@ def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_s51_advice import S51Advice
+    from pins_data_model.models.model_s51_advice import S51Advice
 
     _ENTITY = config["global"]["nsip-s51-advice-entity"]
     _MODEL = S51Advice
@@ -540,7 +448,7 @@ def caseschedule(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    from model_case_schedule import CaseSchedule
+    from pins_data_model.models.model_case_schedule import CaseSchedule
 
     _ENTITY = config["global"]["case-schedule-entity"]
     _MODEL = CaseSchedule
