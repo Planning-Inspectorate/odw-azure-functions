@@ -1,9 +1,7 @@
-pydantic
-azure-identity
-azure-functions
-azure-servicebus
-azure-storage-blob
-sourcery
-ruff
-datamodel-code-generator
-pyyaml
+pydantic==2.5.1
+azure-identity==1.15.0
+azure-functions==1.17.0
+azure-servicebus==7.11.4
+azure-storage-blob==12.19.0
+PyYAML==6.0.1
+git+https://github.com/Planning-Inspectorate/data-model@main#egg=pins_data_model
