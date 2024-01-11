@@ -152,12 +152,6 @@ def employee(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
-
-@_app.function_name("interestedparty")
-@_app.route(
-    route="interestedparty", methods=["get"], auth_level=func.AuthLevel.FUNCTION
-)
-
 @_app.function_name("nsipdocument")
 @_app.route(route="nsipdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
