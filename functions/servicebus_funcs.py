@@ -10,9 +10,7 @@ from azure.servicebus import ServiceBusClient
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 import json
-from validate import validate
-from pydantic import BaseModel
-
+from validate_messages import validate_data
 
 def get_messages_and_validate(
     namespace: str,
@@ -21,7 +19,7 @@ def get_messages_and_validate(
     subscription: str,
     max_message_count: int,
     max_wait_time: int,
-    model: BaseModel,
+    schema,
 ) -> list | str:
     """
     Retrieve messages from a Service Bus topic subscription.
@@ -33,7 +31,7 @@ def get_messages_and_validate(
         subscription (str): The name of the subscription.
         max_message_count (int): The maximum number of messages to retrieve.
         max_wait_time (int): The maximum wait time in seconds.
-        model (BaseModel): The pydantic model to validate against.
+        schema: The json schema to validate against.
 
     Returns:
         list: A list of messages retrieved from the topic subscription.
@@ -68,13 +66,13 @@ def get_messages_and_validate(
             try:
                 if messages:
                     print("Validating message data...")
-                    validate(messages, model)
+                    validate_data(messages, schema)
                     for message in received_msgs:
                         subscription_receiver.complete_message(message)
                     print("Messages validated and completed")
-                    return messages
                 else:
                     print("No messages to validate")
+                return messages
             except Exception as e:
                 for message in received_msgs:
                     subscription_receiver.abandon_message(message)
@@ -88,7 +86,7 @@ def send_to_storage(
     container: str,
     entity: str,
     data: list[list | dict],
-) -> None:
+) -> int:
     """
     Upload data to Azure Blob Storage.
 
@@ -100,8 +98,9 @@ def send_to_storage(
         data: The data to be uploaded.
 
     Returns:
-        None
+        int: a count of messages processed. This is used in the http response body.
     """
+    
     from var_funcs import current_date, current_time
 
     _CURRENT_DATE = current_date()
@@ -119,5 +118,8 @@ def send_to_storage(
         print("Uploading file to storage...")
         blob_client.upload_blob(json_data, overwrite=True)
         print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
+
     else:
         print("No messages to process")
+
+    return len(data)

@@ -32,3 +32,4 @@ global:
   max_message_count: 1000
   max_wait_time: 5
   success_response: "Function executed successfully"
+  validation_error: "Failed validating"

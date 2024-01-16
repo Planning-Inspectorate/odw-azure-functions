@@ -4,8 +4,6 @@ Config file to hold variables used by function apps and other functions
 
 import datetime
 from azure.identity import DefaultAzureCredential
-from pydantic import ConfigDict
-
 
 def current_time():
     return (
@@ -20,4 +18,3 @@ def current_date():
 
 
 CREDENTIAL = DefaultAzureCredential()
-MODEL_CONFIG = ConfigDict(validate_assignment=True, extra="forbid")
