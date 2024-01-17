@@ -1,0 +1,12 @@
+# Define owner of the CODEOWNERS file itself
+/.github/CODEOWNERS @ChrisToppingKandC @alex-delany @MikeCross1979
+
+# Protect important folders
+/infrastructure/ @alex-delany @nasir-rahman9 @ChrisToppingKandC
+/workspace/ @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @paul-dragan-spartaglobal @ChrisToppingKandC
+/pipelines/ @alex-delany @ChrisToppingKandC @nasir-rahman9
+
+# Add protection for certain file extensions, i.e. a python or sql expert must approve
+*.py @ChrisToppingKandC @muhammadkc @paul-dragan-spartaglobal
+*.ipynb @ChrisToppingKandC @muhammadkc @paul-dragan-spartaglobal
+*.sql @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @paul-dragan-spartaglobal @ChrisToppingKandC
