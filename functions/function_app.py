@@ -35,14 +35,15 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["service-user.schema.json"]
-    _ENTITY = config["global"]["service-user-entity"]
+    _TOPIC = config["global"]["entities"]["service-user"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["service-user"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -51,7 +52,7 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -79,14 +80,15 @@ def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["nsip-project.schema.json"]
-    _ENTITY = config["global"]["nsip-project-entity"]
+    _TOPIC = config["global"]["entities"]["nsip-project"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-project"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -95,7 +97,7 @@ def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -123,14 +125,15 @@ def employee(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["employee.schema.json"]
-    _ENTITY = config["global"]["employee-entity"]
+    _TOPIC = config["global"]["entities"]["employee"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["employee"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -139,7 +142,7 @@ def employee(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -166,14 +169,15 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["nsip-document.schema.json"]
-    _ENTITY = config["global"]["nsip-document-entity"]
+    _TOPIC = config["global"]["entities"]["nsip-document"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-document"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -182,7 +186,7 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -211,14 +215,15 @@ def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["nsip-exam-timetable.schema.json"]
-    _ENTITY = config["global"]["nsip-exam-timetable-entity"]
+    _TOPIC = config["global"]["entities"]["nsip-exam-timetable"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-exam-timetable"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -227,7 +232,7 @@ def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -257,14 +262,15 @@ def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["nsip-project-update.schema.json"]
-    _ENTITY = config["global"]["nsip-project-update-entity"]
+    _TOPIC = config["global"]["entities"]["nsip-project-update"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-project-update"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -273,7 +279,7 @@ def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -303,14 +309,15 @@ def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["nsip-representation.schema.json"]
-    _ENTITY = config["global"]["nsip-representation-entity"]
+    _TOPIC = config["global"]["entities"]["nsip-representation"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-representation"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -319,7 +326,7 @@ def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -349,14 +356,15 @@ def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["nsip-subscription.schema.json"]
-    _ENTITY = config["global"]["nsip-subscription-entity"]
+    _TOPIC = config["global"]["entities"]["nsip-subscription"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-subscription"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -365,7 +373,7 @@ def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -393,14 +401,15 @@ def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["s51-advice.schema.json"]
-    _ENTITY = config["global"]["nsip-s51-advice-entity"]
+    _TOPIC = config["global"]["entities"]["nsip-s51-advice"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-s51-advice"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -409,7 +418,7 @@ def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
@@ -437,14 +446,15 @@ def caseschedule(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     _SCHEMA = _SCHEMAS["case-schedule.schema.json"]
-    _ENTITY = config["global"]["case-schedule-entity"]
+    _TOPIC = config["global"]["entities"]["case-schedule"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["case-schedule"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
-            topic=_ENTITY,
-            subscription=_ENTITY,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
@@ -453,7 +463,7 @@ def caseschedule(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_ENTITY,
+            entity=_TOPIC,
             data=_data,
         )
         return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)

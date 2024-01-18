@@ -19,17 +19,48 @@ prod:
 
 global:
   odt-schemas-repo: "https://github.com/Planning-Inspectorate/data-model/tree/main/schemas"
-  service-user-entity: "service-user"
-  nsip-project-entity: "nsip-project"
-  employee-entity: "employee"
-  nsip-document-entity: "nsip-document"
-  nsip-exam-timetable-entity: "nsip-exam-timetable"
-  nsip-project-update-entity: "nsip-project-update"
-  nsip-representation-entity: "nsip-representation"
-  nsip-subscription-entity: "nsip-subscription"
-  nsip-s51-advice-entity: "nsip-s51-advice"
-  case-schedule-entity: "case-schedule"
   max_message_count: 1000
   max_wait_time: 5
   success_response: "Function executed successfully"
   validation_error: "Failed validating"
+
+  entities:
+    service-user:
+      topic: "service-user"
+      subscription: "service-user"
+
+    nsip-project:
+      topic: "nsip-project"
+      subscription: "nsip-project"
+
+    employee: 
+      topic: "employee"
+      subscription: "employee-topic-subscription"
+
+    nsip-document: 
+      topic: "nsip-document" 
+      subscription: "nsip-document"
+
+    nsip-exam-timetable: 
+      topic: "nsip-exam-timetable"
+      subscription: "nsip-exam-timetable"
+
+    nsip-project-update: 
+      topic: "nsip-project-update" 
+      subscription: "nsip-project-update"
+
+    nsip-representation:
+      topic: "nsip-representation"
+      subscription: "nsip-representation"
+
+    nsip-subscription: 
+     topic: "nsip-subscription"
+     subscription: "nsip-subscription"
+
+    nsip-s51-advice: 
+      topic: "nsip-s51-advice"
+      subscription: "nsip-s51-advice"
+
+    case-schedule: 
+      topic: "case-schedule"
+      subscription: "case-schedule"
