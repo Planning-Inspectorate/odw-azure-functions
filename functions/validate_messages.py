@@ -1,6 +1,9 @@
 """
 Module containing a validate function to be called to run validation
-of a list of sevricebus messages
+of a list of sevricebus messages.
+
+The validation uses jsonschema with a format checker function to 
+check that the date-time is compliant with ISO8601.
 """
 
 from jsonschema import validate, FormatChecker, ValidationError
