@@ -47,6 +47,9 @@ trigger:
     exclude:
       - 'functions/*/*'
 
+# Disable pull request triggers, i.e. it will not be triggered by any pull requests.
+pr: none
+
 # Specify the Microsoft hosted image we want to use.
 pool:
   vmImage: ubuntu-22.04
