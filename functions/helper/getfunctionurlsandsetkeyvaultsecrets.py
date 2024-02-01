@@ -54,13 +54,25 @@ def set_secret(secret_name: str, secret_value: str) -> None:
     secret_client.set_secret(secret_name, secret_value)
     return print(f"{secret_name} created")
 
-function_list = listfunctions(resource_group_name, function_app_name)
-for function in function_list:
-    name = function.split("/")[1]
-    function_key = getfunctionkey(resource_group_name, function_app_name, name)
-    function_url = getfunctionurl(function_app_name, name, function_key)
-    secret_name = f"function-url-{name}"
-    secret_value = function_url
-    set_secret(secret_name, secret_value)
+def listfunctionurls():
+    function_list = listfunctions(resource_group_name, function_app_name)
+    for function in function_list:
+        name = function.split("/")[1]
+        function_key = getfunctionkey(resource_group_name, function_app_name, name)
+        function_url = getfunctionurl(function_app_name, name, function_key)
+        print(function_url)
 
-print("All secrets added to KeyVault")
+def setkeyvaultsecrets():
+    function_list = listfunctions(resource_group_name, function_app_name)
+    for function in function_list:
+        name = function.split("/")[1]
+        function_key = getfunctionkey(resource_group_name, function_app_name, name)
+        function_url = getfunctionurl(function_app_name, name, function_key)
+        secret_name = f"function-url-{name}"
+        secret_value = function_url
+        set_secret(secret_name, secret_value)
+    print("All secrets added to KeyVault")
+
+# select the function you want to call or both
+listfunctionurls()
+setkeyvaultsecrets()
