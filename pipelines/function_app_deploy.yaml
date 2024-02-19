@@ -12,6 +12,13 @@ parameters:
     default: Dev
     values:
     - Dev
+  - name: appname
+    displayName: Function App Name
+    type: string
+    default: fnapp01
+    values:
+    - fnapp01
+    - fnapp02
 
 # Create variables to be used in further pipeline jobs / tasks.
 variables:
@@ -27,7 +34,7 @@ variables:
   value: 'pins-rg-function-app-odw-$(environment)-uks'
 # Set the name of the function app, adding the environment as a parameter.
 - name: functionApp
-  value: 'pins-fnapp01-odw-$(environment)-uks'
+  value: 'pins-${{ parameters.appname }}-odw-$(environment)-uks'
 # Set the name of the zip file containing the funciton app code to deploy.
 - name: zipFile
   value: '$(System.ArtifactsDirectory)/FunctionCode/functions.zip'
