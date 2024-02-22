@@ -128,4 +128,8 @@ jobs:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
-        az functionapp deployment source config-zip --resource-group $(resourceGroup) --name $(functionApp) --src $(zipFile)
+        az functionapp deployment source config-zip \
+        --resource-group $(resourceGroup) \
+        --name $(functionApp) \
+        --src $(zipFile) \
+        --build-remote true
