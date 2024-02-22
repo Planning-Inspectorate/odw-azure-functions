@@ -1,5 +1,6 @@
 """
 Azure Function code to read messages from Azure Service Bus and send them to Azure Storage
+One function for each Service us topic
 """
 
 import azure.functions as func
