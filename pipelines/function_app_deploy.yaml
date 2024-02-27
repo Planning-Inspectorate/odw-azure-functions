@@ -26,9 +26,9 @@ variables:
 - group: Terraform ${{ parameters.environment }}
 - name: environment
   value: ${{ lower(parameters.environment) }}
-# Set service connection for the environment to deploy to, e.g. ODW Dev, ODW Test, ODW Prod
+# Set service connection for the environment to deploy to.
 - name: armServiceConnectionName
-  value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
+  value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(parameters.environment)) }}
 # Set the resource group where the function app resides, adding the environment as a parameter.
 - name: resourceGroup
   value: 'pins-rg-function-app-odw-$(environment)-uks'

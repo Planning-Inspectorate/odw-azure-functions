@@ -20,7 +20,7 @@ variables:
     ${{ if eq(parameters.failover_deployment, true) }}:
       value: $(AGENT_POOL_GROUP_NAME_FAILOVER)
   - name: armServiceConnectionName
-    value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
+    value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(parameters.environment)) }}
   - name: artifactName
     value: terraform-plan
   - name: environment

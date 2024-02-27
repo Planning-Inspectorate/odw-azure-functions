@@ -15,7 +15,9 @@ parameters:
 variables:
 - group: Terraform ${{ parameters.environment }}
 - name: armServiceConnectionName
-  value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
+# Azure DevOps Pipelines - ODW DEV - Infrastructure
+  value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(parameters.environment)) }}
+  # value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
 - name: artifactName
   value: terraform-plan
 - name: environment
