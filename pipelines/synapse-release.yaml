@@ -21,7 +21,7 @@ parameters:
 variables:
 - group: Terraform ${{ parameters.environment }}
 - name: armServiceConnectionName
-  value: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }}
+  value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(parameters.environment)) }}
 - name: artifactName
   value: synapse-release
 - name: createLakeDatabasesPipeline
