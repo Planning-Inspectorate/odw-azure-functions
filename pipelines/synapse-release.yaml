@@ -21,7 +21,7 @@ parameters:
 variables:
 - group: Terraform ${{ parameters.environment }}
 - name: armServiceConnectionName
-  value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(parameters.environment)) }}
+  value: ${{ format('ODW {0} - Infrastructure', upper(parameters.environment)) }}
 - name: artifactName
   value: synapse-release
 - name: createLakeDatabasesPipeline
@@ -236,7 +236,7 @@ stages:
               continueOnError: true
               displayName: 'Deploy Workspace'
               inputs:
-                AzureResourceManagerConnection: ${{ replace(format('ODW {0}', parameters.environment), 'Test', 'PreProd') }} # Using "${{ variables.armServiceConnection }}" causes step to fail
+                AzureResourceManagerConnection: ${{ format('ODW {0} - Infrastructure', upper(parameters.environment))}} # Using "${{ variables.armServiceConnection }}" causes step to fail
                 DeleteArtifactsNotInTemplate: true
                 Environment: 'prod'
                 operation: 'deploy'
