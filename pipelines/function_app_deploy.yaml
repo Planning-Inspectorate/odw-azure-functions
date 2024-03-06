@@ -12,6 +12,8 @@ parameters:
     default: Dev
     values:
     - Dev
+    - Test
+    - Prod
   - name: appname
     displayName: Function App Name
     type: string
@@ -32,6 +34,9 @@ variables:
 # Set the resource group where the function app resides, adding the environment as a parameter.
 - name: resourceGroup
   value: 'pins-rg-function-app-odw-$(environment)-uks'
+# Set the agent pool name
+- name: poolName
+  value: 'pins-agent-pool-odw-$(environment)-uks'
 # Set the name of the function app, adding the environment as a parameter.
 - name: functionApp
   value: 'pins-${{ parameters.appname }}-odw-$(environment)-uks'
@@ -59,22 +64,14 @@ pr: none
 
 # Specify the Microsoft hosted image we want to use.
 pool:
-  vmImage: ubuntu-22.04
+  '$(poolName)'
 
 jobs:
-
-# Login to Azure using the service connection according to the environment.
-- job: AzureLogin
-  displayName: 'Azure login'
-
-  steps:
-
-  - template: steps/azure-login.yaml
 
 # Build and package the code.
 - job: BuildAndPackage
   displayName: 'Build and Package'
-  dependsOn: AzureLogin
+  # dependsOn: AzureLogin
 
   steps:
 
