@@ -61,8 +61,10 @@ resources:
     name: Planning-Inspectorate/odw-config
     ref: main
     trigger:
-    - main
-
+      branches:
+        include:
+          - main
+          
 jobs:
 
 - job: CopyFiles
