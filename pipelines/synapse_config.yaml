@@ -13,6 +13,8 @@ parameters:
   default: Dev
   values:
   - Dev
+  - Test
+  - Prod
 - name: failover_deployment
   displayName: 'Failover Deployment'
   type: boolean
@@ -22,64 +24,50 @@ parameters:
 variables:
 - group: Terraform ${{ parameters.environment }}
 
-- name: environment
-  value: ${{ lower(parameters.environment) }}
-
 # Set service connection for the environment to deploy to, e.g. ODW Dev, ODW Test, ODW Prod
 - name: armServiceConnectionName
   value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(parameters.environment)) }}
 
 - name: poolName
-  value: 'pins-agent-pool-odw-dev-uks'
+  value: ${{ format('pins-agent-pool-odw-{0}-uks', lower(parameters.environment)) }}
 
 - name: source_folder
-  value: '$(System.DefaultWorkingDirectory)/infrastructure/configuration/data-lake'
+  value: '$(System.DefaultWorkingDirectory)/data-lake'
 
 - name: target_folder
   value: '$(Build.ArtifactStagingDirectory)'
 
-- name: config_files_path
-  value: '**/infrastructure/configuration/data-lake/*'
-
 - name: storage_account_name
-  value: 'pinsstodwdevuks9h80mb'
+  value: $(DATA_LAKE_STORAGE)
 
 - name: storage_container
-  value: 'data-lake-config'
+  value: 'odw-config'
 
 # Github branch to trigger the running of this pipeline.
 # Any code change in this branch will trigger this pipeline.
-trigger: none
-  # branches:
-  #   include:
-  #     - 'main'
-
-# Only code in the below paths will trigger the pipeline.
-  # paths:
-  #   include:
-  #     - '$(config_files_path)'
+trigger:
+  branches:
+    include:
+      - 'main'
 
 # Disable pull request triggers, i.e. it will not be triggered by any pull requests.
 pr: none
 
 # Specify the Microsoft hosted image we want to use.
-pool: 
-  # vmImage: ubuntu-22.04
-
-  '$(poolName)'
+pool: '$(poolName)'
 
 resources:
   repositories:
   - repository: config
     type: github
     endpoint: Planning-Inspectorate
-    name: Planning-Inspectorate/ODW-Service
+    name: Planning-Inspectorate/odw-config
     ref: main
 
 jobs:
 
-- job: BuildAndPackage
-  displayName: 'Build and Package'
+- job: CopyFiles
+  displayName: 'Copy Files'
 
   steps:
 
