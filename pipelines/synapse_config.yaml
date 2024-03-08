@@ -45,10 +45,7 @@ variables:
 
 # Github branch to trigger the running of this pipeline.
 # Any code change in this branch will trigger this pipeline.
-trigger:
-  branches:
-    include:
-      - 'main'
+trigger: none
 
 # Disable pull request triggers, i.e. it will not be triggered by any pull requests.
 pr: none
@@ -63,6 +60,8 @@ resources:
     endpoint: Planning-Inspectorate
     name: Planning-Inspectorate/odw-config
     ref: main
+    trigger:
+    - main
 
 jobs:
 
