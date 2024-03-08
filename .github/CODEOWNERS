@@ -1,24 +1,22 @@
 # Define owner of the CODEOWNERS file itself
-/.github/CODEOWNERS                                             @ChrisToppingKandC @alex-delany @MikeCross1979
+/.github/CODEOWNERS                                             @ChrisToppingKandC @alex-delany @MikeCross1979 @beejjacobs
 
 # Protect important folders
+
+# Github Actions workflows
+/.github/workflows                                              @ChrisToppingKandC @beejjacobs
 
 # most files in infrastructure relate to Terraform code
 /infrastructure/**                                              @alex-delany @nasir-rahman9 @ChrisToppingKandC
 
-# the following sub-folders however contain files managed
-# by the data team
-/infrastructure/configuration/data-lake/**                      @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @paul-dragan-spartaglobal @ChrisToppingKandC
-/infrastructure/configuration/data-lifecycle/**                 @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @paul-dragan-spartaglobal @ChrisToppingKandC
-
 # Azure Synapse files
-/workspace/**                                                   @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @paul-dragan-spartaglobal @ChrisToppingKandC
+/workspace/**                                                   @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @ChrisToppingKandC
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @alex-delany @ChrisToppingKandC @nasir-rahman9 @m-juckes-pins
+/pipelines/**                                                   @alex-delany @ChrisToppingKandC @nasir-rahman9 @m-juckes-pins @MariaValeroGonzalezKC @muhammadkc
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
-*.py                                                            @ChrisToppingKandC @muhammadkc @paul-dragan-spartaglobal
-*.ipynb                                                         @ChrisToppingKandC @muhammadkc @paul-dragan-spartaglobal
-*.sql                                                           @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @paul-dragan-spartaglobal @ChrisToppingKandC
+*.py                                                            @ChrisToppingKandC @muhammadkc @MariaValeroGonzalezKC
+*.ipynb                                                         @ChrisToppingKandC @muhammadkc @MariaValeroGonzalezKC
+*.sql                                                           @MikeCross1979 @MariaValeroGonzalezKC @muhammadkc @ChrisToppingKandC
