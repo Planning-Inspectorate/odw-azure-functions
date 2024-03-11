@@ -43,10 +43,6 @@ variables:
 - name: storage_container
   value: 'odw-config'
 
-# Github branch to trigger the running of this pipeline.
-# Any code change in this branch will trigger this pipeline.
-trigger: none
-
 # Disable pull request triggers, i.e. it will not be triggered by any pull requests.
 pr: none
 
