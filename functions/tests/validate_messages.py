@@ -36,7 +36,7 @@ def validate_data(data: list, schema: dict) -> list:
         except ValidationError as e:
             print(e)
             success = False
-            raise e
+            # raise e
     if success:
         return data
     else:
