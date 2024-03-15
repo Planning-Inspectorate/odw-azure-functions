@@ -21,10 +21,10 @@ _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
 _app = func.FunctionApp()
 
-@_app.function_name("serviceuser")
-@_app.route(route="serviceuser", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
 
+@_app.function_name("folder")
+@_app.route(route="folder", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def folder(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -35,9 +35,9 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    _SCHEMA = _SCHEMAS["service-user.schema.json"]
-    _TOPIC = config["global"]["entities"]["service-user"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["service-user"]["subscription"]
+    _SCHEMA = _SCHEMAS["folder.schema.json"]
+    _TOPIC = config["global"]["entities"]["folder"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["folder"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
@@ -56,7 +56,10 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
 
     except Exception as e:
         return (
@@ -65,100 +68,10 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
-
-@_app.function_name("nsipproject")
-@_app.route(route="nsipproject", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
-
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-project.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-project"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-project"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("employee")
-@_app.route(route="employee", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def employee(req: func.HttpRequest) -> func.HttpResponse:
-
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["employee.schema.json"]
-    _TOPIC = config["global"]["entities"]["employee"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["employee"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
 
 @_app.function_name("nsipdocument")
 @_app.route(route="nsipdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
-
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -190,7 +103,10 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
 
     except Exception as e:
         return (
@@ -199,12 +115,12 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
+
 @_app.function_name("nsipexamtimetable")
 @_app.route(
     route="nsipexamtimetable", methods=["get"], auth_level=func.AuthLevel.FUNCTION
 )
 def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
-
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -236,7 +152,57 @@ def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
+
+    except Exception as e:
+        return (
+            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
+            if f"{_VALIDATION_ERROR}" in str(e)
+            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )
+
+
+@_app.function_name("nsipproject")
+@_app.route(route="nsipproject", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function endpoint for handling HTTP requests.
+
+    Args:
+        req: An instance of `func.HttpRequest` representing the HTTP request.
+
+    Returns:
+        An instance of `func.HttpResponse` representing the HTTP response.
+    """
+
+    _SCHEMA = _SCHEMAS["nsip-project.schema.json"]
+    _TOPIC = config["global"]["entities"]["nsip-project"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-project"]["subscription"]
+
+    try:
+        _data = get_messages_and_validate(
+            namespace=_NAMESPACE,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA,
+        )
+        _message_count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=_data,
+        )
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
 
     except Exception as e:
         return (
@@ -251,7 +217,6 @@ def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
     route="nsipprojectupdate", methods=["get"], auth_level=func.AuthLevel.FUNCTION
 )
 def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
-
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -283,7 +248,10 @@ def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
 
     except Exception as e:
         return (
@@ -298,7 +266,6 @@ def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
     route="nsiprepresentation", methods=["get"], auth_level=func.AuthLevel.FUNCTION
 )
 def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
-
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -330,54 +297,10 @@ def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
         )
-
-
-@_app.function_name("nsipsubscription")
-@_app.route(
-    route="nsipsubscription", methods=["get"], auth_level=func.AuthLevel.FUNCTION
-)
-def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
-
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-subscription.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-subscription"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-subscription"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
 
     except Exception as e:
         return (
@@ -390,7 +313,6 @@ def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
 @_app.function_name("nsips51advice")
 @_app.route(route="nsips51advice", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
-
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -422,7 +344,10 @@ def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
 
     except Exception as e:
         return (
@@ -432,10 +357,11 @@ def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
-@_app.function_name("caseschedule")
-@_app.route(route="caseschedule", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def caseschedule(req: func.HttpRequest) -> func.HttpResponse:
-
+@_app.function_name("nsipsubscription")
+@_app.route(
+    route="nsipsubscription", methods=["get"], auth_level=func.AuthLevel.FUNCTION
+)
+def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function endpoint for handling HTTP requests.
 
@@ -446,9 +372,9 @@ def caseschedule(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    _SCHEMA = _SCHEMAS["case-schedule.schema.json"]
-    _TOPIC = config["global"]["entities"]["case-schedule"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["case-schedule"]["subscription"]
+    _SCHEMA = _SCHEMAS["nsip-subscription.schema.json"]
+    _TOPIC = config["global"]["entities"]["nsip-subscription"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["nsip-subscription"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
@@ -467,7 +393,57 @@ def caseschedule(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
+
+    except Exception as e:
+        return (
+            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
+            if f"{_VALIDATION_ERROR}" in str(e)
+            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )
+
+
+@_app.function_name("serviceuser")
+@_app.route(route="serviceuser", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function endpoint for handling HTTP requests.
+
+    Args:
+        req: An instance of `func.HttpRequest` representing the HTTP request.
+
+    Returns:
+        An instance of `func.HttpResponse` representing the HTTP response.
+    """
+
+    _SCHEMA = _SCHEMAS["service-user.schema.json"]
+    _TOPIC = config["global"]["entities"]["service-user"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["service-user"]["subscription"]
+
+    try:
+        _data = get_messages_and_validate(
+            namespace=_NAMESPACE,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA,
+        )
+        _message_count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=_data,
+        )
+        return func.HttpResponse(
+            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            status_code=200,
+        )
 
     except Exception as e:
         return (
