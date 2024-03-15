@@ -12,6 +12,7 @@ from azure.storage.blob import BlobServiceClient
 import json
 from validate_messages import validate_data
 
+
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
@@ -100,7 +101,7 @@ def send_to_storage(
     Returns:
         int: a count of messages processed. This is used in the http response body.
     """
-    
+
     from var_funcs import current_date, current_time
 
     _CURRENT_DATE = current_date()

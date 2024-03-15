@@ -19,23 +19,16 @@ prod:
 
 global:
   odt-schemas-repo: "https://github.com/Planning-Inspectorate/data-model/tree/main/schemas"
-  max_message_count: 1000
+  max_message_count: 100000
   max_wait_time: 5
   success_response: "Function executed successfully"
   validation_error: "Failed validating"
 
   entities:
-    service-user:
-      topic: "service-user"
-      subscription: "service-user"
 
-    nsip-project:
-      topic: "nsip-project"
-      subscription: "nsip-project"
-
-    employee: 
-      topic: "employee"
-      subscription: "employee-topic-subscription"
+    folder:
+      topic: "folder"
+      subscription: "folder"
 
     nsip-document: 
       topic: "nsip-document" 
@@ -45,6 +38,10 @@ global:
       topic: "nsip-exam-timetable"
       subscription: "nsip-exam-timetable"
 
+    nsip-project:
+      topic: "nsip-project"
+      subscription: "nsip-project"
+
     nsip-project-update: 
       topic: "nsip-project-update" 
       subscription: "nsip-project-update"
@@ -53,14 +50,14 @@ global:
       topic: "nsip-representation"
       subscription: "nsip-representation"
 
-    nsip-subscription: 
-     topic: "nsip-subscription"
-     subscription: "nsip-subscription"
-
     nsip-s51-advice: 
       topic: "nsip-s51-advice"
       subscription: "nsip-s51-advice"
 
-    case-schedule: 
-      topic: "case-schedule"
-      subscription: "case-schedule"
+    nsip-subscription: 
+     topic: "nsip-subscription"
+     subscription: "nsip-subscription"
+
+    service-user:
+      topic: "service-user"
+      subscription: "service-user"

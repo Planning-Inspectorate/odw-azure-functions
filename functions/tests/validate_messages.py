@@ -6,8 +6,8 @@ of a list of sevricebus messages
 from jsonschema import validate, FormatChecker, ValidationError
 from iso8601 import parse_date, ParseError
 
-def is_iso8601_date_time(instance):
 
+def is_iso8601_date_time(instance):
     """
     Function to check if a date matches ISO-8601 format
     """
@@ -18,13 +18,13 @@ def is_iso8601_date_time(instance):
     except ParseError:
         return False
 
-def validate_data(data: list, schema: dict) -> list:
 
+def validate_data(data: list, schema: dict) -> list:
     """
     Function to validate a list of servicebus messages.
     Validation includes a format check against ISO-8601.
     """
-    
+
     format_checker = FormatChecker()
     format_checker.checks("date-time")(is_iso8601_date_time)
 
@@ -32,7 +32,7 @@ def validate_data(data: list, schema: dict) -> list:
 
     for message in data:
         try:
-            validate(instance = message, schema = schema, format_checker = format_checker)
+            validate(instance=message, schema=schema, format_checker=format_checker)
         except ValidationError as e:
             print(e)
             success = False
