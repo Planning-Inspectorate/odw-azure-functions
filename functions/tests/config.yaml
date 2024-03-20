@@ -26,38 +26,46 @@ global:
 
   entities:
 
-    folder:
-      topic: "folder"
-      subscription: "folder"
+    # folder:
+    #   topic: "folder"
+    #   subscription: "folder"
 
     nsip-document: 
       topic: "nsip-document" 
       subscription: "nsip-document"
+      schema: "nsip-document.schema.json"
 
     nsip-exam-timetable: 
       topic: "nsip-exam-timetable"
       subscription: "nsip-exam-timetable"
+      schema: "nsip-exam-timetable.schema.json"
 
     nsip-project:
       topic: "nsip-project"
       subscription: "nsip-project"
+      schema: "nsip-project.schema.json"
 
     nsip-project-update: 
       topic: "nsip-project-update" 
       subscription: "nsip-project-update"
+      schema: "nsip-project-update.schema.json"
 
     nsip-representation:
       topic: "nsip-representation"
       subscription: "nsip-representation"
+      schema: "nsip-representation.schema.json"
 
     nsip-s51-advice: 
       topic: "nsip-s51-advice"
       subscription: "nsip-s51-advice"
+      schema: "s51-advice.schema.json"
 
     nsip-subscription: 
      topic: "nsip-subscription"
      subscription: "nsip-subscription"
+     schema: "nsip-subscription.schema.json"
 
     service-user:
       topic: "service-user"
       subscription: "service-user"
+      schema: "service-user.schema.json"

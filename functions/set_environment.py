@@ -16,7 +16,7 @@ Functions:
 
 import yaml
 
-CURRENT_ENVIRONMENT = "dev"
+CURRENT_ENVIRONMENT = "preprod"
 ENV_CONFIG_FILE = "config.yaml"
 
 
