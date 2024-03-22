@@ -8,6 +8,7 @@ from servicebus_funcs import get_messages_and_validate, send_to_storage
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
+import json
 
 _STORAGE = current_config["storage_account"]
 _CONTAINER = current_config["storage_container"]
@@ -56,9 +57,12 @@ def folder(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -103,9 +107,12 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -152,9 +159,12 @@ def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -199,9 +209,12 @@ def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -248,9 +261,12 @@ def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -297,9 +313,12 @@ def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -344,9 +363,12 @@ def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -393,9 +415,12 @@ def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
@@ -440,9 +465,12 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
+        
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
         return func.HttpResponse(
-            f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            status_code=200,
+            response,
+            status_code=200
         )
 
     except Exception as e:
