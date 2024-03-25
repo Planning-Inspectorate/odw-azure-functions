@@ -9,11 +9,12 @@ from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
 import json
+import os
 
-_STORAGE = current_config["storage_account"]
-_CONTAINER = current_config["storage_container"]
+_STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
+_CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
+_NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
 _CREDENTIAL = CREDENTIAL
-_NAMESPACE = current_config["servicebus_namespace_odt"]
 _MAX_MESSAGE_COUNT = config["global"]["max_message_count"]
 _MAX_WAIT_TIME = config["global"]["max_wait_time"]
 _SUCCESS_RESPONSE = config["global"]["success_response"]
