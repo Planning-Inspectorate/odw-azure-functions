@@ -1,0 +1,37 @@
+parameters:
+  - name: environment
+    type: string
+
+  - name: armServiceConnectionName
+    type: string
+
+  - name: resourceGroup
+    type: string
+
+  - name: functionApp
+    type: string
+
+  - name: zipFile
+    type: string
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Deploy to function app'
+  inputs:
+    azureSubscription: ${{ parameters.armServiceConnectionName }}
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+
+      echo "Deploying to function app with the following variables:"
+      echo "Environment: $(environment)"
+      echo "Service Connection": $(armServiceConnectionName)
+      echo "Resource Group: $(resourceGroup)"
+      echo "Function App Name: $(functionApp)"
+      echo "Zip File: $(zipFile)"
+
+      az functionapp deployment source config-zip \
+      --resource-group $(resourceGroup) \
+      --name $(functionApp) \
+      --src $(zipFile) \
+      --build-remote true
