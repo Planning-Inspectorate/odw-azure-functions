@@ -4,45 +4,14 @@
 ###
 
 ---
-# Set environment parameter. This can be set at runtime if running manually.
+# Set function app parameter, in case there are multiple apps
 parameters:
-  - name: environment
-    displayName: Environment
-    type: string
-    default: Dev
-    values:
-    - Dev
-    - Test
-    - Prod
   - name: appname
     displayName: Function App Name
     type: string
     default: fnapp01
     values:
     - fnapp01
-    - fnapp02
-
-# Create variables to be used in further pipeline jobs / tasks.
-variables:
-# The variable group can be seen in the portal and contains environment variables for the service connection and are used in azure-login.yaml.
-- group: Terraform ${{ parameters.environment }}
-- name: environment
-  value: ${{ lower(parameters.environment) }}
-# Set service connection for the environment to deploy to.
-- name: armServiceConnectionName
-  value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(parameters.environment)) }}
-# Set the resource group where the function app resides, adding the environment as a parameter.
-- name: resourceGroup
-  value: 'pins-rg-function-app-odw-$(environment)-uks'
-# Set the agent pool name
-- name: poolName
-  value: 'pins-agent-pool-odw-$(environment)-uks'
-# Set the name of the function app, adding the environment as a parameter.
-- name: functionApp
-  value: 'pins-${{ parameters.appname }}-odw-$(environment)-uks'
-# Set the name of the zip file containing the funciton app code to deploy.
-- name: zipFile
-  value: '$(System.ArtifactsDirectory)/FunctionCode/functions.zip'
 
 # Github branch to trigger the running of this pipeline.
 # Any code change in this branch will trigger this pipeline.
@@ -51,8 +20,8 @@ trigger:
     include:
       - 'main'
 
-# Only code in the below paths will trigger the pipeline.
-# All files in the functions folder but not files in subfolders.
+  # Only code in the below paths will trigger the pipeline.
+  # All files in the functions folder but not files in subfolders.
   paths:
     include:
       - 'functions/*'
@@ -62,71 +31,177 @@ trigger:
 # Disable pull request triggers, i.e. it will not be triggered by any pull requests.
 pr: none
 
-# Specify the Microsoft hosted image we want to use.
-pool:
-  '$(poolName)'
+stages:
 
-jobs:
+- stage: BuildStage
 
-# Build and package the code.
-- job: BuildAndPackage
-  displayName: 'Build and Package'
-  # dependsOn: AzureLogin
+  pool: 
+    'pins-agent-pool-odw-dev-uks'
 
-  steps:
+  jobs:
 
-# Checkout the Github repo, in this case ODW-Service.
-  - checkout: self
-    displayName: 'Checkout repo'
+  # Build and package the code.
+  - job: BuildAndPackage
+    displayName: 'Build and Package'
 
-# Switch to functions directory and create a file containing a list of all files in the top level folder.
-  - script: |
+    steps:
 
-      cd $(Build.SourcesDirectory)/functions
-      find . -maxdepth 1 -type f | sed 's|^\./||' > $(Build.SourcesDirectory)/functions/filelist.txt
+    # Checkout the Github repo, in this case ODW-Service.
+    - checkout: self
+      displayName: 'Checkout repo'
 
-    displayName: 'Creating top level files list'
-
-# Create a zip file of all the files in the filelist.
-  - script: |
+    # Switch to functions directory and create a file containing a list of all files in the top level folder.
+    - script: |
 
         cd $(Build.SourcesDirectory)/functions
-        cat $(Build.SourcesDirectory)/functions/filelist.txt | xargs zip -r $(Build.ArtifactStagingDirectory)/functions.zip
+        find . -maxdepth 1 -type f | sed 's|^\./||' > $(Build.SourcesDirectory)/functions/filelist.txt
 
-    displayName: 'Archive top level files'
+      displayName: 'Creating top level files list'
 
-# Publish the zip file as an artifact to be used further in the pipeline.
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish build artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      ArtifactName: 'FunctionCode'
+    # Create a zip file of all the files in the filelist.
+    - script: |
 
-# Job to deploy the zip file to an existing Azure Function App.
-- job: DeployToAzureFunctions
-  displayName: 'Deploy to Azure Functions'
-  dependsOn: BuildAndPackage
-  
-  steps:
+          cd $(Build.SourcesDirectory)/functions
+          cat $(Build.SourcesDirectory)/functions/filelist.txt | xargs zip -r $(Build.ArtifactStagingDirectory)/functions.zip
 
-# Download the artifact first - the zip file.
-  - task: DownloadBuildArtifacts@1
-    displayName: 'Download build artifact'
-    inputs:
-      buildType: 'current'
-      artifactName: 'FunctionCode'
-      downloadPath: '$(System.ArtifactsDirectory)'
+      displayName: 'Archive top level files'
 
-# Use the Azure CLI to deploy the zip file to the Function App in Azure.
-  - task: AzureCLI@2
-    displayName: 'Deploy to function app'
-    inputs:
-      azureSubscription: '$(armServiceConnectionName)'
-      scriptType: 'bash'
-      scriptLocation: 'inlineScript'
-      inlineScript: |
-        az functionapp deployment source config-zip \
-        --resource-group $(resourceGroup) \
-        --name $(functionApp) \
-        --src $(zipFile) \
-        --build-remote true
+    # Publish the zip file as an artifact to be used further in the pipeline.
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish build artifact'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'FunctionCode'
+
+- stage: DeployToDev
+  dependsOn: BuildStage
+  displayName: Deploy to Dev
+
+  variables:
+    - name: environment
+      value: dev
+      # Set service connection for the environment to deploy to.
+    - name: armServiceConnectionName
+      value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(variables.environment)) }}
+      # value: "Azure DevOps Pipelines - ODW TEST - Infrastructure"
+      # Set the resource group where the function app resides, adding the environment as a parameter.
+    - name: resourceGroup
+      value: 'pins-rg-function-app-odw-${{ variables.environment }}-uks'
+      # Set the name of the function app, adding the environment as a parameter.
+    - name: functionApp
+      value: 'pins-${{ parameters.appname }}-odw-${{ variables.environment }}-uks'
+      # Set the name of the zip file containing the funciton app code to deploy.
+    - name: zipFile
+      value: '$(System.ArtifactsDirectory)/FunctionCode/functions.zip'
+      # Set the agent pool
+    - name: poolName
+      value: 'pins-agent-pool-odw-${{ variables.environment }}-uks'
+
+  jobs:
+
+  # Job to deploy the zip file to an existing Azure Function App.
+  - job: DeployToAzureFunctions
+    displayName: 'Deploy to Azure Functions'
+    
+    steps:
+
+    # Download the artifact first - the zip file.
+    - template: steps/download_function_code.yaml
+
+    # Use the Azure CLI to deploy the zip file to the Function App in Azure.
+    - template: steps/deploy_to_function_app.yaml
+      parameters:
+        environment: $(environment)
+        armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+        resourceGroup: $(resourceGroup)
+        functionApp: $(functionApp)
+        zipFile: $(zipFile)
+
+- stage: DeployToTest
+  dependsOn: BuildStage
+  displayName: Deploy to Test
+
+  variables:
+  - name: environment
+    value: test
+    # Set service connection for the environment to deploy to.
+  - name: armServiceConnectionName
+    value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(variables.environment)) }}
+    # value: "Azure DevOps Pipelines - ODW TEST - Infrastructure"
+    # Set the resource group where the function app resides, adding the environment as a parameter.
+  - name: resourceGroup
+    value: 'pins-rg-function-app-odw-${{ variables.environment }}-uks'
+    # Set the name of the function app, adding the environment as a parameter.
+  - name: functionApp
+    value: 'pins-${{ parameters.appname }}-odw-${{ variables.environment }}-uks'
+    # Set the name of the zip file containing the funciton app code to deploy.
+  - name: zipFile
+    value: '$(System.ArtifactsDirectory)/FunctionCode/functions.zip'
+    # Set the agent pool
+  - name: poolName
+    value: 'pins-agent-pool-odw-${{ variables.environment }}-uks'
+
+  jobs:
+
+  # Job to deploy the zip file to an existing Azure Function App.
+  - job: DeployToAzureFunctions
+    displayName: 'Deploy to Azure Functions'
+    
+    steps:
+
+    # Download the artifact first - the zip file.
+    - template: steps/download_function_code.yaml
+
+    # Use the Azure CLI to deploy the zip file to the Function App in Azure.
+    - template: steps/deploy_to_function_app.yaml
+      parameters:
+        environment: $(environment)
+        armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+        resourceGroup: $(resourceGroup)
+        functionApp: $(functionApp)
+        zipFile: $(zipFile)
+
+- stage: DeployToProd
+  dependsOn: DeployToTest
+  displayName: Deploy to Prod
+  condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+  variables:
+  - name: environment
+    value: test
+    # Set service connection for the environment to deploy to.
+  - name: armServiceConnectionName
+    value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(variables.environment)) }}
+    # value: "Azure DevOps Pipelines - ODW TEST - Infrastructure"
+    # Set the resource group where the function app resides, adding the environment as a parameter.
+  - name: resourceGroup
+    value: 'pins-rg-function-app-odw-${{ variables.environment }}-uks'
+    # Set the name of the function app, adding the environment as a parameter.
+  - name: functionApp
+    value: 'pins-${{ parameters.appname }}-odw-${{ variables.environment }}-uks'
+    # Set the name of the zip file containing the funciton app code to deploy.
+  - name: zipFile
+    value: '$(System.ArtifactsDirectory)/FunctionCode/functions.zip'
+    # Set the agent pool
+  - name: poolName
+    value: 'pins-agent-pool-odw-${{ variables.environment }}-uks'
+
+  jobs:
+
+  # Job to deploy the zip file to an existing Azure Function App.
+  - job: DeployToAzureFunctions
+    displayName: 'Deploy to Azure Functions'
+    
+    steps:
+
+    # Download the artifact first - the zip file.
+    - template: steps/download_function_code.yaml
+
+    # Use the Azure CLI to deploy the zip file to the Function App in Azure.
+    - template: steps/deploy_to_function_app.yaml
+      parameters:
+        environment: $(environment)
+        armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+        resourceGroup: $(resourceGroup)
+        functionApp: $(functionApp)
+        zipFile: $(zipFile)
