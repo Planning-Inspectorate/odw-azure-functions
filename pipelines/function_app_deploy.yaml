@@ -168,7 +168,7 @@ stages:
 
   variables:
   - name: environment
-    value: test
+    value: prod
     # Set service connection for the environment to deploy to.
   - name: armServiceConnectionName
     value: ${{ format('Azure DevOps Pipelines - ODW {0} - Infrastructure', upper(variables.environment)) }}
