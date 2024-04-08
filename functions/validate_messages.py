@@ -15,6 +15,8 @@ def is_iso8601_date_time(instance) -> bool:
     Function to check if a date matches ISO-8601 format
     """
 
+    if instance is None:
+        return True
     try:
         parse_date(instance)
         return True
