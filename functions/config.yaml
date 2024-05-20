@@ -61,3 +61,7 @@ global:
     service-user:
       topic: "service-user"
       subscription: "service-user"
+
+    appeal-document:
+      topic: "appeal-document"
+      subscription: "appeal-document-odw-sub"
