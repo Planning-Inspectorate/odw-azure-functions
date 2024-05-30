@@ -65,3 +65,11 @@ global:
     appeal-document:
       topic: "appeal-document"
       subscription: "appeal-document-odw-sub"
+
+    appeal:
+      topic: "appeal"
+      subscription: "appeal-odw-sub"
+    
+    appeal-event:
+      topic: "appeal-event"
+      subscription: "appeal-event-odw-sub"
