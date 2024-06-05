@@ -66,9 +66,9 @@ global:
       topic: "appeal-document"
       subscription: "appeal-document-odw-sub"
 
-    appeal:
-      topic: "appeal"
-      subscription: "appeal-odw-sub"
+    appeal-has:
+      topic: "appeal-has"
+      subscription: "bo-appeals-case-subscription"
     
     appeal-event:
       topic: "appeal-event"

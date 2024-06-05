@@ -531,8 +531,8 @@ def appealdocument(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
-@_app.function_name("appeal")
-@_app.route(route="appeal", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.function_name("appealhas")
+@_app.route(route="appealhas", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def appeal(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function endpoint for handling HTTP requests.
@@ -544,9 +544,9 @@ def appeal(req: func.HttpRequest) -> func.HttpResponse:
         An instance of `func.HttpResponse` representing the HTTP response.
     """
 
-    _SCHEMA = _SCHEMAS["appeal.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal"]["subscription"]
+    _SCHEMA = _SCHEMAS["appeal-has.schema.json"]
+    _TOPIC = config["global"]["entities"]["appeal-has"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["appeal-has"]["subscription"]
 
     try:
         _data = get_messages_and_validate(
