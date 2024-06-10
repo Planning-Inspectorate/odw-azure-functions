@@ -14,6 +14,9 @@ parameters:
   - name: odtSubscriptionId
     type: string
     default: $(ODT_SUBSCRIPTION_ID)
+  - name: horizonSubscriptionId
+    type: string
+    default: $(HORIZON_SUBSCRIPTION_ID)
   - name: environment
     type: string
     default: dev
@@ -34,6 +37,7 @@ steps:
         -var-file=./environments/${{ parameters.environment }}.tfvars \
         -var "failover_deployment=${{ lower(parameters.failoverDeployment) }}" \
         -var "odt_subscription_id=${{ lower(parameters.odtSubscriptionId) }}" \
+        -var "horizon_subscription_id=${{ lower(parameters.horizonSubscriptionId) }}" \
         -input=false \
         -out=${{ parameters.planFileName }}
     displayName: 'Terraform Plan'
