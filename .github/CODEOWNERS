@@ -1,5 +1,5 @@
 # Define owner of the CODEOWNERS file itself
-/.github/CODEOWNERS                                             @ChrisToppingKandC @beejjacobs
+/.github/CODEOWNERS                                             @ChrisToppingKandC @beejjacobs @m-juckes-pins
 
 # Protect important folders
 
@@ -10,13 +10,13 @@
 /infrastructure/**                                              @ChrisToppingKandC @beejjacobs @m-juckes-pins
 
 # Azure Synapse files
-/workspace/**                                                   @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA
+/workspace/**                                                   @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA @kathryn-thompson
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @m-juckes-pins @paul-dragan-spartaglobal @IsminiA
+/pipelines/**                                                   @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @m-juckes-pins @paul-dragan-spartaglobal @IsminiA @kathryn-thompson
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
-*.py                                                            @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA
-*.ipynb                                                         @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA
-*.sql                                                           @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA
+*.py                                                            @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA @kathryn-thompson
+*.ipynb                                                         @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA @kathryn-thompson
+*.sql                                                           @ChrisToppingKandC @MariaValeroGonzalezKC @muhammadkc @RobPalmer30 @paul-dragan-spartaglobal @IsminiA @kathryn-thompson
