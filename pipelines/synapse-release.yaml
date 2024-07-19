@@ -4,6 +4,7 @@ parameters:
     type: string
     default: Test
     values:
+    - Dev
     - Test
     - Prod
   - name: source_workspace
