@@ -276,11 +276,11 @@ stages:
                 workingDirectory: infrastructure
 
             # Run Terraform apply
-            - template: steps/terraform-apply.yaml
-              parameters:
-                environment: ${{ variables.environment }}
-                planFilePath: ${{ variables.planFileName }}
-                workingDirectory: infrastructure
+            #- template: steps/terraform-apply.yaml
+            #  parameters:
+            #    environment: ${{ variables.environment }}
+            #    planFilePath: ${{ variables.planFileName }}
+            #    workingDirectory: infrastructure
 
             # Pause pipeline after Terraform deployment
             - template: steps/pause.yaml
