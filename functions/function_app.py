@@ -8,6 +8,7 @@ from servicebus_funcs import get_messages_and_validate, send_to_storage
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
+from azure.functions.decorators.core import DataType
 import json
 import os
 
@@ -677,3 +678,21 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
+    
+@_app.function_name(name="getTimesheets")
+@_app.route(route="timesheets/{caseType}/{searchCriteria}", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.generic_input_binding(arg_name="timesheet", type="sql",
+                        CommandType="Text",
+                        Parameters="@caseType={caseType},@searchCriteria={searchCriteria}",
+                        ConnectionStringSetting="SqlConnectionString",
+                        data_type=DataType.STRING)
+def get_timesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
+    with open("timesheets_sql.sql", 'r') as timesheets_query:
+        timesheets_sql = timesheets_query.read()
+        timesheet.set('CommandText', timesheets_sql)
+    rows = list(map(lambda r: json.loads(r.to_json()), timesheet))
+    return func.HttpResponse(
+        json.dumps(rows),
+        status_code=200,
+        mimetype="application/json"
+    )
