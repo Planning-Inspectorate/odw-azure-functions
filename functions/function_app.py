@@ -679,7 +679,7 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
-@_app.function_name(name="getTimesheets")
+@_app.function_name(name="get_timesheets")
 @_app.route(route="timesheets/{caseType}/{searchCriteria}", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 @_app.generic_input_binding(arg_name="timesheet", type="sql",
                         CommandType="Text",
