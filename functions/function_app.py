@@ -698,9 +698,6 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
                 connection_string_setting="SqlConnectionString")
 def get_timesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
     try:
-        with open("timesheets_sql.sql", 'r') as timesheets_query:
-            timesheets_sql = timesheets_query.read()
-            timesheet.set('CommandText', timesheets_sql)
         rows = list(map(lambda r: json.loads(r.to_json()), timesheet))
         return func.HttpResponse(
             json.dumps(rows),
