@@ -688,11 +688,12 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
-    
+
+'https://stackoverflow.com/questions/71914897/how-do-i-use-sql-like-value-operator-with-azure-functions-sql-binding'
 @_app.function_name(name="get_timesheets")
 @_app.route(route="timesheets/{caseType}/{searchCriteria}", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 @_app.sql_input(arg_name="timesheet",
-                command_text="SELECT TOP (100) * FROM [odw_harmonised_db].[dbo].[s62a_view_cases_dim] WHERE [Name] LIKE '@searchCriteria'",
+                command_text="SELECT TOP (100) * FROM [odw_harmonised_db].[dbo].[s62a_view_cases_dim] WHERE [Name] LIKE Concat(Char(37), '@searchCriteria', Char(37))",
                 command_type="Text",
                 parameters="@caseType={caseType},@searchCriteria={searchCriteria}",
                 connection_string_setting="SqlConnectionString")
