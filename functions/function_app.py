@@ -12,10 +12,20 @@ from azure.functions.decorators.core import DataType
 import json
 import os
 
-_STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
-_CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
-_NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
-_NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
+
+try:
+    _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
+    _CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
+    _NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
+    _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
+except:
+    print("Warning: Missing Environment Variables")
+    _STORAGE = ""
+    _CONTAINER = ""
+    _NAMESPACE = ""
+    _NAMESPACE_APPEALS = ""
+
+
 _CREDENTIAL = CREDENTIAL
 _MAX_MESSAGE_COUNT = config["global"]["max_message_count"]
 _MAX_WAIT_TIME = config["global"]["max_wait_time"]
@@ -681,18 +691,23 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
     
 @_app.function_name(name="get_timesheets")
 @_app.route(route="timesheets/{caseType}/{searchCriteria}", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-@_app.generic_input_binding(arg_name="timesheet", type="sql",
-                        CommandType="Text",
-                        Parameters="@caseType={caseType},@searchCriteria={searchCriteria}",
-                        ConnectionStringSetting="SqlConnectionString",
-                        data_type=DataType.STRING)
+@_app.sql_input(arg_name="timesheet",
+                command_text="SELECT TOP (100) * FROM [odw_harmonised_db].[dbo].[s62a_view_cases_dim] WHERE [Name] LIKE '@searchCriteria'",
+                command_type="Text",
+                parameters="@caseType={caseType},@searchCriteria={searchCriteria}",
+                connection_string_setting="SqlConnectionString")
 def get_timesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
-    with open("timesheets_sql.sql", 'r') as timesheets_query:
-        timesheets_sql = timesheets_query.read()
-        timesheet.set('CommandText', timesheets_sql)
-    rows = list(map(lambda r: json.loads(r.to_json()), timesheet))
-    return func.HttpResponse(
-        json.dumps(rows),
-        status_code=200,
-        mimetype="application/json"
-    )
+    try:
+        with open("timesheets_sql.sql", 'r') as timesheets_query:
+            timesheets_sql = timesheets_query.read()
+            timesheet.set('CommandText', timesheets_sql)
+        rows = list(map(lambda r: json.loads(r.to_json()), timesheet))
+        return func.HttpResponse(
+            json.dumps(rows),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return (
+            func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )
