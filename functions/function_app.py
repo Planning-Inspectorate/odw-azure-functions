@@ -372,7 +372,7 @@ def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=_TOPIC,
+            entity='s51-advice',
             data=_data,
         )
 
