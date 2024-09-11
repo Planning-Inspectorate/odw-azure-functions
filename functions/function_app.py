@@ -689,7 +689,7 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 @_app.function_name(name="get_timesheets")
-@_app.route(route="timesheets/{caseType}/{searchCriteria}", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.route(route="timesheets", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 @_app.sql_input(arg_name="timesheet",
                 command_text="SELECT TOP (100) * FROM [odw_harmonised_db].[dbo].[s62a_view_cases_dim] WHERE [Name] LIKE Concat(Char(37), @searchCriteria, Char(37))",
                 command_type="Text",
