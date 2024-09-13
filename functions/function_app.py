@@ -688,14 +688,14 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
-@_app.function_name(name="get_timesheets")
-@_app.route(route="get_timesheets", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.function_name(name="get_s62")
+@_app.route(route="get_s62", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 @_app.sql_input(arg_name="timesheet",
-                command_text="SELECT TOP (100) * FROM [odw_harmonised_db].[dbo].[s62a_view_cases_dim] WHERE [Name] LIKE Concat(Char(37), @searchCriteria, Char(37))",
+                command_text="SELECT [name],[caseReference],[applicationType],[applicationValidated],[description],[lpa],[permissionSought],[procedureType],[status],[applicantName],[siteAddress],[sitePostcode],[siteGridReference],[agentName],[agentAddress],[dateReceived],[dateValid],[consultationStatDate],[consultationEndDate],[targetDecisionDate],[decisionDate],[decisionType],[appointedPerson],[caseAdministrator],[caseLeader],[caseOfficer],[eiaOfficer],[legalOfficer] FROM [odw_curated_db].[dbo].[s62a] WHERE [Name] LIKE Concat(Char(37), @searchCriteria, Char(37)) OR [caseReference]  LIKE Concat(Char(37), @searchCriteria, Char(37)) OR [description] LIKE Concat(Char(37), @searchCriteria, Char(37)) OR [applicantName] LIKE Concat(Char(37), @searchCriteria, Char(37)) OR [siteAddress] LIKE Concat(Char(37), @searchCriteria, Char(37)) OR [sitePostcode] LIKE Concat(Char(37), @searchCriteria, Char(37)) OR [siteGridReference] LIKE Concat(Char(37), @searchCriteria, Char(37))",
                 command_type="Text",
-                parameters="@caseType={caseType},@searchCriteria={searchCriteria}",
+                parameters="@searchCriteria={searchCriteria}",
                 connection_string_setting="SqlConnectionString")
-def get_timesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
+def get_s62(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
     """
     We need to use Char(37) to escape the % 
     https://stackoverflow.com/questions/71914897/how-do-i-use-sql-like-value-operator-with-azure-functions-sql-binding
