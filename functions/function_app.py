@@ -341,9 +341,9 @@ def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
-@_app.function_name("nsips51advice")
-@_app.route(route="nsips51advice", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def nsips51advice(req: func.HttpRequest) -> func.HttpResponse:
+@_app.function_name("s51advice")
+@_app.route(route="s51advice", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def s51advice(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function endpoint for handling HTTP requests.
 
