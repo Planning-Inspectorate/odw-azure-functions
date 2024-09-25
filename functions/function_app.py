@@ -688,14 +688,14 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
-@_app.function_name(name="gets62")
-@_app.route(route="gets62", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.function_name(name="gettimesheets")
+@_app.route(route="gettimesheets", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 @_app.sql_input(arg_name="timesheet",
-                command_text="SELECT [name],[caseReference],[applicationType],[applicationValidated],[description],[lpa],[permissionSought],[procedureType],[status],[applicantName],[siteAddress],[sitePostcode],[siteGridReference],[agentName],[agentAddress],[dateReceived],[dateValid],[consultationStatDate],[consultationEndDate],[targetDecisionDate],[decisionDate],[decisionType],[appointedPerson],[caseAdministrator],[caseLeader],[caseOfficer],[eiaOfficer],[legalOfficer] FROM [odw_curated_db].[dbo].[s62a] WHERE UPPER([Name]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([caseReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([description]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([applicantName]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddress]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([sitePostcode]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteGridReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37))",
+                command_text="SELECT [caseReference], [applicationReference], [siteAddressLine1], [siteAddressLine2], [siteAddressTown], [siteAddressCounty], [siteAddressPostcode] FROM [odw_curated_db].[dbo].[appeal_has] WHERE UPPER([caseReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([applicationReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressLine1]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressLine2]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressTown]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressCounty]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressPostcode]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37))",
                 command_type="Text",
                 parameters="@searchCriteria={searchCriteria}",
                 connection_string_setting="SqlConnectionString")
-def gets62(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
+def gettimesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
     """
     We need to use Char(37) to escape the % 
     https://stackoverflow.com/questions/71914897/how-do-i-use-sql-like-value-operator-with-azure-functions-sql-binding
