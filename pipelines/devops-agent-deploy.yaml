@@ -141,11 +141,11 @@ stages:
           resourceGroupName: ${{ variables.agentPoolGroupName }}
           workingDirectory: infrastructure/configuration/devops-agents
 
-      # Clean-up old images
-      - template: steps/azure-image-cleanup.yaml
-        parameters:
-          armServiceConnectionName: ${{ variables.armServiceConnectionName }}
-          resourceGroupName: ${{ variables.agentPoolGroupName }}
+      # # Clean-up old images
+      # - template: steps/azure-image-cleanup.yaml
+      #   parameters:
+      #     armServiceConnectionName: ${{ variables.armServiceConnectionName }}
+      #     resourceGroupName: ${{ variables.agentPoolGroupName }}
 
   - stage: Pool_Plan
     dependsOn: Build
