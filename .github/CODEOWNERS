@@ -13,7 +13,7 @@
 /workspace/**                                                   @ChrisToppingKandC @RobPalmer30 @muhammadkc
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @ChrisToppingKandC @muhammadkc @m-juckes-pins @paul-dragan-spartaglobal @IsminiA @kathryn-thompson
+/pipelines/**                                                   @ChrisToppingKandC @muhammadkc @m-juckes-pins @IsminiA @kathryn-thompson
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
