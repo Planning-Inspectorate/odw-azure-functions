@@ -20,6 +20,9 @@ parameters:
 
 
 steps:
+  - script: packer init .
+    displayName: Packer init
+    workingDirectory: ${{ parameters.workingDirectory }}
   - script: packer build .
     displayName: Packer Build
     env:
