@@ -11,6 +11,12 @@ parameters:
   - name: armTenantId
     type: string
     default: $(AZURE_TENANT_ID)
+  - name: odtSubscriptionId
+    type: string
+    default: $(ODT_SUBSCRIPTION_ID)
+  - name: horizonSubscriptionId
+    type: string
+    default: $(HORIZON_SUBSCRIPTION_ID)
   - name: deployAgentPool
     type: boolean
     default: false
@@ -37,6 +43,8 @@ steps:
       -target=${{ parameters.planTargetResourceName }} -input=false -out=${{ parameters.planFileName }}"
       terraform plan \
         -var-file=./environments/${{ parameters.environment }}.tfvars \
+        -var "odt_subscription_id=${{ lower(parameters.odtSubscriptionId) }}" \
+        -var "horizon_subscription_id=${{ lower(parameters.horizonSubscriptionId) }}" \
         -var "deploy_agent_pool=${{ lower(parameters.deployAgentPool) }}" \
         -var "failover_deployment=${{ lower(parameters.failoverDeployment) }}" \
         -target=${{ parameters.planTargetResourceName }} \
