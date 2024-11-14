@@ -19,11 +19,11 @@ steps:
         --no-color
 
       echo "Running TFLint..."
-      echo "##[command]tflint --config ${{ parameters.configFilePath }} --format compact --module --no-color"
+      echo "##[command]tflint --config ${{ parameters.configFilePath }} --format compact --call-module-type=all --no-color"
       tflint \
         --config ${{ parameters.configFilePath }} \
         --format compact \
-        --module \
+        --call-module-type=all \
         --no-color
 
       if [[ $? -ne 0 ]]; then
