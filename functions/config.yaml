@@ -4,14 +4,13 @@ dev:
   servicebus_namespace_odt: "pins-sb-back-office-dev-ukw-001.servicebus.windows.net"
   servicebus_namespace_odw: "pins-sb-odw-dev-uks-b9rt9m.servicebus.windows.net"
 
-
 preprod:
   storage_account: "https://pinsstodwtestukswic3ai.blob.core.windows.net"
   storage_container: "odw-raw/ServiceBus"
   servicebus_namespace_odt: "pins-sb-back-office-test-ukw-001.servicebus.windows.net"
   servicebus_namespace_odw: "pins-sb-odw-test-uks-hk2zun.servicebus.windows.net"
 
-prod: 
+prod:
   storage_account: "https://pinsstodwprodukson83nw.blob.core.windows.net"
   storage_container: "odw-raw/ServiceBus"
   servicebus_namespace_odt: "pins-sb-back-office-prod-ukw-001.servicebus.windows.net"
@@ -25,16 +24,15 @@ global:
   validation_error: "Failed validating"
 
   entities:
-
     folder:
       topic: "folder"
       subscription: "folder"
 
-    nsip-document: 
-      topic: "nsip-document" 
+    nsip-document:
+      topic: "nsip-document"
       subscription: "nsip-document"
 
-    nsip-exam-timetable: 
+    nsip-exam-timetable:
       topic: "nsip-exam-timetable"
       subscription: "nsip-exam-timetable"
 
@@ -42,21 +40,21 @@ global:
       topic: "nsip-project"
       subscription: "nsip-project"
 
-    nsip-project-update: 
-      topic: "nsip-project-update" 
+    nsip-project-update:
+      topic: "nsip-project-update"
       subscription: "nsip-project-update"
 
     nsip-representation:
       topic: "nsip-representation"
       subscription: "nsip-representation"
 
-    nsip-s51-advice: 
+    nsip-s51-advice:
       topic: "nsip-s51-advice"
       subscription: "nsip-s51-advice"
 
-    nsip-subscription: 
-     topic: "nsip-subscription"
-     subscription: "nsip-subscription"
+    nsip-subscription:
+      topic: "nsip-subscription"
+      subscription: "nsip-subscription"
 
     service-user:
       topic: "service-user"
@@ -69,7 +67,7 @@ global:
     appeal-has:
       topic: "appeal-has"
       subscription: "appeal-has-odw-sub"
-    
+
     appeal-event:
       topic: "appeal-event"
       subscription: "appeal-event-odw-sub"
@@ -77,3 +75,7 @@ global:
     appeal-service-user:
       topic: "appeal-service-user"
       subscription: "appeal-service-user-odw-sub"
+
+    appeal-s78:
+      topic: "appeal-s78"
+      subscription: "appeal-s78-odw-sub"
