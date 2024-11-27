@@ -14,6 +14,7 @@ declare -a schema_names=(
   "nsip-subscription"
   "s51-advice"
   "service-user"
+  "appeal-s78"
   # Add more schema names as needed
 )
 
