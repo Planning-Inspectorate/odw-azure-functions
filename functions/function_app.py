@@ -762,13 +762,20 @@ def appeals78(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
+
 @_app.function_name(name="getDaRT")
 @_app.route(route="getDaRT", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 @_app.sql_input(arg_name="dart",
-                command_text="SELECT h.caseReference ,h.caseType ,h.siteAddressLine1 + ', ' +  h.siteAddressLine2 + ', ' +  siteAddressTown  + ', ' +  h.siteAddressCounty + ', ' +  h.siteAddressPostcode as siteAddress ,h.applicationReference ,h.applicationDate ,h.applicationDecisionDate as lpaDecisionDate ,h.originalDevelopmentDescription ,l.lpaName ,su.firstName + ' ' + su.LastName as appellantName ,e.eventType as typeOfEvent ,e.eventStartDateTime as startDateOfTheEvent ,ent.givenName + ' ' +  ent.surname as inspectorName ,i.qualifications as inspectorQualifications FROM odw_harmonised_db.dbo.sb_appeal_has h left join odw_harmonised_db.dbo.pins_lpa l on h.lpaCode = l.pinsLpaCode and l.isActive = 'Y' left join odw_harmonised_db.dbo.sb_service_user su on h.caseReference = su.caseReference and su.serviceUserType = 'Appellant' and su.isActive = 'Y' left join odw_harmonised_db.dbo.sb_appeal_event e on h.caseReference = e.caseReference and e.isActive = 'Y' left join odw_harmonised_db.dbo.entraid ent on h.inspectorId = ent.id and ent.isActive = 'Y' left join odw_harmonised_db.dbo.pins_inspectors i on ent.userPrincipalName = i.email and i.isActive = 'Y' WHERE h.IsActive = 'Y' AND UPPER([applicationReference]) = UPPER(@applicationReference) OR UPPER([h].[caseReference]) = UPPER(@caseReference)",
+                command_text="""
+                SELECT *
+                FROM odw_curated_db.dbo.dart_api
+                WHERE UPPER([applicationReference]) = UPPER(@applicationReference) 
+                OR UPPER([caseReference]) = UPPER(@caseReference)
+                """,
                 command_type="Text",
                 parameters="@caseReference={caseReference},@applicationReference={applicationReference}",
-                connection_string_setting="SqlConnectionString2")
+                connection_string_setting="SqlConnectionString"
+                )
 def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
 
     try:
