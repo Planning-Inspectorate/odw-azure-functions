@@ -777,15 +777,23 @@ def appeals78(req: func.HttpRequest) -> func.HttpResponse:
                 connection_string_setting="SqlConnectionString"
                 )
 def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
-
     try:
-        rows = list(map(lambda r: json.loads(r.to_json()), dart))
+        rows = []
+        for r in dart:
+            row = json.loads(r.to_json())
+            for key, value in row.items():
+                if isinstance(value, str):
+                    try:
+                        parsed_value = json.loads(value)
+                        row[key] = parsed_value
+                    except json.JSONDecodeError:
+                        row[key] = "Invalid json"
+                        print(f"Failed to parse field '{key}': {value}\nError: {e}")
+            rows.append(row)
         return func.HttpResponse(
             json.dumps(rows),
             status_code=200,
             mimetype="application/json"
         )
     except Exception as e:
-        return (
-            func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
+        return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
