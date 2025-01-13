@@ -787,8 +787,7 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
                         parsed_value = json.loads(value)
                         row[key] = parsed_value
                     except json.JSONDecodeError as e:
-                        row[key] = "Invalid json"
-                        print(f"Failed to parse field '{key}': {value}\nError: {e}")
+                        row[key] = value
             rows.append(row)
         return func.HttpResponse(
             json.dumps(rows),
