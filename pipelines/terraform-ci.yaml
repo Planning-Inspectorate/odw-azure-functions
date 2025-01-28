@@ -12,6 +12,8 @@ variables:
 - group: Terraform ${{ parameters.environment }}
 - name: environment
   value: ${{ lower(parameters.environment) }}
+- name: poolName
+  value: ${{ format('pins-agent-pool-odw-{0}-uks', lower(parameters.environment)) }}
 
 pr: none
 
@@ -25,13 +27,11 @@ trigger:
     exclude:
     - '**/README.md'
 
-pool:
-  vmImage: ubuntu-22.04
-
 stages:
   - stage: Validate
     jobs:
     - job: Validate
+      pool: ${{ variables.poolName }}
       steps:
       # Checkout repo
       - checkout: self
