@@ -79,3 +79,7 @@ global:
     appeal-s78:
       topic: "appeal-s78"
       subscription: "appeal-s78-odw-sub"
+
+    appeal-representation:
+      topic: "appeal-representation"
+      subscription: "appeal-representation-odw-sub"
