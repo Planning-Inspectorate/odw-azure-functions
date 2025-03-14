@@ -10,13 +10,13 @@
 /infrastructure/**                                              @ChrisToppingKandC @beejjacobs @m-juckes-pins @stef-solirius
 
 # Azure Synapse files
-/workspace/**                                                   @ChrisToppingKandC @RobPalmer30 @muhammadkc @stef-solirius
+/workspace/**                                                   @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius 
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @ChrisToppingKandC @muhammadkc @m-juckes-pins @IsminiA @kathryn-thompson @stef-solirius
+/pipelines/**                                                   @ChrisToppingKandC @muhammadkc @m-juckes-pins @IsminiA @kathryn-thompson @stef-solirius @alex-ghoth
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
-*.py                                                            @ChrisToppingKandC @RobPalmer30 @muhammadkc @stef-solirius
-*.ipynb                                                         @ChrisToppingKandC @RobPalmer30 @muhammadkc @stef-solirius
-*.sql                                                           @ChrisToppingKandC @RobPalmer30 @muhammadkc @stef-solirius
+*.py                                                            @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius
+*.ipynb                                                         @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius
+*.sql                                                           @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius
