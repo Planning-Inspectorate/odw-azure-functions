@@ -846,3 +846,37 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
         )
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+
+@_app.function_name(name="testFunction")
+@_app.route(route="testFunction", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.sql_input(
+    arg_name="logs",
+    command_text="""
+    SELECT TOP (1000) [file_ID],
+                    [ingested_datetime],
+                    [ingested_by_process_name],
+                    [input_file],
+                    [modified_datetime],
+                    [modified_by_process_name],
+                    [entity_name],
+                    [rows_raw],
+                    [rows_new]
+    FROM logging.dbo.tables_logs
+    """,
+    command_type="Text",
+    connection_string_setting="SqlConnectionString"
+)
+def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResponse:
+    try:
+        rows = []
+        for r in logs:
+            rows.append(json.loads(r.to_json()))
+
+        return func.HttpResponse(
+            json.dumps(rows),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+    
