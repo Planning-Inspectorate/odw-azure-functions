@@ -63,7 +63,7 @@ variables:
   ${{ if eq(parameters.environment , 'Test') }}:
     value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly' 
   ${{ if eq(parameters.environment , 'Prod') }}: 
-    value: 'tr_daily_7days_2100,tr_backup_daily,tr_weekly'
+    value: 'tr_daily_7days_1800,tr_backup_daily,tr_weekly'
 
 pr: none
 
