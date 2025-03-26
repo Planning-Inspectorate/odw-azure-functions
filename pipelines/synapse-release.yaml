@@ -54,9 +54,9 @@ variables:
   value: 'dev'
 - name: sourceWorkspaceName
   ${{ if eq(parameters.source_workspace, 'Primary') }}:
-    value: 'pins-synw-odw-test-uks'
+    value: 'pins-synw-odw-dev-uks'
   ${{ if eq(parameters.source_workspace, 'Secondary') }}:
-    value: 'pins-synw-odw-test-ukw'
+    value: 'pins-synw-odw-dev-ukw'
 - name: synapseTriggers 
   ${{ if eq(parameters.environment , 'Dev') }}: 
     value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly' 
