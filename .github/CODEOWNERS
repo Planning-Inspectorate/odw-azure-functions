@@ -1,22 +1,22 @@
 # Define owner of the CODEOWNERS file itself
-/.github/CODEOWNERS                                             @ChrisToppingKandC @beejjacobs @m-juckes-pins @stef-solirius
+/.github/CODEOWNERS                                             @beejjacobs @m-juckes-pins @stef-solirius
 
 # Protect important folders
 
 # Github Actions workflows
-/.github/workflows                                              @ChrisToppingKandC @beejjacobs @m-juckes-pins @stef-solirius
+/.github/workflows                                              @beejjacobs @m-juckes-pins @stef-solirius
 
 # most files in infrastructure relate to Terraform code
-/infrastructure/**                                              @ChrisToppingKandC @beejjacobs @m-juckes-pins @stef-solirius
+/infrastructure/**                                              @beejjacobs @m-juckes-pins @stef-solirius
 
 # Azure Synapse files
-/workspace/**                                                   @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius 
+/workspace/**                                                   @alex-ghoth @stef-solirius @HarrisonBoyleThomas
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @ChrisToppingKandC @muhammadkc @m-juckes-pins @IsminiA @kathryn-thompson @stef-solirius @alex-ghoth
+/pipelines/**                                                   @m-juckes-pins @NHAL22 @roytalari @stef-solirius @alex-ghoth @HarrisonBoyleThomas
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
-*.py                                                            @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius
-*.ipynb                                                         @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius
-*.sql                                                           @ChrisToppingKandC @alex-ghoth @muhammadkc @stef-solirius
+*.py                                                            @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas
+*.ipynb                                                         @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas
+*.sql                                                           @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas
