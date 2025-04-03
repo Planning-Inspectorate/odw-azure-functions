@@ -7,16 +7,16 @@
 /.github/workflows                                              @beejjacobs @m-juckes-pins @stef-solirius
 
 # most files in infrastructure relate to Terraform code
-/infrastructure/**                                              @beejjacobs @m-juckes-pins @stef-solirius
+/infrastructure/**                                              @beejjacobs @m-juckes-pins @stef-solirius @HarrisonBoyleThomas
 
 # Azure Synapse files
-/workspace/**                                                   @alex-ghoth @stef-solirius @HarrisonBoyleThomas
+/workspace/**                                                   @alex-ghoth @stef-solirius @HarrisonBoyleThomas @Fred83200
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @m-juckes-pins @NHAL22 @roytalari @stef-solirius @alex-ghoth @HarrisonBoyleThomas
+/pipelines/**                                                   @m-juckes-pins @NHAL22 @roytalari @stef-solirius @alex-ghoth @HarrisonBoyleThomas @Fred83200
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
-*.py                                                            @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas
-*.ipynb                                                         @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas
-*.sql                                                           @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas
+*.py                                                            @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200
+*.ipynb                                                         @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200
+*.sql                                                           @alex-ghoth @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200
