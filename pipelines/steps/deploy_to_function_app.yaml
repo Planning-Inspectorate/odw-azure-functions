@@ -24,14 +24,14 @@ steps:
     inlineScript: |
 
       echo "Deploying to function app with the following variables:"
-      echo "Environment: $(environment)"
-      echo "Service Connection": $(armServiceConnectionName)
-      echo "Resource Group: $(resourceGroup)"
-      echo "Function App Name: $(functionApp)"
-      echo "Zip File: $(zipFile)"
+      echo "Environment: ${{ parameters.environment }}"
+      echo "Service Connection": ${{ parameters.armServiceConnectionName }}
+      echo "Resource Group: ${{ parameters.resourceGroup }}"
+      echo "Function App Name: ${{ parameters.functionApp }}"
+      echo "Zip File: ${{ parameters.zipFile }}"
 
       az functionapp deployment source config-zip \
-      --resource-group $(resourceGroup) \
-      --name $(functionApp) \
-      --src $(zipFile) \
+      --resource-group ${{ parameters.resourceGroup }} \
+      --name ${{ parameters.functionApp }} \
+      --src ${{ parameters.zipFile }} \
       --build-remote true

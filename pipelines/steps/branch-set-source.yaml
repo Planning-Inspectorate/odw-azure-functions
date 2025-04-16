@@ -1,11 +1,14 @@
-parameters:
-  - name: branchName
-    type: string
-
 steps:
-  - powershell: |
-      $SourceBranch = "${{ parameters.branchName }}" -replace "refs/heads/", ""
-      Write-Host "Exporting current branch name $SourceBranch..."
-      Write-Host "##[command][task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
-      Write-Host "##vso[task.setvariable variable=source_branch;isOutput=false]$SourceBranch"
+  - bash: |
+      baseBranch="$(Build.SourceBranch)"
+      echo "Build reason '$(Build.Reason)'"
+      if [[ $(Build.Reason) == "PullRequest" ]]; then
+          baseBranch="$(System.PullRequest.SourceBranch)"
+      fi
+      echo "Base branch set to $baseBranch"
+      toReplace="refs/heads/"
+      toReplaceWith=""
+      sourceBranch="${baseBranch/$toReplace/$toReplaceWith}"
+      echo "Exporting current branch name $sourceBranch..."
+      echo "##vso[task.setvariable variable=source_branch;isOutput=false]$sourceBranch"
     displayName: 'Set Source Branch'

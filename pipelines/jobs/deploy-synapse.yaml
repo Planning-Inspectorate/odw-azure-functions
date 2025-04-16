@@ -1,0 +1,138 @@
+parameters:
+  agentPool: ''
+  env: ''
+  armServiceConnectionName: ''
+  activateTriggers: false
+  primaryWorkspace: true
+
+##
+# Deploy Azure Synapse
+##
+jobs:
+- job: DeploySynapseJob
+  pool: ${{ parameters.agentPool }}
+  timeoutInMinutes: 0 # Max timeout
+  variables:
+  - name: overridesFileName
+    value: 'TemplateParametersForWorkspace.json'
+  - name: artifactName
+    value: 'synapse-release'
+  - name: synapseTriggers 
+    ${{ if eq(parameters.env , 'dev') }}: 
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly' 
+    ${{ if eq(parameters.env , 'test') }}:
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly' 
+    ${{ if eq(parameters.env , 'prod') }}: 
+      value: 'tr_daily_7days_1800,tr_backup_daily,tr_weekly'
+  steps:
+  # Checkout repo
+  - checkout: self
+    displayName: 'Checkout'
+    persistCredentials: true
+    fetchDepth: 0
+  # Login to Azure using Terraform service principal
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/azure-login.yaml
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/get-synapse-details.yaml
+    parameters:
+      env: ${{ parameters.env }}
+      pythonVersion: 3
+      failoverDeployment: false
+  # Set source branch
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/branch-set-source.yaml
+
+  # Switch to the Synapse Workspace publish branch
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/branch-switch.yaml
+    parameters:
+      branchName: 'workspace_publish'
+      showDirectory: $(Build.SourcesDirectory)/$(synapse_workspace_name)
+
+  # Copy Synapse Workspace ARM template files to artifact directory
+  - task: CopyFiles@2
+    displayName: 'Create Release Artifacts'
+    inputs:
+      sourceFolder: $(Build.SourcesDirectory)/$(synapse_workspace_name)
+      contents: |
+        TemplateForWorkspace.json
+        TemplateParametersForWorkspace.json
+      targetFolder: $(Build.ArtifactStagingDirectory)
+
+  # Switch back to the source branch
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/branch-switch.yaml
+    parameters:
+      branchName: $(source_branch)
+      showDirectory: $(Build.SourcesDirectory)
+
+  # Pre-Override Replacement
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/synapse-parameters-override.yaml
+    parameters:
+      overrideFind: 'pinsstodwdevuks9h80mb'
+      overrideReplace: $(data_lake_account_name)
+      templateParametersOverridesFileName: ${{ variables.overridesFileName }}
+      workingDirectory: $(Build.ArtifactStagingDirectory)
+
+  # Publish pipeline artifacts
+  - publish: $(Build.ArtifactStagingDirectory)
+    artifact: ${{ variables.artifactName }}
+    displayName: 'Publish Artifacts'
+  
+  # Check if the dedicated SQL pool is currently paused
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/synapse-sql-pool-check.yaml
+    parameters:
+      armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
+      synapseWorkspaceName: $(synapse_workspace_name)
+  
+  # Disable triggers in the target Synapse Workspace
+  - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
+    displayName: 'Disable Synapse Triggers'
+    inputs:
+      azureSubscription: ${{ parameters.armServiceConnectionName }}
+      ResourceGroupName: $(data_resource_group_name)
+      WorkspaceName: $(synapse_workspace_name)
+      ToggleOn: false
+  
+  # Resume the dedicated SQL pool if it was in a paused state
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/synapse-sql-pool-resume.yaml
+    parameters:
+      armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
+      synapseWorkspaceName: $(synapse_workspace_name)
+  
+  # Deploy Synapse Workspace artifacts from the source Workspace to the target Workspace
+  - task: Synapse workspace deployment@2
+    continueOnError: false
+    retryCountOnTaskFailure: '2'
+    displayName: 'Deploy Workspace'
+    inputs:
+      AzureResourceManagerConnection: ${{ parameters.armServiceConnectionName }}
+      DeleteArtifactsNotInTemplate: true
+      Environment: 'prod'
+      operation: 'deploy'
+      OverrideArmParameters: |
+        workspaceName: $(synapse_workspace_name)
+        ls_dsql_connectionString: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=$(synapse_dsql_endpoint);Initial Catalog=@{linkedService().db_name}
+        ls_ssql_builtin_connectionString: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=$(synapse_ssql_endpoint);Initial Catalog=@{linkedService().db_name}
+        ls_backup_destination_properties_typeProperties_url: $(data_lake_dfs_endpoint_failover)
+        ls_backup_source_properties_typeProperties_url: $(data_lake_dfs_endpoint)
+        ls_kv_properties_typeProperties_baseUrl: $(key_vault_uri)
+        ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
+        ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
+        ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
+      ParametersFile: '$(Build.ArtifactStagingDirectory)/${{ variables.overridesFileName }}'
+      ResourceGroupName: $(data_resource_group_name)
+      TargetWorkspaceName: $(synapse_workspace_name)
+      TemplateFile: '$(Build.ArtifactStagingDirectory)/TemplateForWorkspace.json'
+  
+  # Pause the dedicated SQL pool if it was previously resumed
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/synapse-sql-pool-pause.yaml
+    parameters:
+      armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
+      synapseWorkspaceName: $(synapse_workspace_name)
+  
+  # Re-enable triggers in the target Synapse Workspace
+  - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
+    condition: succeededOrFailed()
+    displayName: 'Enable Synapse Triggers'
+    inputs:
+      azureSubscription: ${{ parameters.armServiceConnectionName }}
+      ResourceGroupName: $(data_resource_group_name)
+      WorkspaceName: $(synapse_workspace_name)
+      Triggers: ${{ variables.synapseTriggers }}
