@@ -1,0 +1,116 @@
+name: Synapse CI/CD
+
+# This is the main CI/CD pipeline of the ODW. This is used to manage the CI/CD through the dev, test and main branches
+parameters:
+# Whether or not to run tests
+- name: runTests
+  type: boolean
+  default: true
+# Whether or not to enforce the deployment of the infrastructure
+- name: enforceInfrastructureDeployment
+  type: boolean
+  default: false
+# Whether or not to enforce the deployment of the azure functions
+- name: enforceFunctionsDeployment
+  type: boolean
+  default: false
+# Whether or not to enforce the deployment of the synapse workspace
+- name: enforceSynapseDeployment
+  type: boolean
+  default: false
+# Whether or not the deployment is for the backup resources
+- name: failoverDeployment
+  type: boolean
+  default: false
+# User-specified environment to deploy to. By default this is auto, which lets the pipeline decide as part of CI/CD
+- name: env
+  default: 'auto'
+  values:
+  - 'auto'
+  - 'dev'
+  - 'test'
+  - 'prod'
+
+# Run when Pull Request raised to the dev or testing branch
+pr:
+- dev
+
+# Run when merged into main or testing
+trigger:
+ branches:
+  include:
+  - main
+  - testing
+
+# Automatically run against the dev branch at a set time every day
+schedules:
+- cron: '30 13 * * 1-5' # cron syntax defining a schedule. At 1:30pm every week day
+  displayName: Daily testing branch run
+  branches:
+    include:
+    - dev
+  always: true
+  batch: false
+
+variables:
+- name: env
+  ${{ if ne(parameters.env, 'auto') }}:
+    value: ${{ parameters.env }}
+  ${{ else }}:
+    ${{ if eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'dev') }}:
+      value: dev
+    ${{ elseif eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'testing') }}:
+      value: test
+    ${{ elseif eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'main') }}:
+      value: prod
+    ${{ else }}:
+      # Update to be the build env once ready
+      value: dev
+
+- name: variableGroupName
+  ${{ if eq(variables.env, 'prod') }}:
+    value: "Terraform Prod"
+  ${{ elseif eq(variables.env, 'test') }}:
+    value: "Terraform Test"
+  ${{ else }}:
+    value: "Terraform Dev"
+- name: agentPool
+  value: 'pins-agent-pool-odw-${{ variables.env }}-uks'
+- name: azureSubscription
+  value: 'pins-agent-pool-odw-${{ variables.env }}-uks'
+- group: ${{ variables.variableGroupName }}
+
+stages:
+- template: stages/pre-deployment.yaml
+  parameters:
+    agentPool: ${{ variables.agentPool }}
+    enforceInfrastructureDeployment: ${{ parameters.enforceInfrastructureDeployment }}
+    enforceFunctionsDeployment: ${{ parameters.enforceFunctionsDeployment }}
+    enforceSynapseDeployment: ${{ parameters.enforceSynapseDeployment }}
+
+- template: stages/wait-for-approval.yaml
+
+- template: stages/conditional-deployment-infrastructure.yaml
+  parameters:
+    agentPool: ${{ variables.agentPool }}
+    env: ${{ variables.env }}
+    armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(variables.env) }} - Infrastructure"
+    failoverDeployment: ${{ parameters.failoverDeployment }}
+    outputsFileName: "tfoutputs.json"
+
+- template: stages/conditional-deployment-functionapp.yaml
+  parameters:
+    agentPool: ${{ variables.agentPool }}
+    env: ${{ variables.env }}
+
+- template: stages/conditional-deployment-synapse.yaml
+  parameters:
+    agentPool: ${{ variables.agentPool }}
+    env: ${{ variables.env }}
+    armServiceConnectionName: "ODW ${{ upper(variables.env) }} - Infrastructure"
+
+- ${{ if eq(parameters.runTests, true) }}:
+  - template: stages/conditional-run-tests.yaml
+    parameters:
+      agentPool: ${{ variables.agentPool }}
+      env: ${{ variables.env }}

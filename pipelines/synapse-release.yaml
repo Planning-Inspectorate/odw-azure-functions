@@ -134,8 +134,6 @@ stages:
 
       # Set source branch
       - template: steps/branch-set-source.yaml
-        parameters:
-          branchName: $(Build.SourceBranch)
 
       # Switch to the Synapse Workspace publish branch
       - template: steps/branch-switch.yaml

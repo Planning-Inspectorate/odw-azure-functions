@@ -1,0 +1,22 @@
+parameters:
+  agentPool: ''
+  env: ''
+
+##
+# Run Synapse integration tests
+##
+jobs:
+- job: RunSynapseIntegrationTestsJob
+  pool: ${{ parameters.agentPool }}
+  timeoutInMinutes: 0 # Max timeout
+  steps:
+  - checkout: self
+    clean: true
+  - task: AzureCLI@2
+    displayName: 'Testing'
+    inputs:
+      azureSubscription: 'ODW ${{ upper(parameters.env) }} - Infrastructure'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "No tests to run"
