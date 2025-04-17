@@ -16,8 +16,8 @@ steps:
     deployEverything=false
     echo "Source branch is '$sourceBranch'"
     if [[ $sourceBranch = dev ]]; then
-        targetBranch=testing
-    elif [[ $sourceBranch = testing ]]; then
+        echo "The source branch is dev, so forcing a full deployment"
+        deployEverything=true
         targetBranch=main
     elif [[ $sourceBranch = main ]]; then
         echo "The source branch is main, so forcing a full deployment"
