@@ -37,43 +37,6 @@ jobs:
       env: ${{ parameters.env }}
       pythonVersion: 3
       failoverDeployment: false
-  # Set source branch
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/branch-set-source.yaml
-
-  # Switch to the Synapse Workspace publish branch
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/branch-switch.yaml
-    parameters:
-      branchName: 'workspace_publish'
-      showDirectory: $(Build.SourcesDirectory)/$(synapse_workspace_name)
-
-  # Copy Synapse Workspace ARM template files to artifact directory
-  - task: CopyFiles@2
-    displayName: 'Create Release Artifacts'
-    inputs:
-      sourceFolder: $(Build.SourcesDirectory)/$(synapse_workspace_name)
-      contents: |
-        TemplateForWorkspace.json
-        TemplateParametersForWorkspace.json
-      targetFolder: $(Build.ArtifactStagingDirectory)
-
-  # Switch back to the source branch
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/branch-switch.yaml
-    parameters:
-      branchName: $(source_branch)
-      showDirectory: $(Build.SourcesDirectory)
-
-  # Pre-Override Replacement
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/synapse-parameters-override.yaml
-    parameters:
-      overrideFind: 'pinsstodwdevuks9h80mb'
-      overrideReplace: $(data_lake_account_name)
-      templateParametersOverridesFileName: ${{ variables.overridesFileName }}
-      workingDirectory: $(Build.ArtifactStagingDirectory)
-
-  # Publish pipeline artifacts
-  - publish: $(Build.ArtifactStagingDirectory)
-    artifact: ${{ variables.artifactName }}
-    displayName: 'Publish Artifacts'
   
   # Check if the dedicated SQL pool is currently paused
   - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/synapse-sql-pool-check.yaml
@@ -103,9 +66,10 @@ jobs:
     displayName: 'Deploy Workspace'
     inputs:
       AzureResourceManagerConnection: ${{ parameters.armServiceConnectionName }}
-      DeleteArtifactsNotInTemplate: true
+      DeleteArtifactsNotInTemplate: false
       Environment: 'prod'
-      operation: 'deploy'
+      operation: 'validateDeploy'
+      ArtifactsFolder: 'workspace'
       OverrideArmParameters: |
         workspaceName: $(synapse_workspace_name)
         ls_dsql_connectionString: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=$(synapse_dsql_endpoint);Initial Catalog=@{linkedService().db_name}
@@ -116,10 +80,8 @@ jobs:
         ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
         ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
         ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
-      ParametersFile: '$(Build.ArtifactStagingDirectory)/${{ variables.overridesFileName }}'
       ResourceGroupName: $(data_resource_group_name)
       TargetWorkspaceName: $(synapse_workspace_name)
-      TemplateFile: '$(Build.ArtifactStagingDirectory)/TemplateForWorkspace.json'
   
   # Pause the dedicated SQL pool if it was previously resumed
   - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/synapse-sql-pool-pause.yaml
