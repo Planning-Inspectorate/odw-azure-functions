@@ -30,6 +30,9 @@ parameters:
   - 'dev'
   - 'test'
   - 'prod'
+- name: fullDeployment
+  type: boolean
+  default: false
 
 # Run when Pull Request raised to the dev branch
 pr:
@@ -105,6 +108,7 @@ stages:
     agentPool: ${{ variables.agentPool }}
     env: ${{ variables.env }}
     armServiceConnectionName: "ODW ${{ upper(variables.env) }} - Infrastructure"
+    fullDeployment: ${{ parameters.fullDeployment }}
 
 - ${{ if eq(parameters.runTests, true) }}:
   - template: stages/conditional-run-tests.yaml

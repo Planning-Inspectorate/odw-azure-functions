@@ -196,3 +196,6 @@ __blob*
 __queue*
 __table*
 **/.DS_Store
+
+
+my_local_workspace/**

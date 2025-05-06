@@ -1,0 +1,17 @@
+parameters:
+  env: ''
+  pythonVersion: ''
+
+steps:
+  - script: |
+      set -x
+      python${{ parameters.pythonVersion }} --version
+      export PYTHONPATH="${PYTHONPATH}:/./"
+      python${{ parameters.pythonVersion }} -m pip install "azure-identity==1.21.0"
+      python${{ parameters.pythonVersion }} $(System.DefaultWorkingDirectory)/pipelines/scripts/remove_unmodified_synapse_files.py -sw "pins-synw-odw-${{ parameters.env }}-uks"
+      if [ $? -eq 1 ]; then
+          echo "##vso[task.logissue type=error]remove_unmodified_synapse_files.py failed"
+          exit 1
+      fi
+    displayName: 'Remove unmodified local Synapse files'
+    name: RemoveUnmodifiedLocalFiles

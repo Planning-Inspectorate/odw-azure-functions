@@ -4,6 +4,7 @@ parameters:
   armServiceConnectionName: ''
   activateTriggers: false
   primaryWorkspace: true
+  fullDeployment: false
 
 ##
 # Deploy Azure Synapse
@@ -58,6 +59,13 @@ jobs:
     parameters:
       armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
       synapseWorkspaceName: $(synapse_workspace_name)
+  
+  - ${{ if ne(lower(parameters.fullDeployment), true) }}:
+    # Delete local Synapse workspace files to optimise the Synapse deployment
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/delete-unmodified-synapse-workspace-files.yaml
+      parameters:
+        env: ${{ parameters.env }}
+        pythonVersion: 3
   
   # Deploy Synapse Workspace artifacts from the source Workspace to the target Workspace
   - task: Synapse workspace deployment@2
