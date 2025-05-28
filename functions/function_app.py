@@ -879,4 +879,39 @@ def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResp
         )
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-    
+
+@_app.function_name("appealeventestimate")
+@_app.route(route="appealeventestimate", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function endpoint for handling appeal-event-estimate service bus messages.
+    """
+    _SCHEMA = _SCHEMAS["appeal-event-estimate.schema.json"]
+    _TOPIC = config["global"]["entities"]["appeal-event-estimate"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["appeal-event-estimate"]["subscription"]
+
+    try:
+        _data = get_messages_and_validate(
+            namespace=_NAMESPACE_APPEALS,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA,
+        )
+        _message_count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=_data,
+        )
+        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+
+    except Exception as e:
+        return (
+            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
+            if f"{_VALIDATION_ERROR}" in str(e)
+            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )

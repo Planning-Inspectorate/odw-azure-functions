@@ -5,7 +5,8 @@ import asyncio
 urls_to_test = [
     "http://localhost:7071/api/serviceuser",
     "http://localhost:7071/api/nsipdocument",
-    "http://localhost:7071/api/nsipsubscription"
+    "http://localhost:7071/api/nsipsubscription",
+    "http://localhost:7071/api/appealeventestimate"
 ]
 
 async def check_api_status(url):

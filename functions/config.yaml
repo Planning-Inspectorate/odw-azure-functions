@@ -72,6 +72,10 @@ global:
       topic: "appeal-event"
       subscription: "appeal-event-odw-sub"
 
+    appeal-event-estimate:
+      topic: "appeal-event-estimate"
+      subscription: "appeal-event-estimate-odw-sub"
+
     appeal-service-user:
       topic: "appeal-service-user"
       subscription: "appeal-service-user-odw-sub"
