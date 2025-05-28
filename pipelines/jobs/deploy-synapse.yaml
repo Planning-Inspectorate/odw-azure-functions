@@ -20,9 +20,9 @@ jobs:
     value: 'synapse-release'
   - name: synapseTriggers 
     ${{ if eq(parameters.env , 'dev') }}: 
-      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly' 
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800' 
     ${{ if eq(parameters.env , 'test') }}:
-      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly' 
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800' 
     ${{ if eq(parameters.env , 'prod') }}: 
       value: 'tr_daily_7days_1800,tr_backup_daily,tr_weekly'
   steps:
@@ -106,3 +106,9 @@ jobs:
       ResourceGroupName: $(data_resource_group_name)
       WorkspaceName: $(synapse_workspace_name)
       Triggers: ${{ variables.synapseTriggers }}
+  
+  # Approve all pending managed private endpoints
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/approve-odw-private-endpoints.yaml
+    parameters:
+      env: ${{ parameters.env }}
+      pythonVersion: 3
