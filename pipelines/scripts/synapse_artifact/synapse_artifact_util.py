@@ -2,12 +2,88 @@ from azure.identity import AzureCliCredential, ChainedTokenCredential, ManagedId
 import requests
 from abc import ABC, abstractmethod
 from typing import Union, List, Dict, Any, Set
+from dataclasses import dataclass
 import re
 import logging
 import json
 import os
+import re
 
 logging.basicConfig(level=logging.INFO)
+
+
+class AttributeNotFoundException(Exception):
+    pass
+
+
+@dataclass
+class SynapseArtifactsPropertyIteratorResult():
+    parent_collection: Union[Dict[str, Any], List[Any]]
+    attribute: str
+    value: Union[Dict[str, Any], List[Any], Any]
+    remaining_attribute: str
+
+
+class SynapseArtifactsPropertyIterator():
+    """
+        Class to iterate through the properties of a json object through dot notation
+    """
+    def __init__(self, dictionary: Dict[str, Any], attribute: str):
+        self.attribute_collection: Union[Dict[str, Any], List[Any]] = dictionary
+        self.attribute_split = attribute.split(".")
+        if not self.attribute_split:
+            raise ValueError(f"There is no attribute to evaluate")
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        """
+            :return: The most recently-accessed collection
+            :return: The most recently-accessed property
+            :return: The value associated with the most recent property in the most recent collection
+            :return: The remaining attribute string
+
+        """
+        if not self.attribute_split:
+            raise StopIteration
+        next_attribute = self.attribute_split.pop(0)
+        if isinstance(self.attribute_collection, list):
+            try:
+                next_attribute = int(next_attribute)
+            except ValueError:
+                pass
+            if not isinstance(next_attribute, int):
+                raise ValueError(f"Trying to access an index of a list collection, but was passed using property '{next_attribute}'")
+            if next_attribute > len(self.attribute_collection):
+                raise IndexError(f"Attribute index '{next_attribute}' out of range for list {self.attribute_collection}")
+            old_collection = self.attribute_collection
+            self.attribute_collection = self.attribute_collection[next_attribute]
+            return SynapseArtifactsPropertyIteratorResult(old_collection, next_attribute, self.attribute_collection, ".".join(self.attribute_split))
+        elif isinstance(self.attribute_collection, dict):
+            if next_attribute in self.attribute_collection:
+                old_collection = self.attribute_collection
+                self.attribute_collection = self.attribute_collection[next_attribute]
+                return SynapseArtifactsPropertyIteratorResult(old_collection, next_attribute, self.attribute_collection, ".".join(self.attribute_split))
+            while self.attribute_split:
+                next_attribute = f"{next_attribute}.{self.attribute_split.pop(0)}"
+                if next_attribute in self.attribute_collection:
+                    old_collection = self.attribute_collection
+                    self.attribute_collection = self.attribute_collection[next_attribute]
+                    return SynapseArtifactsPropertyIteratorResult(
+                        old_collection,
+                        next_attribute,
+                        self.attribute_collection,
+                        ".".join(self.attribute_split)
+                    )
+            raise AttributeNotFoundException(f"Couldn't find attribute '{next_attribute}' in the dictionary '{self.attribute_collection}'")
+        else:
+            raise ValueError(
+                (
+                    f"Trying to access a property '{next_attribute}' of a literal value '{self.attribute_collection}' "
+                    f"with type {type(self.attribute_collection)} rather than a collection"
+                )
+            )
 
 
 class SynapseArtifactUtil(ABC):
@@ -91,6 +167,13 @@ class SynapseArtifactUtil(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_env_attributes_to_replace(self) -> List[str]:
+        """
+            :return: Attributes for specific environments that should be replaced
+        """
+        pass
+
     def compare(self, artifact_a: Dict[str, Any], artifact_b: Dict[str, Any]) -> bool:
         """
             Compare two artifacts.
@@ -126,6 +209,12 @@ class SynapseArtifactUtil(ABC):
                 print(json.dumps(list(new), indent=4))
                 raise Exception("Stopping code execution so that the difference can be analysed")
             '''
+            extra_in_left = artifact_a_attributes_cleaned - artifact_b_attributes_cleaned
+            extra_in_right = artifact_b_attributes_cleaned - artifact_a_attributes_cleaned
+            logging.info("Left arfifact had the following extra mandatory/filled nullable attributes")
+            logging.info(json.dumps(list(extra_in_left), indent=4))
+            logging.info("Right artifact had the following extra mandatory/filled nullable attributes")
+            logging.info(json.dumps(list(extra_in_right), indent=4))
             return False
         return self._compare_dictionaries_by_attributes(artifact_a_attributes_cleaned, artifact_a, artifact_b)
 
@@ -152,7 +241,8 @@ class SynapseArtifactUtil(ABC):
             return True
         return not bool(attribute_value)
 
-    def get_all_attributes(self, artifact_json: Dict[str, Any]) -> Set[str]:
+    @classmethod
+    def get_all_attributes(cls, artifact_json: Dict[str, Any]) -> Set[str]:
         """
             Return all attributes from the given json in dot notation
 
@@ -184,7 +274,7 @@ class SynapseArtifactUtil(ABC):
             }
             ```
         """
-        set(self._extract_dict_attributes(artifact_json, current_level="").keys())
+        return set(cls._extract_dict_attributes(artifact_json, current_level="").keys())
 
     @classmethod
     def _extract_list_attributes(cls, target_list: List[Any], current_level: str) -> Dict[str, None]:
@@ -284,47 +374,40 @@ class SynapseArtifactUtil(ABC):
                     (not any(re.match(pattern, attribute) for pattern in nullable_attributes)) or
                     (
                         any(re.match(pattern, attribute) for pattern in nullable_attributes) and
-                        not self.is_attribute_value_empty(self._extract_dictionary_value_by_attribute(artifact_json, attribute))
+                        not self.is_attribute_value_empty(self.get_by_attribute(artifact_json, attribute))
                     )
                 )
             )
         }
 
     @classmethod
-    def _extract_dictionary_value_by_attribute(cls, dictionary: Dict[str, Any], attribute: str) -> Any:
+    def get_by_attribute(cls, dictionary: Dict[str, Any], attribute: str) -> Any:
         """
             Access json attributes by a dot-notation string.
-            e.g `extract_value_from_attribute({"a": {"b": 2}}, "a.b") -> 2`
+            e.g `get_by_attribute({"a": {"b": 2}}, "a.b") -> 2`
 
             :param dictionary: The json artifact to extract the attribute from
             :param attribute: The attribute to extract, in dot-notation
             :return: The attribute value
             :raises: An exception is raised if the given inputs are invalid
         """
-        attribute_split = attribute.split(".")
-        attribute_value = dictionary
-        for i, subattribute in enumerate(attribute_split):
-            remaining_subattributes = ".".join(attribute_split[i:])
-            if remaining_subattributes in attribute_value:
-                # This is for cases like spark variables which may be stored in the json
-                return attribute_value[remaining_subattributes]
-            if isinstance(attribute_value, dict):
-                if subattribute not in attribute_value:
-                    raise ValueError(
-                        f"Unable to extract subattribute '{subattribute}' from {attribute_value}. Full attribute name is '{attribute}'"
-                    )
-                attribute_value = attribute_value[subattribute]
-            elif isinstance(attribute_value, list):
-                if int(subattribute) >= len(attribute_value):
-                    raise ValueError(
-                        f"Unable to extract subattribute '{subattribute}' from {attribute_value}. Full attribute name is '{attribute}'"
-                    )
-                attribute_value = attribute_value[int(subattribute)]
-            else:
-                if i != len(attribute_split) - 1:
-                    # Only allow returning leaf values if they are the last name to be resolved
-                    raise ValueError(f"Could not access attribute {attribute_value} by key '{subattribute}' - the value is not a collection")
-        return attribute_value
+        property_details = [x for x in SynapseArtifactsPropertyIterator(dictionary, attribute)]
+        return property_details.pop().value
+
+    @classmethod
+    def set_by_attribute(cls, dictionary: Dict[str, Any], attribute: str, new_value: Any):
+        """
+            Set a json attribute by a dot-notation string.
+            e.g `set_by_attribute({"a": {"b": 2}}, "a.b", 5) -> {"a": {"b": 5}}
+
+            :param dictionary: The json artifact to extract the attribute from
+            :param attribute: The attribute to extract, in dot-notation
+            :return: The same dictionary with the updated value
+        """
+        property_details = [x for x in SynapseArtifactsPropertyIterator(dictionary, attribute)]
+        last_entry = property_details.pop()
+        last_entry.parent_collection[last_entry.attribute] = new_value
+        return dictionary
 
     def _compare_dictionaries_by_attributes(self, attributes: Set[str], dict_a: Dict[str, Any], dict_b: Dict[str, Any]) -> Dict[str, bool]:
         """
@@ -336,8 +419,8 @@ class SynapseArtifactUtil(ABC):
             :return: True if the dictionaries match, False otherwise.
         """
         for attribute in attributes:
-            val_a = self._extract_dictionary_value_by_attribute(dict_a, attribute)
-            val_b = self._extract_dictionary_value_by_attribute(dict_b, attribute)
+            val_a = self.get_by_attribute(dict_a, attribute)
+            val_b = self.get_by_attribute(dict_b, attribute)
             if val_a != val_b:
                 logging.info(
                     (
@@ -347,6 +430,36 @@ class SynapseArtifactUtil(ABC):
                 )
                 return False
         return True
+
+    def replace_env_strings(self, artifact: Dict[str, Any], base_env: str, new_env: str) -> Dict[str, Any]:
+        """
+            Immutably replace any hardcoded environment strings that get replaced during Synapse deployment.
+            These strings all point to the `dev` environment by default
+
+            :param artifact: The artifact to clean
+            :param base_env: The default environment the artifacts are developed in (i.e. dev)
+            :param new_env: The environment being deployed to (to replace the base_env with)
+            :return: The cleaned artifact
+        """
+        regex_pattern = fr"{base_env}(?!\.)"
+        for property_to_replace in self.get_env_attributes_to_replace():
+            property_value = None
+            try:
+                property_value = self.get_by_attribute(artifact, property_to_replace)
+            except AttributeNotFoundException:
+                logging.info(f"Couldn't find property by dot-notation string '{property_to_replace}'")
+            if property_value:
+                cleaned_property_value = None
+                if isinstance(property_value, str):
+                    cleaned_property_value = re.sub(regex_pattern, new_env, property_value)
+                elif isinstance(property_value, list):
+                    cleaned_property_value = [
+                        re.sub(regex_pattern, new_env, x) if isinstance(x, str) else x
+                        for x in property_value
+                    ]
+                if cleaned_property_value:
+                    self.set_by_attribute(artifact, property_to_replace, cleaned_property_value)
+        return artifact
 
     @classmethod
     def dependent_artifacts(cls, artifact: Dict[str, Any]) -> Set[str]:
@@ -378,14 +491,14 @@ class SynapseArtifactUtil(ABC):
         reference_type_attributes = {
             k: v
             for k, v in reference_type_attributes.items()
-            if not isinstance(cls._extract_dictionary_value_by_attribute(artifact, k), dict)
+            if not isinstance(cls.get_by_attribute(artifact, k), dict)
         }
         reference_values = {
-            k: cls._extract_dictionary_value_by_attribute(artifact, k)
+            k: cls.get_by_attribute(artifact, k)
             for k in reference_type_attributes.keys()
         }
         reference_type_values = {
-            v: cls._extract_dictionary_value_by_attribute(artifact, v)
+            v: cls.get_by_attribute(artifact, v)
             for v in reference_type_attributes.values()
         }
         return {

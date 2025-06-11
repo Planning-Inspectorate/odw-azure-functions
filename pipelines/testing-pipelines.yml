@@ -6,6 +6,7 @@ parameters:
     type: string
     default: Test
     values:
+      - Build
       - Dev
       - Test
 trigger: none

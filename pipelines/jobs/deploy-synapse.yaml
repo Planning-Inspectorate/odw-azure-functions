@@ -19,12 +19,14 @@ jobs:
   - name: artifactName
     value: 'synapse-release'
   - name: synapseTriggers 
+    ${{ if eq(parameters.env , 'build') }}: 
+      value: ''
     ${{ if eq(parameters.env , 'dev') }}: 
-      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800' 
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900,tr_master_Refactored_Horizon_2100,tr_saphr_daily_800' 
     ${{ if eq(parameters.env , 'test') }}:
-      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800' 
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900,tr_saphr_daily_800' 
     ${{ if eq(parameters.env , 'prod') }}: 
-      value: 'tr_daily_7days_1800,tr_backup_daily,tr_weekly'
+      value: 'tr_daily_7days_1800,tr_backup_daily,tr_weekly,tr_saphr_daily_800'
   steps:
   # Checkout repo
   - checkout: self
@@ -88,6 +90,7 @@ jobs:
         ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
         ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
         ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
+        tr_saphr_daily_800_properties_pipelines_0_parameters_Env_Type: ${{ parameters.env }}
       ResourceGroupName: $(data_resource_group_name)
       TargetWorkspaceName: $(synapse_workspace_name)
   
@@ -99,7 +102,7 @@ jobs:
   
   # Re-enable triggers in the target Synapse Workspace
   - task: AzureSynapseWorkspace.synapsecicd-deploy.toggle-trigger.toggle-triggers-dev@2
-    condition: succeededOrFailed()
+    condition: and(succeededOrFailed(), ne(variables.synapseTriggers, ''))
     displayName: 'Enable Synapse Triggers'
     inputs:
       azureSubscription: ${{ parameters.armServiceConnectionName }}

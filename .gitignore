@@ -199,3 +199,6 @@ __table*
 
 
 my_local_workspace/**
+workspace_copy/**
+
+**.env

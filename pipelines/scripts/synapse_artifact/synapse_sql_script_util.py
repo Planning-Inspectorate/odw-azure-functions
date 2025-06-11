@@ -34,4 +34,11 @@ class SynapseSQLScriptUtil(SynapseArtifactUtil):
         ]
 
     def get_nullable_attributes(self) -> List[str]:
+        #  Note the two properties below are always mismatched for this artifact type due to the database/sql pools no longer existing.
+        return [
+            r"^properties.content.currentConnection.databaseName$",
+            r"^properties.content.currentConnection.poolName$"
+        ]
+
+    def get_env_attributes_to_replace(self) -> List[str]:
         return []

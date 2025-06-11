@@ -4,6 +4,7 @@ parameters:
     type: string
     default: Dev
     values:
+    - Build
     - Dev
     - Test
     - Prod

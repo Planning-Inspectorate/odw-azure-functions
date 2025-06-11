@@ -1,0 +1,15 @@
+parameters:
+  agentPool: ''
+  env: ''
+
+##
+# Run tests relevant to specific environments
+##
+stages:
+- stage: RunDataValidationTests
+  displayName: 'Run data validation tests in the ${{ parameters.env }} environment'
+  jobs:
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/jobs/run-synapse-data-validation-tests.yaml
+      parameters:
+        agentPool: ${{ parameters.agentPool }}
+        env: ${{ parameters.env }}
