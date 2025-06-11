@@ -23,3 +23,12 @@ class SynapseSparkConfigurationUtil(SynapseArtifactUtil):
 
     def get_nullable_attributes(self) -> List[str]:
         return []
+
+    def get_env_attributes_to_replace(self) -> List[str]:
+        # These are environment-specific but are not replaced when deploying to envs. Leaving as a comment for now - we can probably delete these
+        # config files
+        #return [
+        #    "properties.configs.park.executorEnv.dataLakeAccountName",
+        #    "properties.configs.spark.executorEnv.keyVaultName"
+        #]
+        return []

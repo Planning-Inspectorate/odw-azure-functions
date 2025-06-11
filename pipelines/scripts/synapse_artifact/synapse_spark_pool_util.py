@@ -32,3 +32,6 @@ class SynapseSparkPoolUtil(SynapseArtifactUtil):
 
     def get_nullable_attributes(self) -> List[str]:
         return []
+
+    def get_env_attributes_to_replace(self) -> List[str]:
+        return []

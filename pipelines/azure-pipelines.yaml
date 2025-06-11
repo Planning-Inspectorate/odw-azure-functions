@@ -27,6 +27,7 @@ parameters:
   default: 'auto'
   values:
   - 'auto'
+  - 'build'
   - 'dev'
   - 'test'
   - 'prod'
@@ -64,14 +65,15 @@ variables:
     ${{ elseif eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'main') }}:
       value: prod
     ${{ else }}:
-      # Update to be the build env once ready
-      value: dev
+      value: build
 
 - name: variableGroupName
   ${{ if eq(variables.env, 'prod') }}:
     value: "Terraform Prod"
   ${{ elseif eq(variables.env, 'test') }}:
     value: "Terraform Test"
+  ${{ elseif eq(variables.env, 'build') }}:
+    value: "Terraform Build"
   ${{ else }}:
     value: "Terraform Dev"
 - name: agentPool

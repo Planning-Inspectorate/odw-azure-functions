@@ -907,7 +907,14 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
             entity=_TOPIC,
             data=_data,
         )
-        return func.HttpResponse(f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", status_code=200)
+
+        response = json.dumps(
+            {"message": f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
+        return func.HttpResponse(
+            response,
+            status_code=200
+        )
 
     except Exception as e:
         return (
