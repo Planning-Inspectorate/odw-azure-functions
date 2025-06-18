@@ -48,7 +48,7 @@ trigger:
 # Automatically run against the dev branch at a set time every day
 schedules:
 - cron: '0 9 * * 1-5' # cron syntax defining a schedule. At 9am every week day
-  displayName: Daily dev branch run against the test env
+  displayName: Daily dev branch run against the dev env
   branches:
     include:
     - dev
@@ -61,7 +61,7 @@ variables:
     value: ${{ parameters.env }}
   ${{ else }}:
     ${{ if eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'dev') }}:
-      value: test
+      value: dev
     ${{ elseif eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'main') }}:
       value: prod
     ${{ else }}:

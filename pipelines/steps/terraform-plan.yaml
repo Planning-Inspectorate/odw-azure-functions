@@ -38,6 +38,10 @@ steps:
         -var "failover_deployment=${{ lower(parameters.failoverDeployment) }}" \
         -var "odt_subscription_id=${{ lower(parameters.odtSubscriptionId) }}" \
         -var "horizon_subscription_id=${{ lower(parameters.horizonSubscriptionId) }}" \
+        -var "purview_id=$(PURVIEW_ID)" \
+        -var "purview_storage_id=$(PURVIEW_STORAGE_ID)" \
+        -var "purview_event_hub_id"=$(PURVIEW_EVENT_HUB_ID) \
+        -var "purview_msi_id"=$(PURVIEW_MSI_ID) \
         -input=false \
         -out=${{ parameters.planFileName }}
     displayName: 'Terraform Plan'
