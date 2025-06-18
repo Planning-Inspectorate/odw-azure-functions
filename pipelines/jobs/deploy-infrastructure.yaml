@@ -22,10 +22,6 @@ jobs:
   - checkout: self
     displayName: 'Checkout Repo'
 
-  # Install required packages
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/install-tflint.yaml
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/install-checkov.yaml
-
   # Download firewall rule configuration file
   - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/download-secure-file.yaml
     parameters:
@@ -60,7 +56,6 @@ jobs:
   # Run Checkov
   - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/checkov-validate.yaml
     parameters:
-      framework: terraform
       workingDirectory: infrastructure
   
   ###

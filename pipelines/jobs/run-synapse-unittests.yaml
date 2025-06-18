@@ -16,7 +16,6 @@ jobs:
       export PATH="$PATH:/home/AzDevOps/.local/bin/"
       sudo apt-get install unixodbc-dev
       sudo curl -fsSL https://aka.ms/install-azd.sh | bash
-      python3 -m pip install -r $(Build.SourcesDirectory)/tests/requirements.txt
       export SYNAPSE_ENDPOINT="${{ format('https://pins-synw-odw-{0}-uks.dev.azuresynapse.net/', lower(parameters.env)) }}"
       export CREDENTIAL_NAME="${{ format('https://dev.azuresynapse.net/.default', lower(parameters.env)) }}"
       echo $SYNAPSE_ENDPOINT 
