@@ -60,9 +60,29 @@ variables:
     value: 'pins-synw-odw-dev-ukw'
 - name: synapseTriggers 
   ${{ if eq(parameters.environment , 'Dev') }}: 
-    value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900,tr_master_Refactored_Horizon_2100'
+    value: 'tr_daily_weekdays_1500
+          ,tr_backup_daily,tr_weekly
+          ,tr_delta_backup_daily_0800
+          ,tr_delta_backup_daily_0900
+          ,tr_master_Refactored_Horizon_2100
+          ,tr_delta_backup_odw_std_0900
+          ,tr_delta_backup_odw_hrm_0900
+          ,tr_delta_backup_odw_cur_0900
+          ,tr_delta_backup_odw_config_0900
+          ,tr_delta_backup_odw_cur_migr_0900
+          ,tr_delta_backup_odw_logging_0900'
   ${{ if eq(parameters.environment , 'Test') }}:
-    value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900' 
+    value: 'tr_daily_weekdays_1500
+          ,tr_backup_daily
+          ,tr_weekly
+          ,tr_delta_backup_daily_0800
+          ,tr_delta_backup_daily_0900
+          ,tr_delta_backup_odw_std_0900
+          ,tr_delta_backup_odw_hrm_0900
+          ,tr_delta_backup_odw_cur_0900
+          ,tr_delta_backup_odw_config_0900
+          ,tr_delta_backup_odw_cur_migr_0900
+          ,tr_delta_backup_odw_logging_0900'
   ${{ if eq(parameters.environment , 'Prod') }}: 
     value: 'tr_daily_7days_1800,tr_backup_daily,tr_weekly'
 

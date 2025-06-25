@@ -4,6 +4,7 @@ parameters:
   armServiceConnectionName: ''
   failoverDeployment: false
   outputsFileName: ''
+  runTerraformApply: false
 
 
 ##
@@ -58,9 +59,6 @@ jobs:
     parameters:
       workingDirectory: infrastructure
   
-  ###
-  ## Terraform deployment phase
-  ###
   # Run Terraform plan
   - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/terraform-plan.yaml
     parameters:
@@ -69,60 +67,65 @@ jobs:
       planFileName: tfplan
       workingDirectory: infrastructure
   
-  # Copy Terraform plan files to artifact directory
-  - task: CopyFiles@2
-    displayName: 'Create Artifact'
-    inputs:
-      sourceFolder: infrastructure
-      contents: |
-        .terraform/**
-        .terraform.lock.hcl
-        *.tftpl
-        tfplan
-      targetFolder: $(Build.ArtifactStagingDirectory)
+  # Only deploy infrastructure if specifically requested
+  ###
+  ## Terraform deployment phase
+  ###
+  - ${{ if eq(parameters.runTerraformApply, true) }}:
+    # Copy Terraform plan files to artifact directory
+    - task: CopyFiles@2
+      displayName: 'Create Artifact'
+      inputs:
+        sourceFolder: infrastructure
+        contents: |
+          .terraform/**
+          .terraform.lock.hcl
+          *.tftpl
+          tfplan
+        targetFolder: $(Build.ArtifactStagingDirectory)
 
-  # Publish pipeline artifacts
-  - publish: $(Build.ArtifactStagingDirectory)
-    artifact: terraform-plan
-    displayName: 'Publish Artifact'
-  
-  # Unlock resources
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/azure-resource-unlock.yaml
-    parameters:
-      armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
-  
-  # Run Terraform apply
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/terraform-apply.yaml
-    parameters:
-      environment: ${{ parameters.env }}
-      planFilePath: tfplan
-      workingDirectory: infrastructure
-  
-  # Get Terraform outputs
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/terraform-outputs.yaml
-    parameters:
-      outputsFileName: ${{ parameters.outputsFileName }}
-      workingDirectory: infrastructure
+    # Publish pipeline artifacts
+    - publish: $(Build.ArtifactStagingDirectory)
+      artifact: terraform-plan
+      displayName: 'Publish Artifact'
+    
+    # Unlock resources
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/azure-resource-unlock.yaml
+      parameters:
+        armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
+    
+    # Run Terraform apply
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/terraform-apply.yaml
+      parameters:
+        environment: ${{ parameters.env }}
+        planFilePath: tfplan
+        workingDirectory: infrastructure
+    
+    # Get Terraform outputs
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/terraform-outputs.yaml
+      parameters:
+        outputsFileName: ${{ parameters.outputsFileName }}
+        workingDirectory: infrastructure
 
-  # Convert Terraform outputs to local pipeline variables
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/terraform-outputs-to-variables.yaml
-    parameters:
-      multiStageVariables: false
-      outputsFileName: ${{ parameters.outputsFileName }}
-      workingDirectory: infrastructure
+    # Convert Terraform outputs to local pipeline variables
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/terraform-outputs-to-variables.yaml
+      parameters:
+        multiStageVariables: false
+        outputsFileName: ${{ parameters.outputsFileName }}
+        workingDirectory: infrastructure
 
-  # Approve the data lake managed private endpoint if it has been reinstated
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/azure-private-endpoint-approval.yaml
-    parameters:
-      armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
-      resourceIds:
-      - $(data_lake_account_id)
-      - $(data_lake_account_id_failover)
+    # Approve the data lake managed private endpoint if it has been reinstated
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/azure-private-endpoint-approval.yaml
+      parameters:
+        armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
+        resourceIds:
+        - $(data_lake_account_id)
+        - $(data_lake_account_id_failover)
 
-  # Lock resources
-  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/azure-resource-lock.yaml
-    parameters:
-      armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
-      resourceIds:
-      - $(data_lake_account_id)
-      - $(data_lake_account_id_failover)
+    # Lock resources
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/azure-resource-lock.yaml
+      parameters:
+        armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
+        resourceIds:
+        - $(data_lake_account_id)
+        - $(data_lake_account_id_failover)

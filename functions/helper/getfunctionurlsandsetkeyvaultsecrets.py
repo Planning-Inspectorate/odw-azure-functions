@@ -30,6 +30,15 @@ Teams_Webhook = "https://pinso365.webhook.office.com/webhookb2/c7088ab3-5530-400
 # vault_uri = "https://pinskvsynwodwproduks.vault.azure.net/"
 # Teams_Webhook = "https://pinso365.webhook.office.com/webhookb2/c7088ab3-5530-4007-b222-3044f604a848@5878df98-6f88-48ab-9322-998ce557088d/IncomingWebhook/40955bbd63f14bfebc7049080e52d00d/e7b7b154-3e75-46ae-8332-a534cb30d38e"
 
+# Build
+#subscription_id = "12806449-ae7c-4754-b104-65bcdc7b28c8"
+#resource_group_name = "pins-rg-function-app-odw-build-uks"
+#DB_resource_group_name = "pins-rg-data-odw-build-uks"
+#function_app_name = "pins-fnapp01-odw-build-uks"
+#keyvault_name = "pinskvsynwodwbuilduks"
+#vault_uri = "https://pinskvsynwodwbuilduks.vault.azure.net/"
+#Teams_Webhook = ""
+
 # Authenticate using DefaultAzureCredential
 credential = DefaultAzureCredential()
 

@@ -35,6 +35,17 @@ class Util:
         raise RuntimeError(f"Failed to decode output from `{cmd}` - please check you are signed in. Raised exception: {exception}")
 
     @classmethod
+    def get_subscription(cls) -> str:
+        return cls.get_current_subscription_details()["name"]
+
+    @classmethod
+    def set_subscription(cls, subscription_name: str):
+        cmd = f'az account set --subscription {subscription_name}'
+        logging.info(f"Switching subscription to '{subscription_name}' via command '{cmd}'")
+        os.popen(cmd).read()
+        logging.info(f"Current subscription is '{cls.get_subscription()}'")
+
+    @classmethod
     def get_current_user(cls) -> str:
         """
             Return the name of the current user

@@ -22,9 +22,9 @@ jobs:
     ${{ if eq(parameters.env , 'build') }}: 
       value: ''
     ${{ if eq(parameters.env , 'dev') }}: 
-      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900,tr_master_Refactored_Horizon_2100,tr_saphr_daily_800' 
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900,tr_master_Refactored_Horizon_2100,tr_saphr_daily_800,tr_delta_backup_odw_std_0900,tr_delta_backup_odw_hrm_0900,tr_delta_backup_odw_cur_0900,tr_delta_backup_odw_config_0900,tr_delta_backup_odw_cur_migr_0900,tr_delta_backup_odw_logging_0900'
     ${{ if eq(parameters.env , 'test') }}:
-      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900,tr_saphr_daily_800' 
+      value: 'tr_daily_weekdays_1500,tr_backup_daily,tr_weekly,tr_delta_backup_daily_0800,tr_delta_backup_daily_0900,tr_saphr_daily_800,tr_delta_backup_odw_std_0900,tr_delta_backup_odw_hrm_0900,tr_delta_backup_odw_cur_0900,tr_delta_backup_odw_config_0900,tr_delta_backup_odw_cur_migr_0900,tr_delta_backup_odw_logging_0900'
     ${{ if eq(parameters.env , 'prod') }}: 
       value: 'tr_daily_7days_1800,tr_backup_daily,tr_weekly,tr_saphr_daily_800'
   steps:
@@ -76,7 +76,7 @@ jobs:
     displayName: 'Deploy Workspace'
     inputs:
       AzureResourceManagerConnection: ${{ parameters.armServiceConnectionName }}
-      DeleteArtifactsNotInTemplate: false
+      DeleteArtifactsNotInTemplate: ${{ lower(parameters.fullDeployment) }}
       Environment: 'prod'
       operation: 'validateDeploy'
       ArtifactsFolder: 'workspace'
