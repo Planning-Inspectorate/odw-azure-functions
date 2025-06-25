@@ -2,15 +2,15 @@ name: Data Validation Dev
 
 # This is the nightly data validation pipeline against the dev environment
 
-# Automatically run against the dev branch at a set time every day
+# Automatically run against the main branch at a set time every day
 trigger: none
 pr: none
 schedules:
 - cron: '0 20 * * 1-5' # cron syntax defining a schedule. At 8pm every week day
-  displayName: Daily dev branch run against the dev env
+  displayName: Daily main branch run against the dev env
   branches:
     include:
-    - dev
+    - main
   always: true
   batch: false
 
