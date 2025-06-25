@@ -202,3 +202,5 @@ my_local_workspace/**
 workspace_copy/**
 
 **.env
+
+**test-output.xml

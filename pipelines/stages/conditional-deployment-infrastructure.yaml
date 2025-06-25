@@ -4,6 +4,7 @@ parameters:
   armServiceConnectionName: ''
   failoverDeployment: false
   outputsFileName: ''
+  runTerraformApply: false
 
 ##
 # Deploy Infrastructure only if a modification has been detected in the codebase
@@ -24,3 +25,4 @@ stages:
       armServiceConnectionName: ${{ parameters.armServiceConnectionName }}
       failoverDeployment: ${{ parameters.failoverDeployment }}
       outputsFileName: ${{ parameters.outputsFileName }}
+      runTerraformApply: ${{ parameters.runTerraformApply }}

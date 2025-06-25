@@ -34,6 +34,9 @@ parameters:
 - name: fullDeployment
   type: boolean
   default: false
+- name: runTerraformApply
+  type: boolean
+  default: false
 
 # Run when Pull Request raised to the dev branch
 pr:
@@ -99,6 +102,7 @@ stages:
     armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(variables.env) }} - Infrastructure"
     failoverDeployment: ${{ parameters.failoverDeployment }}
     outputsFileName: "tfoutputs.json"
+    runTerraformApply: ${{ parameters.runTerraformApply }}
 
 - template: stages/conditional-deployment-functionapp.yaml
   parameters:

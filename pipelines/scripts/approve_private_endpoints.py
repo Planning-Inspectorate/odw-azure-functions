@@ -1,9 +1,11 @@
 from pipelines.scripts.private_endpoint.synapse_private_endpoint_manager import SynapsePrivateEndpointManager
 from pipelines.scripts.private_endpoint.key_vault_private_endpoint_manager import KeyVaultPrivateEndpointManager
 from pipelines.scripts.private_endpoint.storage_private_endpoint_manager import StoragePrivateEndpointManager
+from pipelines.scripts.private_endpoint.service_bus_private_endpoint_manager import ServiceBusPrivateEndpointManager
 from pipelines.scripts.util import Util
 import argparse
 import logging
+import os
 
 
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +21,7 @@ def approve_private_endpoints(env: str):
     """
         Approve all ODW private endpoints
     """
+    initial_subscription = Util.get_subscription()
     synapse_private_endpoint_manager = SynapsePrivateEndpointManager()
     synapse_private_endpoint_manager.approve_all(
         f"pins-rg-data-odw-{env}-uks",
@@ -39,6 +42,28 @@ def approve_private_endpoints(env: str):
             storage_account,
             ENDPOINTS_TO_EXCLUDE
         )
+    # Approve pending Synapse MPEs pointing to the Appeals Back Office service bus
+    # Switch to the appeals bo subscription
+    if env != "build":
+        exception = None
+        Util.set_subscription(os.environ.get("ODT_SUBSCRIPTION_ID"))
+        try:
+            service_bus_private_endpoint_manager = ServiceBusPrivateEndpointManager()
+            appeals_bo_resource_group = f"pins-rg-appeals-bo-{env}"
+            appeals_bo_service_bus_name = f"pins-sb-appeals-bo-{env}"
+            all_private_endpoints = service_bus_private_endpoint_manager.get_all(
+                appeals_bo_resource_group,
+                appeals_bo_service_bus_name
+            )
+            synapse_mpes = [x for x in all_private_endpoints if f"synapse-mpe-appeals-bo--odw-{env}-uks" in x["properties"]["privateEndpoint"]["id"]]
+            for synapse_mpe in synapse_mpes:
+                service_bus_private_endpoint_manager.approve(synapse_mpe["id"])
+        except Exception as e:
+            exception = e
+        finally:
+            Util.set_subscription(initial_subscription)
+        if exception:
+            raise exception
 
 
 if __name__ == "__main__":
