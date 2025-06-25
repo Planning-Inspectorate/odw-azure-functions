@@ -22,11 +22,10 @@ parameters:
 - name: failoverDeployment
   type: boolean
   default: false
-# User-specified environment to deploy to. By default this is auto, which lets the pipeline decide as part of CI/CD
+# User-specified environment to deploy to
 - name: env
-  default: 'auto'
+  default: 'build'
   values:
-  - 'auto'
   - 'build'
   - 'dev'
   - 'test'
@@ -38,9 +37,9 @@ parameters:
   type: boolean
   default: false
 
-# Run when Pull Request raised to the dev branch
+# Run when Pull Request raised to the main branch
 pr:
-- dev
+- main
 
 # Run when merged into main
 trigger:
@@ -48,41 +47,31 @@ trigger:
   include:
   - main
 
-# Automatically run against the dev branch at a set time every day
+# Automatically run against the main branch at a set time every day
 schedules:
 - cron: '0 9 * * 1-5' # cron syntax defining a schedule. At 9am every week day
-  displayName: Daily dev branch run against the dev env
+  displayName: Daily main branch run against the test env
   branches:
     include:
-    - dev
+    - main
   always: true
   batch: false
 
 variables:
-- name: env
-  ${{ if ne(parameters.env, 'auto') }}:
-    value: ${{ parameters.env }}
-  ${{ else }}:
-    ${{ if eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'dev') }}:
-      value: dev
-    ${{ elseif eq(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'main') }}:
-      value: prod
-    ${{ else }}:
-      value: build
 
 - name: variableGroupName
-  ${{ if eq(variables.env, 'prod') }}:
+  ${{ if eq(parameters.env, 'prod') }}:
     value: "Terraform Prod"
-  ${{ elseif eq(variables.env, 'test') }}:
+  ${{ elseif eq(parameters.env, 'test') }}:
     value: "Terraform Test"
-  ${{ elseif eq(variables.env, 'build') }}:
+  ${{ elseif eq(parameters.env, 'build') }}:
     value: "Terraform Build"
   ${{ else }}:
     value: "Terraform Dev"
 - name: agentPool
-  value: 'pins-agent-pool-odw-${{ variables.env }}-uks'
+  value: 'pins-agent-pool-odw-${{ parameters.env }}-uks'
 - name: azureSubscription
-  value: 'pins-agent-pool-odw-${{ variables.env }}-uks'
+  value: 'pins-agent-pool-odw-${{ parameters.env }}-uks'
 - group: ${{ variables.variableGroupName }}
 
 stages:
@@ -98,8 +87,8 @@ stages:
 - template: stages/conditional-deployment-infrastructure.yaml
   parameters:
     agentPool: ${{ variables.agentPool }}
-    env: ${{ variables.env }}
-    armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(variables.env) }} - Infrastructure"
+    env: ${{ parameters.env }}
+    armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
     failoverDeployment: ${{ parameters.failoverDeployment }}
     outputsFileName: "tfoutputs.json"
     runTerraformApply: ${{ parameters.runTerraformApply }}
@@ -107,17 +96,17 @@ stages:
 - template: stages/conditional-deployment-functionapp.yaml
   parameters:
     agentPool: ${{ variables.agentPool }}
-    env: ${{ variables.env }}
+    env: ${{ parameters.env }}
 
 - template: stages/conditional-deployment-synapse.yaml
   parameters:
     agentPool: ${{ variables.agentPool }}
-    env: ${{ variables.env }}
-    armServiceConnectionName: "ODW ${{ upper(variables.env) }} - Infrastructure"
+    env: ${{ parameters.env }}
+    armServiceConnectionName: "ODW ${{ upper(parameters.env) }} - Infrastructure"
     fullDeployment: ${{ parameters.fullDeployment }}
 
 - ${{ if eq(parameters.runTests, true) }}:
   - template: stages/conditional-run-tests.yaml
     parameters:
       agentPool: ${{ variables.agentPool }}
-      env: ${{ variables.env }}
+      env: ${{ parameters.env }}
