@@ -62,3 +62,19 @@ class SynapsePipelineUtil(SynapseArtifactUtil):
 
     def get_env_attributes_to_replace(self) -> List[str]:
         return []
+
+    @classmethod
+    def can_be_archived(cls) -> bool:
+        return True
+
+    @classmethod
+    def archive(cls, artifact: Dict[str, Any]) -> Dict[str, Any]:
+        existing_folder = artifact["properties"].get("folder", dict())
+        existing_folder_name = existing_folder.get("name", "")
+        existing_folder.update(
+            {
+                "name": "/".join(["archive", existing_folder_name])
+            }
+        )
+        artifact["properties"]["folder"] = existing_folder
+        return artifact
