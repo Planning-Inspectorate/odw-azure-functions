@@ -8,7 +8,8 @@ from pipelines.scripts.synapse_artifact.synapse_pipeline_util import SynapsePipe
 from pipelines.scripts.synapse_artifact.synapse_spark_configuration_util import SynapseSparkConfigurationUtil
 from pipelines.scripts.synapse_artifact.synapse_sql_script_util import SynapseSQLScriptUtil
 from pipelines.scripts.synapse_artifact.synapse_trigger_util import SynapseTriggerUtil
-from typing import Type, List
+from pipelines.scripts.synapse_artifact.synapse_integration_runtime_util import SynapseIntegrationRuntimeUtil
+from typing import Type
 
 
 class SynapseArtifactUtilFactory():
@@ -23,7 +24,8 @@ class SynapseArtifactUtilFactory():
             SynapsePipelineUtil,
             SynapseSparkConfigurationUtil,
             SynapseSQLScriptUtil,
-            SynapseTriggerUtil
+            SynapseTriggerUtil,
+            SynapseIntegrationRuntimeUtil
         ]
     }
 

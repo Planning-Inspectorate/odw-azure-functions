@@ -29,10 +29,12 @@ class SynapseArtifactsPropertyIterator():
         Class to iterate through the properties of a json object through dot notation
     """
     def __init__(self, dictionary: Dict[str, Any], attribute: str):
+        self.parent_attribute_collection: Union[Dict[str, Any], List[Any]] = None
         self.attribute_collection: Union[Dict[str, Any], List[Any]] = dictionary
-        self.attribute_split = attribute.split(".")
+        self.attribute_split = [x for x in attribute.split(".") if x]
         if not self.attribute_split:
             raise ValueError(f"There is no attribute to evaluate")
+        self.last_evaluated_attribute = None
 
     def __iter__(self):
         return self
@@ -46,44 +48,46 @@ class SynapseArtifactsPropertyIterator():
 
         """
         if not self.attribute_split:
+            #print()
             raise StopIteration
-        next_attribute = self.attribute_split.pop(0)
+        # Imagine everything below is wrapped in a while loop as long as self.attribute_split has value
+        self.last_evaluated_attribute = self.attribute_split.pop(0)
         if isinstance(self.attribute_collection, list):
-            try:
-                next_attribute = int(next_attribute)
-            except ValueError:
-                pass
-            if not isinstance(next_attribute, int):
-                raise ValueError(f"Trying to access an index of a list collection, but was passed using property '{next_attribute}'")
-            if next_attribute > len(self.attribute_collection):
-                raise IndexError(f"Attribute index '{next_attribute}' out of range for list {self.attribute_collection}")
-            old_collection = self.attribute_collection
-            self.attribute_collection = self.attribute_collection[next_attribute]
-            return SynapseArtifactsPropertyIteratorResult(old_collection, next_attribute, self.attribute_collection, ".".join(self.attribute_split))
+            if not self.last_evaluated_attribute.isdigit():
+                raise AttributeNotFoundException(f"Trying to access sub property '{self.last_evaluated_attribute}' on a list collection")
+            self.last_evaluated_attribute = int(self.last_evaluated_attribute)
+            if not (0 <= self.last_evaluated_attribute < len(self.attribute_collection)):
+                raise AttributeNotFoundException(f"List index out of range for subproperty '{self.last_evaluated_attribute}' in list collection")
+            self.parent_attribute_collection = self.attribute_collection
+            self.attribute_collection = self.attribute_collection[self.last_evaluated_attribute]
         elif isinstance(self.attribute_collection, dict):
-            if next_attribute in self.attribute_collection:
-                old_collection = self.attribute_collection
-                self.attribute_collection = self.attribute_collection[next_attribute]
-                return SynapseArtifactsPropertyIteratorResult(old_collection, next_attribute, self.attribute_collection, ".".join(self.attribute_split))
-            while self.attribute_split:
-                next_attribute = f"{next_attribute}.{self.attribute_split.pop(0)}"
-                if next_attribute in self.attribute_collection:
-                    old_collection = self.attribute_collection
-                    self.attribute_collection = self.attribute_collection[next_attribute]
-                    return SynapseArtifactsPropertyIteratorResult(
-                        old_collection,
-                        next_attribute,
-                        self.attribute_collection,
-                        ".".join(self.attribute_split)
+            if self.last_evaluated_attribute not in self.attribute_collection:
+                if not self.attribute_split:
+                    raise AttributeNotFoundException(
+                        f"Sub attribute '{self.last_evaluated_attribute}' not in dictionary collection {self.attribute_collection}"
                     )
-            raise AttributeNotFoundException(f"Couldn't find attribute '{next_attribute}' in the dictionary '{self.attribute_collection}'")
+                # Special case where the key contains a period
+                while self.attribute_split:
+                    next_attribute = self.attribute_split.pop(0)
+                    self.last_evaluated_attribute += f".{next_attribute}"
+                    if self.last_evaluated_attribute in self.attribute_collection:
+                        self.parent_attribute_collection = self.attribute_collection
+                        self.attribute_collection = self.attribute_collection[self.last_evaluated_attribute]
+            else:
+                self.parent_attribute_collection = self.attribute_collection
+                self.attribute_collection = self.attribute_collection[self.last_evaluated_attribute]
         else:
-            raise ValueError(
-                (
-                    f"Trying to access a property '{next_attribute}' of a literal value '{self.attribute_collection}' "
-                    f"with type {type(self.attribute_collection)} rather than a collection"
+            if len(self.attribute_split) > 0:
+                raise ValueError(
+                    f"Trying to access a leaf property of a collection, but the remaining sub properties still need to be expanded: {self.attribute_split}"
                 )
-            )
+        #print(f"Last evaluated: '{self.last_evaluated_attribute}'")
+        return SynapseArtifactsPropertyIteratorResult(
+            self.parent_attribute_collection,
+            self.last_evaluated_attribute,
+            self.attribute_collection,
+            ".".join(self.attribute_split)
+        )
 
 
 class SynapseArtifactUtil(ABC):
@@ -506,3 +510,29 @@ class SynapseArtifactUtil(ABC):
             for attribute, attribute_type in reference_attributes.items()
             if reference_type_values[attribute_type] not in reference_types_to_ignore
         }
+    
+    @classmethod
+    def can_be_archived(cls) -> bool:
+        """
+            Return True if the artifact kind can be archived, false otherwise. An artifact can be archived if it has a 'folder' property
+        """
+        return False
+    
+    @classmethod
+    def archive(cls, artifact: Dict[str, Any]) -> Dict[str, Any]:
+        """
+            Archive the given artifact. Must be explicitly implemented for each individual base artifact util class. This prepends
+            the current folder property with 'archive/'
+        """
+        return artifact
+    
+    @classmethod
+    def is_archived(cls, artifact: Dict[str, Any]) -> bool:
+        """
+            Return True if the artifact has already been archived. If a 'folder' property exists and already starts with 'archive/' then return True,
+            False otherwise
+        """
+        existing_folder = artifact["properties"].get("folder", dict())
+        if not existing_folder:
+            return False
+        return existing_folder.get("name", "").startswith("archive")

@@ -98,3 +98,27 @@ class Util:
                 for x in artifact_paths
             ) and name.endswith(".json")
         ]
+    
+    @classmethod
+    def _convert_to_json(cls, obj: object) -> Dict[str, Any]:
+        '''
+        if isinstance(obj, list):
+            return [
+                cls._convert_to_json(elem)
+                for elem in obj
+            ]
+        if isinstance(obj, dict):
+            return {
+                k: cls._convert_to_json(v)
+                for k, v in obj.items()
+            }
+        if getattr(obj, "__dict__", None):
+            return {
+                k: cls._convert_to_json(v)
+                for k, v in obj.__dict__.items()
+            }
+        return str()
+        '''
+        return json.loads(
+            json.dumps(obj, default=lambda o: getattr(o, "__dict__", str(o)))
+        )
