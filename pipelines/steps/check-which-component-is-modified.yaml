@@ -15,16 +15,12 @@ steps:
     fi
     deployEverything=false
     echo "Source branch is '$sourceBranch'"
-    if [[ $sourceBranch = dev ]]; then
-        echo "The source branch is dev, so forcing a full deployment"
-        deployEverything=true
-        targetBranch=main
-    elif [[ $sourceBranch = main ]]; then
+    if [[ $sourceBranch = main ]]; then
         echo "The source branch is main, so forcing a full deployment"
         deployEverything=true
         targetBranch=main
     else
-        targetBranch=dev
+        targetBranch=main
     fi
     echo "Using target branch '$targetBranch'"
     modifiedFiles="$(git diff --name-status origin/$targetBranch)"
