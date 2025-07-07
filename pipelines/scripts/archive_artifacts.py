@@ -149,6 +149,9 @@ class ArtifactArchiver():
     def _get_artifact_json(self, artifact_path: str) -> Dict[str, Any]:
         return json.load(open(artifact_path, "r"))
 
+    def _get_artifact_json(self, artifact_path: str) -> Dict[str, Any]:
+        return json.load(open(artifact_path, "r"))
+
     def get_artifact(self, artifact_path: str) -> Dict[str, Any]:
         if artifact_path not in self.ALL_ARTIFACTS:
             raise ValueError(f"No artifact json could be found for '{artifact_path}'")
