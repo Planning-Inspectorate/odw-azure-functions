@@ -94,18 +94,28 @@ class SynapseArtifactUtil(ABC):
     """
         Abstract class for managing the retrieval and analysis of Synapse artifacts
     """
-    credential = ChainedTokenCredential(
-        #ManagedIdentityCredential(),
-        AzureCliCredential()
-    )
-    _token = credential.get_token("https://dev.azuresynapse.net").token
+    # By default leave these unset, so that non-azure aspects of the code do not require
+    # az cli to be set up
+    credential = None
+    _token = None
+
     def __init__(self, workspace_name: str):
         """
             :param workspace_name: The name of the Synapse workspace
         """
         self.workspace_name = workspace_name
         self.synapse_endpoint = f"https://{self.workspace_name}.dev.azuresynapse.net"
-    
+
+    @classmethod
+    def _get_token(cls) -> str:
+        if not (cls.credential and cls._token):
+            cls.credential = ChainedTokenCredential(
+                # ManagedIdentityCredential(),
+                AzureCliCredential()
+            )
+            cls._token = cls.credential.get_token("https://dev.azuresynapse.net").token
+        return cls._token
+
     @classmethod
     @abstractmethod
     def get_type_name(cls) -> str:
@@ -118,7 +128,7 @@ class SynapseArtifactUtil(ABC):
             :param endpooint: The url to send the request to
             :return: The http response
         """
-        api_call_headers = {'Authorization': 'Bearer ' + self._token}
+        api_call_headers = {'Authorization': 'Bearer ' + self._get_token()}
         return requests.get(endpoint, headers=api_call_headers)
 
     @abstractmethod
