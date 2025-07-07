@@ -90,7 +90,6 @@ jobs:
         ls_servicebus_properties_typeProperties_url: $(service_bus_namespace_name).servicebus.windows.net
         ls_servicebus_properties_typeProperties_aadResourceId: https://servicebus.azure.net
         ls_storage_properties_typeProperties_url: $(data_lake_dfs_endpoint)
-        tr_saphr_daily_800_properties_pipelines_0_parameters_Env_Type: ${{ parameters.env }}
       ResourceGroupName: $(data_resource_group_name)
       TargetWorkspaceName: $(synapse_workspace_name)
   
