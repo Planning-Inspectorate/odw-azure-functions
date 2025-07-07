@@ -16,7 +16,6 @@ class MockSynapseWorkspaceUtil():
 
 def copy_workspace():
     shutil.copytree("workspace_copy", "my_local_workspace", dirs_exist_ok=True)
-    shutil.rmtree("my_local_workspace/testing")
     shutil.rmtree("my_local_workspace/integrationRuntime")
     os.remove("my_local_workspace/template-parameters-definition.json")
     os.remove("my_local_workspace/publish_config.json")
@@ -24,7 +23,6 @@ def copy_workspace():
 
 def initialise_workspace_folder_for_testing():
     shutil.copytree("workspace_copy", "workspace", dirs_exist_ok=True)
-    shutil.rmtree("workspace/testing")
     shutil.rmtree("workspace/integrationRuntime")
     os.remove("workspace/template-parameters-definition.json")
     os.remove("workspace/publish_config.json")
