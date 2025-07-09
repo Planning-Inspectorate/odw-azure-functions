@@ -3,7 +3,7 @@ parameters:
   env: ''
 
 ##
-# Deploy Azure Functions only if a modification has been detected in the codebase
+# Deploy Azure Functions
 ##
 stages:
 - stage: DeployFunctionApp
