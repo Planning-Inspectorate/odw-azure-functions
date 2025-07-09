@@ -1,27 +1,7 @@
-name: Synapse CI/CD
+name: Azure Functions CI/CD
 
-# This is the main CI/CD pipeline of the ODW. This is used to manage the CI/CD through the dev, test and main branches
+# This is the main CI/CD pipeline for ODW Azure Functions
 parameters:
-# Whether or not to run tests
-- name: runTests
-  type: boolean
-  default: true
-# Whether or not to enforce the deployment of the infrastructure
-- name: enforceInfrastructureDeployment
-  type: boolean
-  default: false
-# Whether or not to enforce the deployment of the azure functions
-- name: enforceFunctionsDeployment
-  type: boolean
-  default: false
-# Whether or not to enforce the deployment of the synapse workspace
-- name: enforceSynapseDeployment
-  type: boolean
-  default: false
-# Whether or not the deployment is for the backup resources
-- name: failoverDeployment
-  type: boolean
-  default: false
 # User-specified environment to deploy to
 - name: env
   default: 'build'
@@ -30,12 +10,6 @@ parameters:
   - 'dev'
   - 'test'
   - 'prod'
-- name: fullDeployment
-  type: boolean
-  default: false
-- name: runTerraformApply
-  type: boolean
-  default: false
 
 # Run when Pull Request raised to the main branch
 pr:
@@ -46,16 +20,6 @@ trigger:
  branches:
   include:
   - main
-
-# Automatically run against the main branch at a set time every day
-schedules:
-- cron: '0 9 * * 1-5' # cron syntax defining a schedule. At 9am every week day
-  displayName: Daily main branch run against the test env
-  branches:
-    include:
-    - main
-  always: true
-  batch: false
 
 variables:
 
@@ -70,43 +34,12 @@ variables:
     value: "Terraform Dev"
 - name: agentPool
   value: 'pins-agent-pool-odw-${{ parameters.env }}-uks'
-- name: azureSubscription
-  value: 'pins-agent-pool-odw-${{ parameters.env }}-uks'
 - group: ${{ variables.variableGroupName }}
 
 stages:
-- template: stages/pre-deployment.yaml
-  parameters:
-    agentPool: ${{ variables.agentPool }}
-    enforceInfrastructureDeployment: ${{ parameters.enforceInfrastructureDeployment }}
-    enforceFunctionsDeployment: ${{ parameters.enforceFunctionsDeployment }}
-    enforceSynapseDeployment: ${{ parameters.enforceSynapseDeployment }}
-
 - template: stages/wait-for-approval.yaml
 
-- template: stages/conditional-deployment-infrastructure.yaml
+- template: stages/deploy-function-app.yaml
   parameters:
     agentPool: ${{ variables.agentPool }}
     env: ${{ parameters.env }}
-    armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
-    failoverDeployment: ${{ parameters.failoverDeployment }}
-    outputsFileName: "tfoutputs.json"
-    runTerraformApply: ${{ parameters.runTerraformApply }}
-
-- template: stages/conditional-deployment-functionapp.yaml
-  parameters:
-    agentPool: ${{ variables.agentPool }}
-    env: ${{ parameters.env }}
-
-- template: stages/conditional-deployment-synapse.yaml
-  parameters:
-    agentPool: ${{ variables.agentPool }}
-    env: ${{ parameters.env }}
-    armServiceConnectionName: "ODW ${{ upper(parameters.env) }} - Infrastructure"
-    fullDeployment: ${{ parameters.fullDeployment }}
-
-- ${{ if eq(parameters.runTests, true) }}:
-  - template: stages/conditional-run-tests.yaml
-    parameters:
-      agentPool: ${{ variables.agentPool }}
-      env: ${{ parameters.env }}

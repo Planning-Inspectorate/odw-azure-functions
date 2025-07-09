@@ -3,16 +3,12 @@ parameters:
   env: ''
 
 ##
-# Deploy Azure Functions only if a modification has been detected in the codebase
+# Deploy Azure Functions
 ##
 stages:
 - stage: DeployFunctionApp
   displayName: 'Deploy Function App to the ${{ parameters.env }} environment'
-  condition: |
-    and(
-      not(or(failed(), canceled())),
-      eq(dependencies.PreDeploy.outputs['PreDeploymentJob.checkModifiedComponents.functionsModified'], true)
-    )
+  condition: not(or(failed(), canceled()))
   jobs:
   - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/jobs/deploy-functionapp.yaml
     parameters:
