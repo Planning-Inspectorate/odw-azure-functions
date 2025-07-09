@@ -97,6 +97,15 @@ class ArtifactArchiver():
             "pipeline/rel_1416_master_fixes.json",
             "pipeline/rel_has_156.json",
             "pipeline/rel_THEODW-992-WelshFields.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/AzureSqlDatabase639.json",  # Keep private endpoints
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-sql-sqlServer--sql-odw-dev-uks.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-sql-sqlServer--sql-odw-dev-ukw.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-st-dfs--pinsstodwdevuks9h80mb.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-st-dfs--pinsstodwdevukwdvzrjm.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-ws-sql--pins-synw-odw-dev-uks.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-ws-sql--pins-synw-odw-dev-ukw.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-ws-sqlOnDemand--pins-synw-odw-dev-uks.json",
+            "managedVirtualNetwork/default/managedPrivateEndpoint/synapse-ws-sqlOnDemand--pins-synw-odw-dev-ukw.json"
         }
         """Artifacts to use as the base of the dependency analysis"""
 
