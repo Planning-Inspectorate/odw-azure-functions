@@ -39,7 +39,7 @@ variables:
 stages:
 - template: stages/wait-for-approval.yaml
 
-- template: stages/deploy-functionapp.yaml
+- template: stages/deploy-function-app.yaml
   parameters:
     agentPool: ${{ variables.agentPool }}
     env: ${{ parameters.env }}
