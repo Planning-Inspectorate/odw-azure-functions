@@ -1,0 +1,17 @@
+parameters:
+  agentPool: ''
+  env: ''
+
+##
+# Deploy Azure Functions only if a modification has been detected in the codebase
+##
+stages:
+- stage: DeployFunctionApp
+  displayName: 'Deploy Function App to the ${{ parameters.env }} environment'
+  condition: not(or(failed(), canceled()))
+  jobs:
+  - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/jobs/deploy-functionapp.yaml
+    parameters:
+      agentPool: ${{ parameters.agentPool }}
+      env: ${{ parameters.env }}
+      appName: 'fnapp01'

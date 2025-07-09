@@ -75,38 +75,9 @@ variables:
 - group: ${{ variables.variableGroupName }}
 
 stages:
-- template: stages/pre-deployment.yaml
-  parameters:
-    agentPool: ${{ variables.agentPool }}
-    enforceInfrastructureDeployment: ${{ parameters.enforceInfrastructureDeployment }}
-    enforceFunctionsDeployment: ${{ parameters.enforceFunctionsDeployment }}
-    enforceSynapseDeployment: ${{ parameters.enforceSynapseDeployment }}
-
 - template: stages/wait-for-approval.yaml
-
-- template: stages/conditional-deployment-infrastructure.yaml
-  parameters:
-    agentPool: ${{ variables.agentPool }}
-    env: ${{ parameters.env }}
-    armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
-    failoverDeployment: ${{ parameters.failoverDeployment }}
-    outputsFileName: "tfoutputs.json"
-    runTerraformApply: ${{ parameters.runTerraformApply }}
 
 - template: stages/conditional-deployment-functionapp.yaml
   parameters:
     agentPool: ${{ variables.agentPool }}
     env: ${{ parameters.env }}
-
-- template: stages/conditional-deployment-synapse.yaml
-  parameters:
-    agentPool: ${{ variables.agentPool }}
-    env: ${{ parameters.env }}
-    armServiceConnectionName: "ODW ${{ upper(parameters.env) }} - Infrastructure"
-    fullDeployment: ${{ parameters.fullDeployment }}
-
-- ${{ if eq(parameters.runTests, true) }}:
-  - template: stages/conditional-run-tests.yaml
-    parameters:
-      agentPool: ${{ variables.agentPool }}
-      env: ${{ parameters.env }}

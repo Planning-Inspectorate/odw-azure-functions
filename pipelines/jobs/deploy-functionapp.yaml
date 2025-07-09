@@ -4,7 +4,7 @@ parameters:
   appName: ''
 
 ##
-# Deploy Azure Synapse
+# Deploy ODW Azure Function App
 ##
 jobs:
 - job: DeployFunctionAppJob
