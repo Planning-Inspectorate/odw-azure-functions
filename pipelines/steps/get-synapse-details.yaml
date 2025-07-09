@@ -1,0 +1,17 @@
+parameters:
+  env: ''
+  pythonVersion: ''
+  failoverDeployment: false
+
+steps:
+  - script: |
+      set -x
+      python${{ parameters.pythonVersion }} --version
+      export PYTHONPATH="${PYTHONPATH}:/./"
+      python${{ parameters.pythonVersion }} $(System.DefaultWorkingDirectory)/pipelines/scripts/get_synapse_details.py --env ${{ parameters.env }} --failover_deployment ${{ parameters.failoverDeployment }}
+      if [ $? -eq 1 ]; then
+          echo "##vso[task.logissue type=error]get_synapse_details.py failed"
+          exit 1
+      fi
+    displayName: 'Set Variables'
+    name: SetVariables

@@ -1,0 +1,22 @@
+# Define owner of the CODEOWNERS file itself
+/.github/CODEOWNERS                                             @beejjacobs @m-juckes-pins @stef-solirius
+
+# Protect important folders
+
+# Github Actions workflows
+/.github/workflows                                              @beejjacobs @m-juckes-pins @stef-solirius
+
+# most files in infrastructure relate to Terraform code
+/infrastructure/**                                              @beejjacobs @m-juckes-pins @stef-solirius @HarrisonBoyleThomas @chiash12 @Imran-23
+
+# Azure Synapse files
+/workspace/**                                                   @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
+
+# Azure DevOps pipeline files
+/pipelines/**                                                   @m-juckes-pins @NHAL22 @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
+
+# Add protection for certain file extensions,
+# i.e. a python or sql expert must approve
+*.py                                                            @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
+*.ipynb                                                         @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
+*.sql                                                           @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23

@@ -1,0 +1,7 @@
+steps:
+- task: DownloadBuildArtifacts@1
+  displayName: 'Download function code artifact'
+  inputs:
+    buildType: 'current'
+    artifactName: 'FunctionCode'
+    downloadPath: '$(System.ArtifactsDirectory)'

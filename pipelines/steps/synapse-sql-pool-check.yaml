@@ -1,0 +1,24 @@
+parameters:
+  - name: armServiceConnectionName
+    type: string
+  - name: synapseWorkspaceName
+    type: string
+
+steps:
+  - task: AzurePowerShell@5
+    displayName: 'Check SQL Pool'
+    inputs:
+      ConnectedServiceNameARM: ${{ parameters.armServiceConnectionName }}
+      errorActionPreference: 'stop'
+      inline: |
+        Write-Host "Checking Synapse SQL pool..."
+        Write-Host "##[command]Get-AzSynapseSqlPool -WorkspaceName ${{ parameters.synapseWorkspaceName }}"
+        $Pool = Get-AzSynapseSqlPool -WorkspaceName ${{ parameters.synapseWorkspaceName }}
+        $Pool | Format-List 'SqlPoolName','Sku','Status' | ConvertTo-Json
+        If ($Pool.Status -eq 'Paused') {
+          Write-Host "Synapse SQL pool $($Pool.SqlPoolName) will be temporarily resumed for release..."
+          Write-Host "##vso[task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
+          Write-Host "##[command][task.setvariable variable=pause_sql_pool_name;isoutput=false]$($Pool.SqlPoolName)"
+        }
+      scriptType: inlineScript
+      TargetAzurePs: LatestVersion

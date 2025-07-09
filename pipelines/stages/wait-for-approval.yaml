@@ -1,0 +1,17 @@
+##
+# Wait for admins to approve this stage before proceeding with subsequent stages
+##
+stages:
+- stage: WaitForApproval
+  displayName: Wait For Approval Before Deploying
+  condition: eq(variables.env, 'prod')
+  jobs:
+  - deployment: WaitForApprovalJob
+    displayName: Wait For Approval
+    environment: $(env)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo "Approved"
+            displayName: Approved Message

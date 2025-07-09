@@ -1,0 +1,89 @@
+dev:
+  storage_account: "https://pinsstodwdevuks9h80mb.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-dev-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-dev-uks-b9rt9m.servicebus.windows.net"
+
+preprod:
+  storage_account: "https://pinsstodwtestukswic3ai.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-test-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-test-uks-hk2zun.servicebus.windows.net"
+
+prod:
+  storage_account: "https://pinsstodwprodukson83nw.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-prod-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-prod-uks-mwzecc.servicebus.windows.net"
+
+global:
+  odt-schemas-repo: "https://github.com/Planning-Inspectorate/data-model/tree/main/schemas"
+  max_message_count: 100000
+  max_wait_time: 5
+  success_response: "Function executed successfully"
+  validation_error: "Failed validating"
+
+  entities:
+    folder:
+      topic: "folder"
+      subscription: "folder"
+
+    nsip-document:
+      topic: "nsip-document"
+      subscription: "nsip-document"
+
+    nsip-exam-timetable:
+      topic: "nsip-exam-timetable"
+      subscription: "nsip-exam-timetable"
+
+    nsip-project:
+      topic: "nsip-project"
+      subscription: "nsip-project"
+
+    nsip-project-update:
+      topic: "nsip-project-update"
+      subscription: "nsip-project-update"
+
+    nsip-representation:
+      topic: "nsip-representation"
+      subscription: "nsip-representation"
+
+    nsip-s51-advice:
+      topic: "nsip-s51-advice"
+      subscription: "nsip-s51-advice"
+
+    nsip-subscription:
+      topic: "nsip-subscription"
+      subscription: "nsip-subscription"
+
+    service-user:
+      topic: "service-user"
+      subscription: "service-user"
+
+    appeal-document:
+      topic: "appeal-document"
+      subscription: "appeal-document-odw-sub"
+
+    appeal-has:
+      topic: "appeal-has"
+      subscription: "appeal-has-odw-sub"
+
+    appeal-event:
+      topic: "appeal-event"
+      subscription: "appeal-event-odw-sub"
+
+    appeal-event-estimate:
+      topic: "appeal-event-estimate"
+      subscription: "appeal-event-estimate-odw-sub"
+
+    appeal-service-user:
+      topic: "appeal-service-user"
+      subscription: "appeal-service-user-odw-sub"
+
+    appeal-s78:
+      topic: "appeal-s78"
+      subscription: "appeal-s78-odw-sub"
+
+    appeal-representation:
+      topic: "appeal-representation"
+      subscription: "appeal-representation-odw-sub"

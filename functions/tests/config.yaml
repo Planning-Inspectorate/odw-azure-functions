@@ -1,0 +1,71 @@
+dev:
+  storage_account: "https://pinsstodwdevuks9h80mb.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-dev-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-dev-uks-b9rt9m.servicebus.windows.net"
+
+
+preprod:
+  storage_account: "https://pinsstodwtestukswic3ai.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-test-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-test-uks-hk2zun.servicebus.windows.net"
+
+prod: 
+  storage_account: "https://pinsstodwprodukson83nw.blob.core.windows.net"
+  storage_container: "odw-raw/ServiceBus"
+  servicebus_namespace_odt: "pins-sb-back-office-prod-ukw-001.servicebus.windows.net"
+  servicebus_namespace_odw: "pins-sb-odw-prod-uks-mwzecc.servicebus.windows.net"
+
+global:
+  odt-schemas-repo: "https://github.com/Planning-Inspectorate/data-model/tree/main/schemas"
+  max_message_count: 100000
+  max_wait_time: 5
+  success_response: "Function executed successfully"
+  validation_error: "Failed validating"
+
+  entities:
+
+    # folder:
+    #   topic: "folder"
+    #   subscription: "folder"
+
+    nsip-document: 
+      topic: "nsip-document" 
+      subscription: "nsip-document"
+      schema: "nsip-document.schema.json"
+
+    nsip-exam-timetable: 
+      topic: "nsip-exam-timetable"
+      subscription: "nsip-exam-timetable"
+      schema: "nsip-exam-timetable.schema.json"
+
+    nsip-project:
+      topic: "nsip-project"
+      subscription: "nsip-project"
+      schema: "nsip-project.schema.json"
+
+    nsip-project-update: 
+      topic: "nsip-project-update" 
+      subscription: "nsip-project-update"
+      schema: "nsip-project-update.schema.json"
+
+    nsip-representation:
+      topic: "nsip-representation"
+      subscription: "nsip-representation"
+      schema: "nsip-representation.schema.json"
+
+    nsip-s51-advice: 
+      topic: "nsip-s51-advice"
+      subscription: "nsip-s51-advice"
+      schema: "s51-advice.schema.json"
+
+    nsip-subscription: 
+     topic: "nsip-subscription"
+     subscription: "nsip-subscription"
+     schema: "nsip-subscription.schema.json"
+
+    service-user:
+      topic: "service-user"
+      subscription: "service-user"
+      schema: "service-user.schema.json"
