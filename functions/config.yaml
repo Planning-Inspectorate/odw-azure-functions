@@ -26,39 +26,39 @@ global:
   entities:
     folder:
       topic: "folder"
-      subscription: "folder"
+      subscription: "odw-folder-sub"
 
     nsip-document:
       topic: "nsip-document"
-      subscription: "nsip-document"
+      subscription: "odw-nsip-document-sub"
 
     nsip-exam-timetable:
       topic: "nsip-exam-timetable"
-      subscription: "nsip-exam-timetable"
+      subscription: "odw-nsip-exam-timetable-sub"
 
     nsip-project:
       topic: "nsip-project"
-      subscription: "nsip-project"
+      subscription: "odw-nsip-project-sub"
 
     nsip-project-update:
       topic: "nsip-project-update"
-      subscription: "nsip-project-update"
+      subscription: "odw-nsip-project-update-sub"
 
     nsip-representation:
       topic: "nsip-representation"
-      subscription: "nsip-representation"
+      subscription: "odw-nsip-representation-sub"
 
     nsip-s51-advice:
       topic: "nsip-s51-advice"
-      subscription: "nsip-s51-advice"
+      subscription: "odw-nsip-s51-advice-sub"
 
     nsip-subscription:
       topic: "nsip-subscription"
-      subscription: "nsip-subscription"
+      subscription: "odw-nsip-subscription-sub"
 
     service-user:
       topic: "service-user"
-      subscription: "service-user"
+      subscription: "odw-service-user-sub"
 
     appeal-document:
       topic: "appeal-document"
