@@ -31,7 +31,7 @@ def extract_namespace_from_connstr(conn_str: str) -> str:
             endpoint = part.split("=", 1)[1].strip()
             endpoint = endpoint.replace("sb://", "").rstrip("/")
             return endpoint.split(".")[0]
-    return "<unknown>"
+    raise ValueError("Invalid Service Bus connection string Endpoint missing")
 
 def purge_dlq():
     namespace = extract_namespace_from_connstr(SERVICE_BUS_CONNECTION_STR)
