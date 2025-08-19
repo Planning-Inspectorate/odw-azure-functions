@@ -1,7 +1,7 @@
 import os
 from azure.servicebus import ServiceBusClient, ServiceBusReceiveMode, ServiceBusSubQueue
 from dotenv import load_dotenv
-# Before running the script run this in your terminal
+# Before running the script run this in your terminal and make sure you re-processed the dead-letters before deleting them
 # python3 -m venv .venv
 # source .venv/bin/activate
 # pip install azure-servicebus==7.13.0 python-dotenv==1.0.1
