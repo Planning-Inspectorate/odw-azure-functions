@@ -3,6 +3,7 @@ Azure Function code to read messages from Azure Service Bus and send them to Azu
 One function for each Service us topic
 """
 
+import logging
 import azure.functions as func
 from servicebus_funcs import get_messages_and_validate, send_to_storage
 from set_environment import current_config, config
@@ -558,6 +559,9 @@ def appeal(req: func.HttpRequest) -> func.HttpResponse:
     _TOPIC = config["global"]["entities"]["appeal-has"]["topic"]
     _SUBSCRIPTION = config["global"]["entities"]["appeal-has"]["subscription"]
 
+    # Log the schema being used
+    logging.info(f"Using schema for appealhas: {_SCHEMA}")
+
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE_APPEALS,
@@ -584,6 +588,10 @@ def appeal(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     except Exception as e:
+        # Log the error and extract validation details if possible
+        logging.error(f"Error processing appealhas: {str(e)}")
+        if hasattr(e, 'errors'):
+            logging.error(f"Validation details: {e.errors}")
         return (
             func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
             if f"{_VALIDATION_ERROR}" in str(e)
