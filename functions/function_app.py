@@ -559,9 +559,6 @@ def appeal(req: func.HttpRequest) -> func.HttpResponse:
     _TOPIC = config["global"]["entities"]["appeal-has"]["topic"]
     _SUBSCRIPTION = config["global"]["entities"]["appeal-has"]["subscription"]
 
-    # Log the schema being used
-    logging.info(f"Using schema for appealhas: {_SCHEMA}")
-
     try:
         _data = get_messages_and_validate(
             namespace=_NAMESPACE_APPEALS,
@@ -592,6 +589,8 @@ def appeal(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"Error processing appealhas: {str(e)}")
         if hasattr(e, 'errors'):
             logging.error(f"Validation details: {e.errors}")
+            # Log the schema being used
+            logging.info(f"Using schema for appealhas: {_SCHEMA}")
         return (
             func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
             if f"{_VALIDATION_ERROR}" in str(e)
