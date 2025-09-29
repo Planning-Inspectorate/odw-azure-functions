@@ -92,9 +92,9 @@ def get_messages_and_validate(
                         else:
                             other_message_types.append(message_body)
 
-                        is_message_valid, validation_errors = validate_data(message_body, schema)
+                        validation_errors = validate_data(message_body, schema)
 
-                        if is_message_valid:
+                        if not validation_errors:
                             valid_messages.append(message_body)
                             subscription_receiver.complete_message(message)
                             message_body["message_type"] = message_type
