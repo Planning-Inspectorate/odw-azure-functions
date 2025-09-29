@@ -38,5 +38,5 @@ def validate_data(message, schema: dict) -> bool:
         validate(instance=message, schema=schema, format_checker=format_checker)
     except ValidationError as e:
         error_path = "/".join([str(p) for p in e.path]) or "<root>"
-        errors.append(f"{error_path}: {e.message}")
+        errors = [f"{error_path}: {e.message}"]
     return errors
