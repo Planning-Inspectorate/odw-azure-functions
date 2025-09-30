@@ -6,6 +6,7 @@ Functions:
 - send_to_storage: Upload data to Azure Blob Storage.
 """
 
+import logging
 from azure.servicebus import ServiceBusClient
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -91,9 +92,9 @@ def get_messages_and_validate(
                         else:
                             other_message_types.append(message_body)
 
-                        is_message_valid: bool = validate_data(message_body, schema)
+                        validation_errors = validate_data(message_body, schema)
 
-                        if is_message_valid:
+                        if not validation_errors:
                             valid_messages.append(message_body)
                             subscription_receiver.complete_message(message)
                             message_body["message_type"] = message_type
@@ -103,9 +104,16 @@ def get_messages_and_validate(
                             message_body["message_id"] = message_id
                             valid_with_properties.append(message_body)
                         else:
-                            invalid_messages.append(message_body)
+                            invalid_messages.append({
+                                "message_id": message_id,
+                                "body": message_body,
+                                "errors": validation_errors
+                            })
+                            logging.error(
+                                f"Message ID {message_id} failed validation: {validation_errors}"
+                            )
                             subscription_receiver.dead_letter_message(
-                                message, reason="Failed validation against schema"
+                                message, reason="Failed validation against schema", error_description="; ".join(validation_errors)
                             )
 
                     print(

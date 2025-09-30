@@ -33,10 +33,10 @@ def validate_data(message, schema: dict) -> bool:
     format_checker = FormatChecker()
     format_checker.checks("date-time")(is_iso8601_date_time)
 
+    errors = []
     try:
         validate(instance=message, schema=schema, format_checker=format_checker)
-        is_valid = True
     except ValidationError as e:
-        is_valid = False
-        print(e)
-    return is_valid
+        error_path = "/".join([str(p) for p in e.path]) or "<root>"
+        errors = [f"{error_path}: {e.message}"]
+    return errors
