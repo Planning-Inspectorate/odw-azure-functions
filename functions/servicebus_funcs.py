@@ -125,6 +125,7 @@ def get_messages_and_validate(
 
     except Exception as e:
         print(f"Error processing messages\n{e}")
+        raise e
 
     return valid_with_properties
 
