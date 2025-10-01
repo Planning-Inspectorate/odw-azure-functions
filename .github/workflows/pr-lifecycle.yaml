@@ -1,0 +1,19 @@
+##
+# Auto marks PRs and Issues as 'Stale' if they have no activity and are inactive for a long time, and auto-deletes very stale items
+# Based on https://github.com/actions/stale
+##
+name: 'Close stale issues and PRs'
+on:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v10
+        with:
+          days-before-stale: 14
+          days-before-close: 7
+          stale-issue-message: 'This issue is stale because it has been open 14 days with no activity. Remove stale label or comment or this will be closed in 7 days.'
+          stale-pr-message: 'This pull request is stale because it has been open 14 days with no activity. Remove stale label or comment or this will be closed in 7 days.'
