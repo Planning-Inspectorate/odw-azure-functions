@@ -23,6 +23,7 @@ def get_messages_and_validate(
     max_wait_time: int,
     schema: dict,
 ) -> list:
+    print(f"Attempting to connect to namespace '{namespace}', subs '{subscription}'")
     """
     Retrieve messages from a Service Bus topic subscription.
 
