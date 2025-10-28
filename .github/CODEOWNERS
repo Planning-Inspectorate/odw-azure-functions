@@ -4,19 +4,16 @@
 # Protect important folders
 
 # Github Actions workflows
-/.github/workflows                                              @beejjacobs @m-juckes-pins @stef-solirius
+/.github/workflows                                              @beejjacobs @m-juckes-pins @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @KranthiRayipudi
 
-# most files in infrastructure relate to Terraform code
-/infrastructure/**                                              @beejjacobs @m-juckes-pins @stef-solirius @HarrisonBoyleThomas @chiash12 @Imran-23
-
-# Azure Synapse files
-/workspace/**                                                   @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
+# Azure Function files
+/functions/**                                                   @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @KranthiRayipudi
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @m-juckes-pins @NHAL22 @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
+/pipelines/**                                                   @m-juckes-pins @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @KranthiRayipudi
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
-*.py                                                            @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
-*.ipynb                                                         @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
-*.sql                                                           @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @Amerali786 @chiash12 @Imran-23
+*.py                                                            @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @KranthiRayipudi
+*.ipynb                                                         @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @KranthiRayipudi
+*.sql                                                           @roytalari @stef-solirius @HarrisonBoyleThomas @Fred83200 @KranthiRayipudi
