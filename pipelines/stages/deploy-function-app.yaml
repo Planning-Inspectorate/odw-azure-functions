@@ -1,6 +1,7 @@
 parameters:
   agentPool: ''
   env: ''
+  appName: 'fnapp01'
 
 ##
 # Deploy Azure Functions
@@ -14,4 +15,4 @@ stages:
     parameters:
       agentPool: ${{ parameters.agentPool }}
       env: ${{ parameters.env }}
-      appName: 'fnapp01'
+      appName: ${{ parameters.appName }}

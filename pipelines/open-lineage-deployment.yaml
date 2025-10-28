@@ -12,10 +12,14 @@ parameters:
   - 'prod'
 
 # Run when Pull Request raised to the main branch
-pr: none
+pr:
+- main
 
 # Run when merged into main
-trigger: none
+trigger:
+ branches:
+  include:
+  - main
 
 variables:
 
@@ -33,30 +37,10 @@ variables:
 - group: ${{ variables.variableGroupName }}
 
 stages:
-- stage: DeployFunctionApp
-  displayName: 'Deploy Open Lineage Function Apps to the ${{ parameters.env }} environment'
-  condition: not(or(failed(), canceled()))
-  jobs:
-  - job: DeployFunctionAppJob
-    pool: ${{ variables.agentPool }}
-    timeoutInMinutes: 0 # Max timeout
-    steps:
-    # Checkout the Github repo, in this case ODW-Service.
-    - checkout: self
-      displayName: 'Checkout repo'
-    # Use the Azure CLI to deploy the zip file to the Function App in Azure.
-    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/deploy_to_function_app.yaml
-      parameters:
-        environment: ${{ parameters.env }}
-        armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
-        resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
-        functionApp: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
-        zipFile: '$(Build.SourcesDirectory)/ol-json-receiver-prod.zip'
-    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/deploy_to_function_app.yaml
-      parameters:
-        environment: ${{ parameters.env }}
-        armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
-        resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
-        functionApp: 'pins-oljsonparser-odw-${{ parameters.env }}-uks'
-        zipFile: '$(Build.SourcesDirectory)/ol-json-parser.zip'
+- template: stages/wait-for-approval.yaml
 
+- template: stages/deploy-function-app.yaml
+  parameters:
+    agentPool: ${{ variables.agentPool }}
+    env: ${{ parameters.env }}
+    appName: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
