@@ -16,7 +16,7 @@ parameters:
 
 steps:
 - task: AzureCLI@2
-  displayName: 'Deploy to function app'
+  displayName: 'Deploy to function app to ${{ parameters.functionApp }}'
   inputs:
     azureSubscription: ${{ parameters.armServiceConnectionName }}
     scriptType: 'bash'

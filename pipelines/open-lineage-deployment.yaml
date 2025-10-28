@@ -1,0 +1,62 @@
+name: Azure Functions CI/CD
+
+# This is the main CI/CD pipeline for ODW Azure Functions
+parameters:
+# User-specified environment to deploy to
+- name: env
+  default: 'dev'
+  values:
+  - 'build'
+  - 'dev'
+  - 'test'
+  - 'prod'
+
+# Run when Pull Request raised to the main branch
+pr: none
+
+# Run when merged into main
+trigger: none
+
+variables:
+
+- name: variableGroupName
+  ${{ if eq(parameters.env, 'prod') }}:
+    value: "Terraform Prod"
+  ${{ elseif eq(parameters.env, 'test') }}:
+    value: "Terraform Test"
+  ${{ elseif eq(parameters.env, 'build') }}:
+    value: "Terraform Build"
+  ${{ else }}:
+    value: "Terraform Dev"
+- name: agentPool
+  value: 'pins-agent-pool-odw-${{ parameters.env }}-uks'
+- group: ${{ variables.variableGroupName }}
+
+stages:
+- stage: DeployFunctionApp
+  displayName: 'Deploy Open Lineage Function Apps to the ${{ parameters.env }} environment'
+  condition: not(or(failed(), canceled()))
+  jobs:
+  - job: DeployFunctionAppJob
+    pool: ${{ parameters.agentPool }}
+    timeoutInMinutes: 0 # Max timeout
+    steps:
+    # Checkout the Github repo, in this case ODW-Service.
+    - checkout: self
+      displayName: 'Checkout repo'
+    # Use the Azure CLI to deploy the zip file to the Function App in Azure.
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/deploy_to_function_app.yaml
+      parameters:
+        environment: ${{ parameters.env }}
+        armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
+        resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
+        functionApp: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
+        zipFile: '$(System.ArtifactsDirectory)/ol-json-receiver-prod.zip'
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/deploy_to_function_app.yaml
+      parameters:
+        environment: ${{ parameters.env }}
+        armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
+        resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
+        functionApp: 'pins-oljsonparser-odw-${{ parameters.env }}-uks'
+        zipFile: '$(System.ArtifactsDirectory)/ol-json-parser.zip'
+
