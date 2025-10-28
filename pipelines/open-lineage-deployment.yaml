@@ -43,4 +43,4 @@ stages:
   parameters:
     agentPool: ${{ variables.agentPool }}
     env: ${{ parameters.env }}
-    appName: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
+    appName: 'oljsonreceiver'
