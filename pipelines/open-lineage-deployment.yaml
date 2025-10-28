@@ -38,7 +38,7 @@ stages:
   condition: not(or(failed(), canceled()))
   jobs:
   - job: DeployFunctionAppJob
-    pool: ${{ parameters.agentPool }}
+    pool: ${{ variables.agentPool }}
     timeoutInMinutes: 0 # Max timeout
     steps:
     # Checkout the Github repo, in this case ODW-Service.
