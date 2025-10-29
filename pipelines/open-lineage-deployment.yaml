@@ -52,11 +52,11 @@ stages:
         resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
         functionApp: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
         zipFile: '$(Build.SourcesDirectory)/ol-json-receiver-prod.zip'
-    #- template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/deploy_to_function_app.yaml
-    #  parameters:
-    #    environment: ${{ parameters.env }}
-    #    armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
-    #    resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
-    #    functionApp: 'pins-oljsonparser-odw-${{ parameters.env }}-uks'
-    #    zipFile: '$(Build.SourcesDirectory)/ol-json-parser.zip'
+    - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/steps/deploy_to_function_app.yaml
+      parameters:
+        environment: ${{ parameters.env }}
+        armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
+        resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
+        functionApp: 'pins-oljsonparser-odw-${{ parameters.env }}-uks'
+        zipFile: '$(Build.SourcesDirectory)/ol-json-parser.zip'
 
