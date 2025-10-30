@@ -22,7 +22,8 @@ trigger:
   - main
 
 variables:
-
+- name: buildReason
+  value: ${{ variables['Build.Reason'] }}
 - name: variableGroupName
   ${{ if eq(parameters.env, 'prod') }}:
     value: "Terraform Prod"
@@ -37,6 +38,16 @@ variables:
 - group: ${{ variables.variableGroupName }}
 
 stages:
+- stage:
+  displayName: "test stage"
+  jobs:
+  - job:
+    displayName: "test job"
+    steps:
+    - script: |
+        echo "The build reason is set to ${{ variables.buildReason }}"
+      displayName: 'test step'
+
 - template: stages/wait-for-approval.yaml
 
 - template: stages/deploy-function-app.yaml
