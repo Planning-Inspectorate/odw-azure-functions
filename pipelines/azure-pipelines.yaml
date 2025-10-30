@@ -22,35 +22,29 @@ trigger:
   - main
 
 variables:
-- name: buildReason
-  value: ${{ variables['Build.Reason'] }}
+- name: env
+  # If the pipeline was triggered by a merge, and the source branch is the main branch
+  ${{ if and(eq(variables['Build.Reason'], 'IndividualCI'), eq(variables['Build.SourceBranch'], 'refs/heads/main')) }}:
+    value: test
+  ${{ else }}:
+    value: ${{ parameters.env }}
 - name: variableGroupName
-  ${{ if eq(parameters.env, 'prod') }}:
+  ${{ if eq(variables.env, 'prod') }}:
     value: "Terraform Prod"
-  ${{ elseif eq(parameters.env, 'test') }}:
+  ${{ elseif eq(variables.env, 'test') }}:
     value: "Terraform Test"
-  ${{ elseif eq(parameters.env, 'build') }}:
+  ${{ elseif eq(variables.env, 'build') }}:
     value: "Terraform Build"
   ${{ else }}:
     value: "Terraform Dev"
 - name: agentPool
-  value: 'pins-agent-pool-odw-${{ parameters.env }}-uks'
+  value: 'pins-agent-pool-odw-${{ variables.env }}-uks'
 - group: ${{ variables.variableGroupName }}
 
 stages:
-- stage:
-  displayName: "test stage"
-  jobs:
-  - job:
-    displayName: "test job"
-    steps:
-    - script: |
-        echo "The build reason is set to ${{ variables.buildReason }}"
-      displayName: 'test step'
-
 - template: stages/wait-for-approval.yaml
 
 - template: stages/deploy-function-app.yaml
   parameters:
     agentPool: ${{ variables.agentPool }}
-    env: ${{ parameters.env }}
+    env: ${{ variables.env }}
