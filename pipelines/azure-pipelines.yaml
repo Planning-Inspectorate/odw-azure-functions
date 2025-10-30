@@ -42,16 +42,6 @@ variables:
 - group: ${{ variables.variableGroupName }}
 
 stages:
-- stage:
-  displayName: "test stage"
-  jobs:
-  - job:
-    displayName: "test job"
-    steps:
-    - script: |
-        echo "The build reason is set to ${{ variables.buildReason }}"
-      displayName: 'test step'
-
 - template: stages/wait-for-approval.yaml
 
 - template: stages/deploy-function-app.yaml
