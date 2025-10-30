@@ -24,7 +24,7 @@ trigger:
 variables:
 - name: env
   # If the pipeline was triggered by a merge, and the source branch is the main branch
-  ${{ if and(eq(variables['Build.Reason'], 'IndividualCI'), and(eq(variables['Build.SourceBranch'], 'refs/heads/main')) }}:
+  ${{ if and(eq(variables['Build.Reason'], 'IndividualCI'), eq(variables['Build.SourceBranch'], 'refs/heads/main')) }}:
     value: test
   ${{ else }}:
     value: ${{ parameters.env }}
