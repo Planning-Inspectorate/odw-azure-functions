@@ -44,4 +44,4 @@ jobs:
       armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
       resourceGroup: 'pins-rg-openlineage-odw-${{ parameters.env }}-uks'
       functionApp: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
-      zipFile: '$(System.ArtifactsDirectory)/oljsonreceiver.zip'
+      zipFile: '$(Build.ArtifactStagingDirectory)/oljsonreceiver.zip'
