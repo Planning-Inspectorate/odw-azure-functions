@@ -890,6 +890,21 @@ def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResp
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
 
+
+@_app.function_name(name="hbtTestFunction")
+@_app.route(route="testFunction", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def hbt_test_function(req: func.HttpRequest) -> func.HttpResponse:
+    return func.HttpResponse(
+        json.dumps(
+            {
+                "message": "Hello world"
+            }
+        ),
+        status_code=200,
+        mimetype="application/json"
+    )
+
+
 @_app.function_name("appealeventestimate")
 @_app.route(route="appealeventestimate", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
