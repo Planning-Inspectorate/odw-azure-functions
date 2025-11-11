@@ -43,5 +43,5 @@ jobs:
       environment: ${{ parameters.env }}
       armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
       resourceGroup: 'pins-rg-function-app-odw-${{ parameters.env }}-uks'
-      functionApp: 'pins-${{ parameters.appName }}-odw-${{ parameters.env }}-uks'
+      functionApp: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
       zipFile: '$(System.ArtifactsDirectory)/FunctionCode/functions.zip'
