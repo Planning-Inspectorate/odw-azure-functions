@@ -43,5 +43,5 @@ jobs:
       environment: ${{ parameters.env }}
       armServiceConnectionName: "Azure Devops Pipelines - ODW ${{ upper(parameters.env) }} - Infrastructure"
       resourceGroup: 'pins-rg-openlineage-odw-${{ parameters.env }}-uks'
-      functionApp: 'pins-oljsonreceiver-odw-${{ parameters.env }}-uks'
-      zipFile: '$(Build.SourcesDirectory)/hbtoljsonreceiver.zip'
+      functionApp: 'pins-oljsonparser-odw-${{ parameters.env }}-uks'
+      zipFile: '$(Build.SourcesDirectory)/hbtoljsonparser.zip'
