@@ -2,13 +2,13 @@
 Purge messages from a topic subscription in Azure Service Bus.
 
 Supports:
-  Purging the Dead Letter Queue (DLQ)
-  Purging ACTIVE subscription messages
-  Optional limit for active purge (delete first N only)
+  - Purging the Dead Letter Queue (DLQ)
+  - Purging ACTIVE subscription messages
+  - Optional limit for active purge (delete first N only)
 
 Auth modes:
   1) SAS connection string (if SERVICE_BUS_CONNECTION_STR is set)
-  2) Microsoft Entra ID / RBAC (azure-identity)
+  2) Microsoft Entra ID / RBAC via DefaultAzureCredential (azure-identity)
 
 Prereqs (SAS auth):
   python3 -m venv .venv
@@ -22,58 +22,49 @@ Prereqs (AAD auth):
   az login
 
 Environment (.env):
-  # SAS mode (preferred)
+  # SAS mode (preferred if available)
   # SERVICE_BUS_CONNECTION_STR=Endpoint=sb://<namespace>.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=...
 
-  # Entra ID mode
+  # Entra ID mode (no SAS)
   # SERVICE_BUS_NAMESPACE_FQDN=<namespace>.servicebus.windows.net
 
-  SERVICE_BUS_TOPIC=<topic-name>
-  SERVICE_BUS_SUBSCRIPTION=<subscription-name>
+  # Optional defaults (can be overridden by CLI args):
+  # SERVICE_BUS_TOPIC=<topic-name>
+  # SERVICE_BUS_SUBSCRIPTION=<subscription-name>
+
   DLQ_BATCH=1000
   DLQ_WAIT=5
 
   --- How to run the script ---
 
-  - To Purge all DLQ messages:
-  python purge.py --dlq
+  - To Purge all DLQ messages (default behaviour):
+    python purge.py
 
   - To Purge all active subscription messages:
-  python purge.py --active
+    python purge.py --active
 
   - To purge only a specific number of active subscription messages:
-  python purge.py --active --limit [number]
+    python purge.py --active --limit [number]
 
-  - If you run the script with the default command it will run only the DLQ
-  python purge.py
+  - Optional: override topic/subscription without editing .env
+    python purge.py --topic nsip-project --subscription odw-nsip-project-sub --active --limit 7
 """
 
 import os
 import argparse
 from azure.servicebus import ServiceBusClient, ServiceBusReceiveMode, ServiceBusSubQueue
+from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
-
-# Optional AAD auth
-USE_AAD = True
-try:
-    from azure.identity import DefaultAzureCredential, InteractiveBrowserCredential
-except Exception:
-    USE_AAD = False
 
 load_dotenv()
 
 # Load config
 SERVICE_BUS_CONNECTION_STR = os.getenv("SERVICE_BUS_CONNECTION_STR")
 SERVICE_BUS_NAMESPACE_FQDN = os.getenv("SERVICE_BUS_NAMESPACE_FQDN") or os.getenv("SERVICE_BUS_NAMESPACE")
-SERVICE_BUS_TOPIC = os.getenv("SERVICE_BUS_TOPIC")
-SERVICE_BUS_SUBSCRIPTION = os.getenv("SERVICE_BUS_SUBSCRIPTION")
+ENV_TOPIC = os.getenv("SERVICE_BUS_TOPIC")
+ENV_SUBSCRIPTION = os.getenv("SERVICE_BUS_SUBSCRIPTION")
 BATCH_SIZE = int(os.getenv("DLQ_BATCH", "1000"))
 WAIT_SECONDS = int(os.getenv("DLQ_WAIT", "5"))
-
-if not SERVICE_BUS_TOPIC:
-    raise SystemExit("ERROR: Set SERVICE_BUS_TOPIC in your .env")
-if not SERVICE_BUS_SUBSCRIPTION:
-    raise SystemExit("ERROR: Set SERVICE_BUS_SUBSCRIPTION in your .env")
 
 
 def extract_namespace_from_connstr(conn_str: str) -> str:
@@ -88,28 +79,22 @@ def extract_namespace_from_connstr(conn_str: str) -> str:
 def to_fqdn(namespace: str) -> str:
     namespace = (namespace or "").strip()
     if not namespace:
-        raise SystemExit("ERROR: Set SERVICE_BUS_NAMESPACE_FQDN in your .env for AAD auth")
+        raise SystemExit("ERROR: Set SERVICE_BUS_NAMESPACE_FQDN or SERVICE_BUS_NAMESPACE in your .env")
     return namespace if "." in namespace else f"{namespace}.servicebus.windows.net"
 
 
 def get_client() -> ServiceBusClient:
+    # Prefer SAS if provided (keeps backwards compatibility)
     if SERVICE_BUS_CONNECTION_STR:
         ns = extract_namespace_from_connstr(SERVICE_BUS_CONNECTION_STR)
         print(f"Auth: SAS | Namespace: {ns}")
         return ServiceBusClient.from_connection_string(SERVICE_BUS_CONNECTION_STR)
 
-    if not USE_AAD:
-        raise SystemExit("ERROR: No SAS connection string and azure-identity not available")
-
+    # Otherwise, use AAD via DefaultAzureCredential (matches other scripts)
     fqdn = to_fqdn(SERVICE_BUS_NAMESPACE_FQDN or "")
-    try:
-        credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
-        print(f"Auth: AAD (DefaultAzureCredential) | Namespace: {fqdn}")
-        return ServiceBusClient(fqdn, credential=credential)
-    except Exception:
-        credential = InteractiveBrowserCredential()
-        print(f"Auth: AAD (InteractiveBrowserCredential) | Namespace: {fqdn}")
-        return ServiceBusClient(fqdn, credential=credential)
+    credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
+    print(f"Auth: AAD (DefaultAzureCredential) | Namespace: {fqdn}")
+    return ServiceBusClient(fqdn, credential=credential)
 
 
 def namespace_label() -> str:
@@ -119,23 +104,26 @@ def namespace_label() -> str:
 
 
 # DELETE FROM DLQ
-def purge_dlq():
+def purge_dlq(topic: str, subscription: str) -> None:
     ns = namespace_label()
-    print(f"Purging DLQ: {ns}/{SERVICE_BUS_TOPIC}/{SERVICE_BUS_SUBSCRIPTION}")
+    print(f"Purging DLQ: {ns}/{topic}/{subscription}")
 
     client = get_client()
     total = 0
 
     with client:
         receiver = client.get_subscription_receiver(
-            topic_name=SERVICE_BUS_TOPIC,
-            subscription_name=SERVICE_BUS_SUBSCRIPTION,
+            topic_name=topic,
+            subscription_name=subscription,
             sub_queue=ServiceBusSubQueue.DEAD_LETTER,
             receive_mode=ServiceBusReceiveMode.RECEIVE_AND_DELETE,
         )
         with receiver:
             while True:
-                msgs = receiver.receive_messages(max_message_count=BATCH_SIZE, max_wait_time=WAIT_SECONDS)
+                msgs = receiver.receive_messages(
+                    max_message_count=BATCH_SIZE,
+                    max_wait_time=WAIT_SECONDS,
+                )
                 if not msgs:
                     break
                 total += len(msgs)
@@ -145,9 +133,9 @@ def purge_dlq():
 
 
 # DELETE FROM ACTIVE SUBSCRIPTION
-def purge_active(limit: int | None = None):
+def purge_active(topic: str, subscription: str, limit: int | None = None) -> None:
     ns = namespace_label()
-    print(f"Purging ACTIVE messages: {ns}/{SERVICE_BUS_TOPIC}/{SERVICE_BUS_SUBSCRIPTION}")
+    print(f"Purging ACTIVE messages: {ns}/{topic}/{subscription}")
     if limit:
         print(f"Limit: Will delete at most {limit} messages.")
 
@@ -156,8 +144,8 @@ def purge_active(limit: int | None = None):
 
     with client:
         receiver = client.get_subscription_receiver(
-            topic_name=SERVICE_BUS_TOPIC,
-            subscription_name=SERVICE_BUS_SUBSCRIPTION,
+            topic_name=topic,
+            subscription_name=subscription,
             receive_mode=ServiceBusReceiveMode.RECEIVE_AND_DELETE,
         )
         with receiver:
@@ -166,7 +154,13 @@ def purge_active(limit: int | None = None):
                     break
 
                 batch = BATCH_SIZE if not limit else min(BATCH_SIZE, limit - total)
-                msgs = receiver.receive_messages(max_message_count=batch, max_wait_time=WAIT_SECONDS)
+                if batch <= 0:
+                    break
+
+                msgs = receiver.receive_messages(
+                    max_message_count=batch,
+                    max_wait_time=WAIT_SECONDS,
+                )
                 if not msgs:
                     break
 
@@ -179,13 +173,37 @@ def purge_active(limit: int | None = None):
 # MAIN ENTRYPOINT
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Purge Azure Service Bus subscription messages")
-    parser.add_argument("--dlq", action="store_true", help="Purge Dead Letter Queue messages")
-    parser.add_argument("--active", action="store_true", help="Purge ACTIVE subscription messages")
-    parser.add_argument("--limit", type=int, help="Limit active purge to N messages")
+    parser.add_argument(
+        "--topic",
+        help="Topic name (overrides SERVICE_BUS_TOPIC if set)",
+    )
+    parser.add_argument(
+        "--subscription",
+        help="Subscription name (overrides SERVICE_BUS_SUBSCRIPTION if set)",
+    )
+    parser.add_argument(
+        "--active",
+        action="store_true",
+        help="Purge ACTIVE subscription messages (default is DLQ)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit active purge to N messages (only used with --active)",
+    )
 
     args = parser.parse_args()
 
+    topic = args.topic or ENV_TOPIC
+    subscription = args.subscription or ENV_SUBSCRIPTION
+
+    if not topic:
+        raise SystemExit("ERROR: Provide --topic or set SERVICE_BUS_TOPIC in .env")
+    if not subscription:
+        raise SystemExit("ERROR: Provide --subscription or set SERVICE_BUS_SUBSCRIPTION in .env")
+
     if args.active:
-        purge_active(limit=args.limit)
+        purge_active(topic, subscription, limit=args.limit)
     else:
-        purge_dlq()
+        # Default behaviour: purge DLQ
+        purge_dlq(topic, subscription)
