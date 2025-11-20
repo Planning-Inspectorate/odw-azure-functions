@@ -10,7 +10,6 @@ from azure.keyvault.secrets import SecretClient
 #function_app_name = "pins-fnapp01-odw-dev-uks"
 #keyvault_name = "pinskvsynwodwdevuks"
 #vault_uri = "https://pinskvsynwodwdevuks.vault.azure.net/"
-#Teams_Webhook = "https://pinso365.webhook.office.com/webhookb2/c7088ab3-5530-4007-b222-3044f604a848@5878df98-6f88-48ab-9322-998ce557088d/IncomingWebhook/0ef53e5faadc4e8d8fd9508d324d1f48/e7b7b154-3e75-46ae-8332-a534cb30d38e"
 
 # Pre-Prod
 subscription_id = "6b18ba9d-2399-48b5-a834-e0f267be122d"
@@ -19,7 +18,6 @@ DB_resource_group_name = "pins-rg-data-odw-test-uks"
 function_app_name = "pins-fnapp01-odw-test-uks"
 keyvault_name = "pinskvsynwodwtestuks"
 vault_uri = "https://pinskvsynwodwtestuks.vault.azure.net/"
-Teams_Webhook = "https://pinso365.webhook.office.com/webhookb2/c7088ab3-5530-4007-b222-3044f604a848@5878df98-6f88-48ab-9322-998ce557088d/IncomingWebhook/418ef22183d243c2b6466f8aeb024000/e7b7b154-3e75-46ae-8332-a534cb30d38e"
 
 # Prod
 # subscription_id = "a82fd28d-5989-4e06-a0bb-1a5d859f9e0c"
@@ -28,7 +26,6 @@ Teams_Webhook = "https://pinso365.webhook.office.com/webhookb2/c7088ab3-5530-400
 # function_app_name = "pins-fnapp01-odw-prod-uks"
 # keyvault_name = "pinskvsynwodwproduks"
 # vault_uri = "https://pinskvsynwodwproduks.vault.azure.net/"
-# Teams_Webhook = "https://pinso365.webhook.office.com/webhookb2/c7088ab3-5530-4007-b222-3044f604a848@5878df98-6f88-48ab-9322-998ce557088d/IncomingWebhook/40955bbd63f14bfebc7049080e52d00d/e7b7b154-3e75-46ae-8332-a534cb30d38e"
 
 # Build
 #subscription_id = "12806449-ae7c-4754-b104-65bcdc7b28c8"
@@ -37,7 +34,6 @@ Teams_Webhook = "https://pinso365.webhook.office.com/webhookb2/c7088ab3-5530-400
 #function_app_name = "pins-fnapp01-odw-build-uks"
 #keyvault_name = "pinskvsynwodwbuilduks"
 #vault_uri = "https://pinskvsynwodwbuilduks.vault.azure.net/"
-#Teams_Webhook = ""
 
 # Authenticate using DefaultAzureCredential
 credential = DefaultAzureCredential()
@@ -108,7 +104,6 @@ def setkeyvaultsecrets() -> None:
 # select the function you want to call
 
 def main() -> None:
-    set_secret("TeamsWebhook", Teams_Webhook)
     set_secret("SubscriptionId", subscription_id)
     set_secret("DBResourceGroup", DB_resource_group_name)
     listfunctionurls()
