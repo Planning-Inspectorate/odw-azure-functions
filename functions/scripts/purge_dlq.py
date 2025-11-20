@@ -6,12 +6,12 @@ Auth modes:
 2) Microsoft Entra ID (RBAC)
 
 Prereqs:
-  # For SAS : Create venv and install deps
+  - For SAS : Create venv and install deps
   python3 -m venv .venv
   source .venv/bin/activate
   pip install azure-servicebus==7.13.0 python-dotenv==1.0.1
 
-  # For Entra ID mode (when SAS is disabled)
+  - For Entra ID mode (when SAS is disabled)
   python3 -m venv .venv
   source .venv/bin/activate
   pip install azure-servicebus==7.13.0 python-dotenv==1.0.1 azure-identity==1.17.1
