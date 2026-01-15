@@ -1,10 +1,12 @@
+
 """
 Azure Function code to read messages from Azure Service Bus and send them to Azure Storage
-One function for each Service us topic
+One function for each Service Bus topic
 """
 
 import logging
 import azure.functions as func
+from typing import List
 from servicebus_funcs import get_messages_and_validate, send_to_storage
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
@@ -13,19 +15,16 @@ from azure.functions.decorators.core import DataType
 import json
 import os
 
-_STORAGE = ""
-_CONTAINER = ""
-_NAMESPACE = ""
-_NAMESPACE_APPEALS = ""
+# Initialize environment variables
+_STORAGE = os.getenv("MESSAGE_STORAGE_ACCOUNT", "")
+_CONTAINER = os.getenv("MESSAGE_STORAGE_CONTAINER", "")
+_NAMESPACE = os.getenv("ServiceBusConnection__fullyQualifiedNamespace", "")
+_NAMESPACE_APPEALS = os.getenv("SERVICEBUS_NAMESPACE_APPEALS", "")
 
-try:
-    _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
-    _CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
-    _NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
-    _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
-except:
-    print("Warning: Missing Environment Variables")
+if not _STORAGE or not _CONTAINER or not _NAMESPACE:
+    logging.warning("Missing one or more environment variables.")
 
+# Global configs
 _CREDENTIAL = CREDENTIAL
 _MAX_MESSAGE_COUNT = config["global"]["max_message_count"]
 _MAX_WAIT_TIME = config["global"]["max_wait_time"]
@@ -33,27 +32,21 @@ _SUCCESS_RESPONSE = config["global"]["success_response"]
 _VALIDATION_ERROR = config["global"]["validation_error"]
 _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
+# Initialize Function App
 _app = func.FunctionApp()
 
-
-@_app.function_name("folder")
-@_app.route(route="folder", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.function_name(name="folder")
+@_app.route(route="folder", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def folder(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
     """
-
-    _SCHEMA = _SCHEMAS["folder.schema.json"]
+    _SCHEMA = _SCHEMAS.get("folder.schema.json")
     _TOPIC = config["global"]["entities"]["folder"]["topic"]
     _SUBSCRIPTION = config["global"]["entities"]["folder"]["subscription"]
 
     try:
+        # Fetch and validate messages
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
@@ -63,6 +56,8 @@ def folder(req: func.HttpRequest) -> func.HttpResponse:
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
         )
+
+        # Send messages to storage
         _message_count = send_to_storage(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
@@ -71,20 +66,21 @@ def folder(req: func.HttpRequest) -> func.HttpResponse:
             data=_data,
         )
 
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+        response = {
+            "message": f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
+            "count": _message_count
+        }
 
         return func.HttpResponse(
-            response,
-            status_code=200
+            json.dumps(response),
+            status_code=200,
+            mimetype="application/json"
         )
 
     except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
+        logging.error(f"Error occurred: {e}")
 
+# ---- NEW: Batch Service Bus Topic Trigger for nsipdocument ----
 
 @_app.function_name("nsipdocument")
 @_app.route(route="nsipdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
@@ -134,6 +130,7 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
+
 
 
 @_app.function_name("nsipexamtimetable")
@@ -493,54 +490,63 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
-@_app.function_name("appealdocument")
-@_app.route(route="appealdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appealdocument(req: func.HttpRequest) -> func.HttpResponse:
+
+@_app.function_name(name="appealdocument")
+@_app.service_bus_topic_trigger(
+    arg_name="messages",
+    topic_name=config["global"]["entities"]["appeal-document"]["topic"],
+    subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
+    connection="ServiceBusConnection",  # your existing SB connection name
+    data_type=func.DataType.STRING,
+    cardinality=func.Cardinality.MANY   # receive a list of messages in batch
+)
+def appealdocument(messages: List[func.ServiceBusMessage]) -> None:
     """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
+    Batch Service Bus trigger that receives multiple 'appeal-document' messages
+    and writes them to storage in a single batch.
     """
 
     _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
     _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-document"]["subscription"]
 
+    batch = []
+
+    # Collect raw message bodies
+    for msg in messages:
+        try:
+            body = msg.get_body().decode("utf-8")
+            batch.append(body)
+        except Exception as e:
+            logging.error(f"[appealdocument] Failed to decode message: {e}")
+
+    # Validate + write to storage
     try:
-        _data = get_messages_and_validate(
+        # If your old logic requires validation step before storage:
+        _validated_data = get_messages_and_validate(
             namespace=_NAMESPACE_APPEALS,
             credential=_CREDENTIAL,
             topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
+            subscription=config["global"]["entities"]["appeal-document"]["subscription"],
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
+            override_messages=batch  # you may need to add this param to validation function
         )
+
         _message_count = send_to_storage(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
             entity=_TOPIC,
-            data=_data,
+            data=_validated_data,
         )
-        
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
+        logging.info(
+            f"[appealdocument] Wrote {_message_count} messages to storage"
         )
 
     except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
+        logging.error(f"[appealdocument] Processing failed: {e}")
+
 
 @_app.function_name("appealhas")
 @_app.route(route="appealhas", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
