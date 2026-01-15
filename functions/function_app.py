@@ -15,16 +15,18 @@ from azure.functions.decorators.core import DataType
 import json
 import os
 
-# Initialize environment variables
-_STORAGE = os.getenv("MESSAGE_STORAGE_ACCOUNT", "")
-_CONTAINER = os.getenv("MESSAGE_STORAGE_CONTAINER", "")
-_NAMESPACE = os.getenv("ServiceBusConnection__fullyQualifiedNamespace", "")
-_NAMESPACE_APPEALS = os.getenv("SERVICEBUS_NAMESPACE_APPEALS", "")
+_STORAGE = ""
+_CONTAINER = ""
+_NAMESPACE = ""
+_NAMESPACE_APPEALS = ""
 
-if not _STORAGE or not _CONTAINER or not _NAMESPACE:
-    logging.warning("Missing one or more environment variables.")
-
-# Global configs
+try:
+    _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
+    _CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
+    _NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
+    _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
+except:
+    print("Warning: Missing Environment Variables")
 _CREDENTIAL = CREDENTIAL
 _MAX_MESSAGE_COUNT = config["global"]["max_message_count"]
 _MAX_WAIT_TIME = config["global"]["max_wait_time"]
