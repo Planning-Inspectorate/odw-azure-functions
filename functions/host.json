@@ -1,5 +1,6 @@
 {
   "version": "2.0",
+
   "logging": {
     "applicationInsights": {
       "samplingSettings": {
@@ -8,8 +9,20 @@
       }
     }
   },
+
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.*, 5.0.0)"
+  },
+
+  "extensions": {
+    "serviceBus": {
+      "messageProcessingOptions": {
+        "autoCompleteMessages": true,
+        "maxConcurrentCalls": 8,
+        "maxMessageBatchSize": 50,
+        "prefetchCount": 100
+      }
+    }
   }
 }
