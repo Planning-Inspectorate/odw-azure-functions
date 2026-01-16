@@ -962,7 +962,7 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
 
     try:
         validated = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
+            namespace=_NAMESPACE,
             credential=_CREDENTIAL,
             topic=_TOPIC,
             subscription=config["global"]["entities"]["appeal-document"]["subscription"],
