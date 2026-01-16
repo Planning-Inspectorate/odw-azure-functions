@@ -14,7 +14,7 @@ from pins_data_model import load_schemas
 from azure.functions.decorators.core import DataType
 import json
 import os
-import startup_triggers
+
 
 _STORAGE = ""
 _CONTAINER = ""
@@ -37,6 +37,8 @@ _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
 # Initialize Function App
 _app = func.FunctionApp()
+
+import startup_triggers
 
 @_app.function_name(name="folder")
 @_app.route(route="folder", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
