@@ -1,12 +1,10 @@
-
 """
 Azure Function code to read messages from Azure Service Bus and send them to Azure Storage
-One function for each Service Bus topic
+One function for each Service us topic
 """
 
 import logging
 import azure.functions as func
-from typing import List
 from servicebus_funcs import get_messages_and_validate, send_to_storage
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
@@ -14,7 +12,7 @@ from pins_data_model import load_schemas
 from azure.functions.decorators.core import DataType
 import json
 import os
-
+from typing import List
 
 _STORAGE = ""
 _CONTAINER = ""
@@ -28,6 +26,7 @@ try:
     _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
 except:
     print("Warning: Missing Environment Variables")
+
 _CREDENTIAL = CREDENTIAL
 _MAX_MESSAGE_COUNT = config["global"]["max_message_count"]
 _MAX_WAIT_TIME = config["global"]["max_wait_time"]
@@ -35,21 +34,27 @@ _SUCCESS_RESPONSE = config["global"]["success_response"]
 _VALIDATION_ERROR = config["global"]["validation_error"]
 _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
-# Initialize Function App
 _app = func.FunctionApp()
 
-@_app.function_name(name="folder")
-@_app.route(route="folder", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+
+@_app.function_name("folder")
+@_app.route(route="folder", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def folder(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function endpoint for handling HTTP requests.
+
+    Args:
+        req: An instance of `func.HttpRequest` representing the HTTP request.
+
+    Returns:
+        An instance of `func.HttpResponse` representing the HTTP response.
     """
-    _SCHEMA = _SCHEMAS.get("folder.schema.json")
+
+    _SCHEMA = _SCHEMAS["folder.schema.json"]
     _TOPIC = config["global"]["entities"]["folder"]["topic"]
     _SUBSCRIPTION = config["global"]["entities"]["folder"]["subscription"]
 
     try:
-        # Fetch and validate messages
         _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
@@ -59,8 +64,6 @@ def folder(req: func.HttpRequest) -> func.HttpResponse:
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
         )
-
-        # Send messages to storage
         _message_count = send_to_storage(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
@@ -69,21 +72,20 @@ def folder(req: func.HttpRequest) -> func.HttpResponse:
             data=_data,
         )
 
-        response = {
-            "message": f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage",
-            "count": _message_count
-        }
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
 
         return func.HttpResponse(
-            json.dumps(response),
-            status_code=200,
-            mimetype="application/json"
+            response,
+            status_code=200
         )
 
     except Exception as e:
-        logging.error(f"Error occurred: {e}")
+        return (
+            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
+            if f"{_VALIDATION_ERROR}" in str(e)
+            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )
 
-# ---- NEW: Batch Service Bus Topic Trigger for nsipdocument ----
 
 @_app.function_name("nsipdocument")
 @_app.route(route="nsipdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
@@ -133,7 +135,6 @@ def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
-
 
 
 @_app.function_name("nsipexamtimetable")
@@ -983,4 +984,3 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
 
     except Exception as e:
         logging.error(f"[appealdocument_sb] Processing failed: {e}", exc_info=True)
-        raise
