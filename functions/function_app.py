@@ -38,8 +38,6 @@ _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 # Initialize Function App
 _app = func.FunctionApp()
 
-import startup_triggers
-
 @_app.function_name(name="folder")
 @_app.route(route="folder", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def folder(req: func.HttpRequest) -> func.HttpResponse:
@@ -494,6 +492,56 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
+
+@_app.function_name("appealdocument")
+@_app.route(route="appealdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def appealdocument(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function endpoint for handling HTTP requests.
+
+    Args:
+        req: An instance of `func.HttpRequest` representing the HTTP request.
+
+    Returns:
+        An instance of `func.HttpResponse` representing the HTTP response.
+    """
+
+    _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
+    _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["appeal-document"]["subscription"]
+
+    try:
+        _data = get_messages_and_validate(
+            namespace=_NAMESPACE_APPEALS,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA,
+        )
+        _message_count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=_data,
+        )
+        
+        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
+        return func.HttpResponse(
+            response,
+            status_code=200
+        )
+
+    except Exception as e:
+        return (
+            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
+            if f"{_VALIDATION_ERROR}" in str(e)
+            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )
+
 @_app.function_name("appealhas")
 @_app.route(route="appealhas", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def appeal(req: func.HttpRequest) -> func.HttpResponse:
@@ -884,3 +932,55 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
+    
+@_app.function_name(name="appealdocument_sb")
+@_app.service_bus_topic_trigger(
+    arg_name="messages",
+    topic_name=config["global"]["entities"]["appeal-document"]["topic"],
+    subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
+    connection="ServiceBusConnection",
+    data_type=func.DataType.STRING,
+    cardinality=func.Cardinality.MANY
+)
+def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
+    logging.info("[appealdocument_sb] Service Bus trigger fired")
+
+    _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
+    _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
+
+    batch = []
+    for msg in messages:
+        try:
+            batch.append(msg.get_body().decode("utf-8"))
+        except Exception as e:
+            logging.error(f"[appealdocument_sb] Decode failed: {e}")
+
+    if not batch:
+        logging.warning("[appealdocument_sb] Empty batch received")
+        return
+
+    try:
+        validated = get_messages_and_validate(
+            namespace=_NAMESPACE_APPEALS,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=config["global"]["entities"]["appeal-document"]["subscription"],
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA,
+            override_messages=batch,
+        )
+
+        count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=validated,
+        )
+
+        logging.info(f"[appealdocument_sb] Wrote {count} messages")
+
+    except Exception as e:
+        logging.error(f"[appealdocument_sb] Processing failed: {e}", exc_info=True)
+        raise
