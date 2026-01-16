@@ -492,60 +492,6 @@ def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
-
-@_app.function_name(name="appealdocument")
-@_app.service_bus_topic_trigger(
-    arg_name="messages",
-    topic_name=config["global"]["entities"]["appeal-document"]["topic"],
-    subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
-    connection="ServiceBusConnection",
-    data_type=func.DataType.STRING,
-    cardinality=func.Cardinality.MANY
-)
-def appealdocument(messages: List[func.ServiceBusMessage]) -> None:
-    """
-    Batch Service Bus trigger that receives multiple 'appeal-document' messages
-    and writes them to storage in a single batch.
-    """
-    _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
-
-    batch = []
-
-    # Collect raw message bodies
-    for msg in messages:
-        try:
-            body = msg.get_body().decode("utf-8")
-            batch.append(body)
-        except Exception as e:
-            logging.error(f"[appealdocument] Failed to decode message: {e}")
-
-    # Validate + write to storage
-    try:
-        _validated_data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=config["global"]["entities"]["appeal-document"]["subscription"],
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-            override_messages=batch
-        )
-
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_validated_data,
-        )
-
-        logging.info(f"[appealdocument] Wrote {_message_count} messages to storage")
-
-    except Exception as e:
-        logging.error(f"[appealdocument] Processing failed: {e}")
-
 @_app.function_name("appealhas")
 @_app.route(route="appealhas", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def appeal(req: func.HttpRequest) -> func.HttpResponse:
