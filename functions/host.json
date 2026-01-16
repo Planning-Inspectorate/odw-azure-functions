@@ -20,7 +20,7 @@
       "messageProcessingOptions": {
         "autoCompleteMessages": true,
         "maxConcurrentCalls": 8,
-        "maxMessageBatchSize": 50,
+        "maxMessageBatchSize": 1,
         "prefetchCount": 100
       }
     }
