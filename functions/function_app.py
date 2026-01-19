@@ -934,7 +934,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
-@_app.function_name(name="appealdocument_sb")
+@_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
@@ -954,7 +954,7 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             override_messages.append(msg.get_body().decode("utf-8"))
 
         if not override_messages:
-            logging.warning("[appealdocument_sb] Empty batch received")
+            logging.warning("[appeal_document_trigger] Empty batch received")
             return
 
         validated = get_messages_and_validate(
@@ -977,11 +977,64 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
         )
 
         logging.info(
-            f"[appealdocument_sb] Batch processed: "
+            f"[appeal_document_trigger] Batch processed: "
             f"{len(override_messages)} received, {count} stored"
         )
 
     except Exception:
-        logging.exception("[appealdocument_sb] Batch processing failed")
+        logging.exception("[appeal_document_trigger] Batch processing failed") 
+    
+
+@_app.function_name(name="nsipdocument_trigger")
+@_app.service_bus_topic_trigger(
+    arg_name="messages",
+    topic_name=config["global"]["entities"]["nsip-document"]["topic"],
+    subscription_name=config["global"]["entities"]["nsip-document"]["subscription"],
+    connection="ServiceBusConnection",
+    data_type=func.DataType.STRING,
+    cardinality=func.Cardinality.MANY
+)
+def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
+    _SCHEMA = _SCHEMAS["nsip-document.schema.json"]
+    _TOPIC = config["global"]["entities"]["nsip-document"]["topic"]
+    _SUB   = config["global"]["entities"]["nsip-document"]["subscription"]
+
+    try:
+        override_messages = []
+
+        for msg in messages:
+            override_messages.append(msg.get_body().decode("utf-8"))
+
+        if not override_messages:
+            logging.warning("[nsipdocument_trigger] Empty batch received")
+            return
+
+        validated = get_messages_and_validate(
+            namespace=_NAMESPACE,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=_SUB,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA,
+            override_messages=override_messages
+        )
+
+        count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=validated
+        )
+
+        logging.info(
+            f"[nsipdocument_trigger] Batch processed: "
+            f"{len(override_messages)} received, {count} stored"
+        )
+
+    except Exception:
+        logging.exception("[nsipdocument_trigger] Batch processing failed")
         raise
+
 
