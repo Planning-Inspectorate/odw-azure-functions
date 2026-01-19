@@ -948,16 +948,13 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
     _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
 
     try:
-        override_messages = []
-
-        for msg in messages:
-            override_messages.append(msg.get_body().decode("utf-8"))
+        override_messages = [m.get_body().decode("utf-8") for m in messages]
 
         if not override_messages:
             logging.warning("[appeal_document_trigger] Empty batch received")
             return
 
-        _data = get_messages_and_validate(
+        data = get_messages_and_validate(
             namespace=_NAMESPACE_APPEALS,
             credential=_CREDENTIAL,
             topic=_TOPIC,
@@ -968,22 +965,33 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             override_messages=override_messages
         )
 
-        _message_count = send_to_storage(
+        if not data:
+         
+            for msg in messages:
+                msg.dead_letter(
+                    reason="Validation error",
+                    error_description="Failed schema validation"
+                )
+
+            logging.warning("[appeal_document_trigger] Messages moved to DLQ due to validation failure")
+            return  
+
+        count = send_to_storage(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
             entity=_TOPIC,
-            data=_data
+            data=data
         )
 
         logging.info(
             f"[appeal_document_trigger] Batch processed: "
-            f"{len(override_messages)} received, {_message_count} stored"
+            f"{len(override_messages)} received, {count} stored"
         )
 
     except Exception:
-        logging.exception("[appeal_document_trigger] Batch processing failed") 
-    raise
+        logging.exception("[appeal_document_trigger] Batch processing failed")
+        
 
 @_app.function_name(name="nsipdocument_trigger")
 @_app.service_bus_topic_trigger(
@@ -997,19 +1005,16 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
 def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
     _SCHEMA = _SCHEMAS["nsip-document.schema.json"]
     _TOPIC = config["global"]["entities"]["nsip-document"]["topic"]
-    _SUB   = config["global"]["entities"]["nsip-document"]["subscription"]
+    _SUB = config["global"]["entities"]["nsip-document"]["subscription"]
 
     try:
-        override_messages = []
-
-        for msg in messages:
-            override_messages.append(msg.get_body().decode("utf-8"))
+        override_messages = [m.get_body().decode("utf-8") for m in messages]
 
         if not override_messages:
             logging.warning("[nsipdocument_trigger] Empty batch received")
             return
 
-        _data = get_messages_and_validate(
+        data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
             topic=_TOPIC,
@@ -1020,17 +1025,26 @@ def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             override_messages=override_messages
         )
 
-        _message_count = send_to_storage(
+        if not data:
+            for msg in messages:
+                msg.dead_letter(
+                    reason="Validation error",
+                    error_description="Failed schema validation"
+                )
+
+            logging.warning("[nsipdocument_trigger] Messages moved to DLQ due to validation failure")
+            return  
+        count = send_to_storage(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
             entity=_TOPIC,
-            data=_data
+            data=data
         )
 
         logging.info(
             f"[nsipdocument_trigger] Batch processed: "
-            f"{len(override_messages)} received, {_message_count} stored"
+            f"{len(override_messages)} received, {count} stored"
         )
 
     except Exception:
