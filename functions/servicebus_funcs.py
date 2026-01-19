@@ -15,6 +15,12 @@ from validate_messages import validate_data
 
 
 
+from typing import List, Optional, Union
+import json
+import logging
+from azure.identity import DefaultAzureCredential
+from azure.servicebus import ServiceBusClient
+
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
@@ -23,8 +29,14 @@ def get_messages_and_validate(
     max_message_count: int,
     max_wait_time: int,
     schema: dict,
-    override_messages: list | None = None,
+    override_messages: Optional[List[Union[str, dict]]] = None,
 ) -> list:
+    """
+    Retrieve and validate messages from a Service Bus topic subscription (pull mode),
+    OR validate already-received messages provided via `override_messages` (push mode).
+
+    Returns a list of validated message bodies with selected properties attached.
+    """
 
     message_type_mapping: dict = {
         "Create": [],
@@ -39,38 +51,36 @@ def get_messages_and_validate(
     valid_with_properties: list = []
 
     try:
+        # -------------------------------
+        # PUSH MODE (Service Bus trigger)
+        # -------------------------------
         if override_messages is not None:
-            print("Processing overridden messages (Service Bus trigger mode)...")
+            logging.info("Processing overridden messages (SB trigger path) ...")
 
-            for raw_message in override_messages:
-                message_body = json.loads(raw_message)
-                message_type = message_body.get("type")
+            for raw in override_messages:
+                # raw can be a JSON string or a dict
+                body = json.loads(raw) if isinstance(raw, str) else dict(raw)
 
-                if message_type in message_type_mapping:
-                    message_type_mapping[message_type].append(message_body)
+                msg_type = body.get("type")  # best-effort; SB props not available here
+                if msg_type in message_type_mapping:
+                    message_type_mapping[msg_type].append(body)
                 else:
-                    other_message_types.append(message_body)
+                    other_message_types.append(body)
 
-                validation_errors = validate_data(message_body, schema)
-
-                if not validation_errors:
-                    message_body["message_type"] = message_type
-                    valid_with_properties.append(message_body)
+                errors = validate_data(body, schema)
+                if not errors:
+                    body["message_type"] = msg_type
+                    valid_with_properties.append(body)
                 else:
-                    invalid_messages.append({
-                        "body": message_body,
-                        "errors": validation_errors
-                    })
-                    logging.error(
-                        f"Message failed validation: {validation_errors}"
-                    )
+                    invalid_messages.append({"body": body, "errors": errors})
+                    logging.error("Message failed validation: %s", errors)
 
+            logging.info("Validated %d message(s) via override", len(valid_with_properties))
             return valid_with_properties
 
-        # --------------------------
-        # OLD CODE BELOW (UNCHANGED)
-        # --------------------------
-
+        # -------------------------------
+        # PULL MODE (HTTP/manual path)
+        # -------------------------------
         print("Creating Servicebus client...")
 
         servicebus_client: ServiceBusClient = ServiceBusClient(
@@ -92,9 +102,7 @@ def get_messages_and_validate(
                 )
 
                 if received_msgs:
-                    print(
-                        f"{len(received_msgs)} messages received - processing them one by one..."
-                    )
+                    print(f"{len(received_msgs)} messages received - processing them one by one...")
 
                     for message in received_msgs:
                         message_body = json.loads(str(message))
@@ -105,7 +113,7 @@ def get_messages_and_validate(
                         properties = message.application_properties
                         message_type = properties.get(b"type", None)
                         if message_type is not None:
-                            message_type: str = message_type.decode("utf-8")
+                            message_type = message_type.decode("utf-8")
 
                         if message_type in message_type_mapping:
                             message_type_mapping[message_type].append(message_body)
@@ -115,6 +123,7 @@ def get_messages_and_validate(
                         validation_errors = validate_data(message_body, schema)
 
                         if not validation_errors:
+                            valid_messages.append(message_body)
                             subscription_receiver.complete_message(message)
                             message_body["message_type"] = message_type
                             message_body["message_enqueued_time_utc"] = message_enqueued_time_utc
@@ -127,13 +136,18 @@ def get_messages_and_validate(
                                 "errors": validation_errors
                             })
                             logging.error(
-                                f"Message ID {message_id} failed validation: {validation_errors}"
+                                "Message ID %s failed validation: %s",
+                                message_id, validation_errors
                             )
                             subscription_receiver.dead_letter_message(
                                 message,
                                 reason="Failed validation against schema",
                                 error_description="; ".join(validation_errors)
                             )
+                    print(f"Valid: {len(valid_messages)}\nInvalid: {len(invalid_messages)}")
+                else:
+                    print("No messages received")
+
     except Exception as e:
         print(f"Error processing messages\n{e}")
         raise

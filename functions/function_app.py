@@ -934,33 +934,22 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
+
 @_app.function_name(name="appealdocument_sb")
 @_app.service_bus_topic_trigger(
-    arg_name="messages",
+    arg_name="message",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    data_type=func.DataType.STRING,
-    cardinality=func.Cardinality.MANY
+    data_type=func.DataType.STRING
 )
-def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
-    logging.info("[appealdocument_sb] Service Bus trigger fired")
-
+def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
     _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
     _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
 
-    batch = []
-    for msg in messages:
-        try:
-            batch.append(msg.get_body().decode("utf-8"))
-        except Exception as e:
-            logging.error(f"[appealdocument_sb] Decode failed: {e}")
-
-    if not batch:
-        logging.warning("[appealdocument_sb] Empty batch received")
-        return
-
     try:
+        body = message.get_body().decode("utf-8")
+
         validated = get_messages_and_validate(
             namespace=_NAMESPACE_APPEALS,
             credential=_CREDENTIAL,
@@ -969,7 +958,7 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
-            override_messages=batch,
+            override_messages=[body],
         )
 
         count = send_to_storage(
@@ -983,4 +972,5 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
         logging.info(f"[appealdocument_sb] Wrote {count} messages")
 
     except Exception as e:
-        logging.error(f"[appealdocument_sb] Processing failed: {e}", exc_info=True)
+        logging.exception("[appealdocument_sb] Processing failed")
+        raise
