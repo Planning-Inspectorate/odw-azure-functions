@@ -934,21 +934,28 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
-
 @_app.function_name(name="appealdocument_sb")
 @_app.service_bus_topic_trigger(
-    arg_name="message",
+    arg_name="messages",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    data_type=func.DataType.STRING
+    data_type=func.DataType.STRING,
+    cardinality=func.Cardinality.MANY
 )
-def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
+def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
     _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
     _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
 
     try:
-        body = message.get_body().decode("utf-8")
+        override_messages = []
+
+        for msg in messages:
+            override_messages.append(msg.get_body().decode("utf-8"))
+
+        if not override_messages:
+            logging.warning("[appealdocument_sb] Empty batch received")
+            return
 
         validated = get_messages_and_validate(
             namespace=_NAMESPACE_APPEALS,
@@ -958,7 +965,7 @@ def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
             max_message_count=_MAX_MESSAGE_COUNT,
             max_wait_time=_MAX_WAIT_TIME,
             schema=_SCHEMA,
-            override_messages=[body],
+            override_messages=override_messages
         )
 
         count = send_to_storage(
@@ -966,11 +973,15 @@ def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
             credential=_CREDENTIAL,
             container=_CONTAINER,
             entity=_TOPIC,
-            data=validated,
+            data=validated
         )
 
-        logging.info(f"[appealdocument_sb] Wrote {count} messages")
+        logging.info(
+            f"[appealdocument_sb] Batch processed: "
+            f"{len(override_messages)} received, {count} stored"
+        )
 
-    except Exception as e:
-        logging.exception("[appealdocument_sb] Processing failed")
+    except Exception:
+        logging.exception("[appealdocument_sb] Batch processing failed")
         raise
+

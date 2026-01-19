@@ -19,9 +19,10 @@
     "serviceBus": {
       "messageProcessingOptions": {
         "autoCompleteMessages": true,
-        "maxConcurrentCalls": 8,
-        "maxMessageBatchSize": 1,
-        "prefetchCount": 100
+        "maxConcurrentCalls": 1,
+        "maxMessageBatchSize": 100,
+        "prefetchCount": 0
+
       }
     }
   }
