@@ -23,7 +23,7 @@ try:
     _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
     _CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
     _NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
-    _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
+    _NAMESPACE_APPEALS = os.environ["ServiceBusConnectionAppeals__fullyQualifiedNamespace"]
 except:
     print("Warning: Missing Environment Variables")
 
