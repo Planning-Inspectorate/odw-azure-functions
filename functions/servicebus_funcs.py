@@ -14,6 +14,7 @@ import json
 from validate_messages import validate_data
 
 
+
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
@@ -22,22 +23,8 @@ def get_messages_and_validate(
     max_message_count: int,
     max_wait_time: int,
     schema: dict,
+    override_messages: list | None = None,
 ) -> list:
-    """
-    Retrieve messages from a Service Bus topic subscription.
-
-    Args:
-        namespace (str): The fully qualified namespace of the Service Bus.
-        credential: The credential object for authentication.
-        topic (str): The name of the topic.
-        subscription (str): The name of the subscription.
-        max_message_count (int): The maximum number of messages to retrieve.
-        max_wait_time (int): The maximum wait time in seconds.
-        schema: The json schema to validate against.
-
-    Returns:
-        list: A list of messages retrieved from the topic subscription.
-    """
 
     message_type_mapping: dict = {
         "Create": [],
@@ -52,6 +39,38 @@ def get_messages_and_validate(
     valid_with_properties: list = []
 
     try:
+        if override_messages is not None:
+            print("Processing overridden messages (Service Bus trigger mode)...")
+
+            for raw_message in override_messages:
+                message_body = json.loads(raw_message)
+                message_type = message_body.get("type")
+
+                if message_type in message_type_mapping:
+                    message_type_mapping[message_type].append(message_body)
+                else:
+                    other_message_types.append(message_body)
+
+                validation_errors = validate_data(message_body, schema)
+
+                if not validation_errors:
+                    message_body["message_type"] = message_type
+                    valid_with_properties.append(message_body)
+                else:
+                    invalid_messages.append({
+                        "body": message_body,
+                        "errors": validation_errors
+                    })
+                    logging.error(
+                        f"Message failed validation: {validation_errors}"
+                    )
+
+            return valid_with_properties
+
+        # --------------------------
+        # OLD CODE BELOW (UNCHANGED)
+        # --------------------------
+
         print("Creating Servicebus client...")
 
         servicebus_client: ServiceBusClient = ServiceBusClient(
@@ -87,6 +106,7 @@ def get_messages_and_validate(
                         message_type = properties.get(b"type", None)
                         if message_type is not None:
                             message_type: str = message_type.decode("utf-8")
+
                         if message_type in message_type_mapping:
                             message_type_mapping[message_type].append(message_body)
                         else:
@@ -95,12 +115,9 @@ def get_messages_and_validate(
                         validation_errors = validate_data(message_body, schema)
 
                         if not validation_errors:
-                            valid_messages.append(message_body)
                             subscription_receiver.complete_message(message)
                             message_body["message_type"] = message_type
-                            message_body[
-                                "message_enqueued_time_utc"
-                            ] = message_enqueued_time_utc
+                            message_body["message_enqueued_time_utc"] = message_enqueued_time_utc
                             message_body["message_id"] = message_id
                             valid_with_properties.append(message_body)
                         else:
@@ -113,21 +130,16 @@ def get_messages_and_validate(
                                 f"Message ID {message_id} failed validation: {validation_errors}"
                             )
                             subscription_receiver.dead_letter_message(
-                                message, reason="Failed validation against schema", error_description="; ".join(validation_errors)
+                                message,
+                                reason="Failed validation against schema",
+                                error_description="; ".join(validation_errors)
                             )
-
-                    print(
-                        f"Valid: {len(valid_messages)}\nInvalid: {len(invalid_messages)}"
-                    )
-
-                else:
-                    print("No messages received")
-
     except Exception as e:
         print(f"Error processing messages\n{e}")
-        raise e
+        raise
 
     return valid_with_properties
+
 
 
 def send_to_storage(
