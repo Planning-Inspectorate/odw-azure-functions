@@ -939,7 +939,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     arg_name="messages",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
-    connection="ServiceBusConnection",
+    connection="ServiceBusConnectionAppeals",
     data_type=func.DataType.STRING,
     cardinality=func.Cardinality.MANY
 )
@@ -962,7 +962,7 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
 
     try:
         validated = get_messages_and_validate(
-            namespace=_NAMESPACE,
+            namespace=_NAMESPACE_APPEALS,
             credential=_CREDENTIAL,
             topic=_TOPIC,
             subscription=config["global"]["entities"]["appeal-document"]["subscription"],
