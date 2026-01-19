@@ -957,7 +957,7 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             logging.warning("[appeal_document_trigger] Empty batch received")
             return
 
-        validated = get_messages_and_validate(
+        _data = get_messages_and_validate(
             namespace=_NAMESPACE_APPEALS,
             credential=_CREDENTIAL,
             topic=_TOPIC,
@@ -968,22 +968,22 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             override_messages=override_messages
         )
 
-        count = send_to_storage(
+        _message_count = send_to_storage(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
             entity=_TOPIC,
-            data=validated
+            data=_data
         )
 
         logging.info(
             f"[appeal_document_trigger] Batch processed: "
-            f"{len(override_messages)} received, {count} stored"
+            f"{len(override_messages)} received, {_message_count} stored"
         )
 
     except Exception:
         logging.exception("[appeal_document_trigger] Batch processing failed") 
-    
+    raise
 
 @_app.function_name(name="nsipdocument_trigger")
 @_app.service_bus_topic_trigger(
@@ -1009,7 +1009,7 @@ def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             logging.warning("[nsipdocument_trigger] Empty batch received")
             return
 
-        validated = get_messages_and_validate(
+        _data = get_messages_and_validate(
             namespace=_NAMESPACE,
             credential=_CREDENTIAL,
             topic=_TOPIC,
@@ -1020,17 +1020,17 @@ def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             override_messages=override_messages
         )
 
-        count = send_to_storage(
+        _message_count = send_to_storage(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
             entity=_TOPIC,
-            data=validated
+            data=_data
         )
 
         logging.info(
             f"[nsipdocument_trigger] Batch processed: "
-            f"{len(override_messages)} received, {count} stored"
+            f"{len(override_messages)} received, {_message_count} stored"
         )
 
     except Exception:
