@@ -1,3 +1,4 @@
+
 {
   "version": "2.0",
 
@@ -17,15 +18,11 @@
 
   "extensions": {
     "serviceBus": {
-      "messageProcessingOptions": {
-
-        "autoCompleteMessages": true,
+      "messageHandlerOptions": {
+        "autoComplete": true,
         "maxConcurrentCalls": 1,
-        "maxMessageBatchSize": 100,
-        "prefetchCount": 0
-
+        "maxAutoRenewDuration": "00:05:00"
       }
     }
   }
 }
-
