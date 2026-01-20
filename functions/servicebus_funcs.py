@@ -14,7 +14,6 @@ import json
 from validate_messages import validate_data
 
 
-
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
@@ -129,9 +128,6 @@ def get_messages_and_validate(
         raise e
 
     return valid_with_properties
-
-
-
 
 
 def send_to_storage(
