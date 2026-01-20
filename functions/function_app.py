@@ -942,7 +942,6 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    data_type=func.DataType.STRING,
     cardinality=func.Cardinality.MANY
 )
 def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
@@ -950,29 +949,13 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
     _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
 
     try:
+        logging.info("[appeal_document_trigger] Service Bus trigger fired")
+
         if not messages:
             logging.warning("[appeal_document_trigger] Empty batch received")
             return
 
-       
         data = validate_trigger_messages(messages, _SCHEMA)
-
-        # If you want to keep this safety check, it's harmless,
-        # but validate_trigger_messages() typically raises on validation failure.
-        if not data:
-            for msg in messages:
-                try:
-                    msg.dead_letter(
-                        reason="Validation error",
-                        error_description="Failed schema validation"
-                    )
-                except Exception:
-                    # Some hosts manage settlement; log and continue
-                    logging.warning(
-                        "[appeal_document_trigger] Dead-letter call failed; runtime may handle settlement."
-                    )
-            logging.warning("[appeal_document_trigger] Messages moved to DLQ due to validation failure")
-            return
 
         count = send_to_storage(
             account_url=_STORAGE,
@@ -983,66 +966,12 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
         )
 
         logging.info(
-            f"[appeal_document_trigger] Batch processed: {len(messages)} received, {count} stored"
+            f"[appeal_document_trigger] Batch processed: "
+            f"{len(messages)} received, {count} stored"
         )
 
     except Exception:
         logging.exception("[appeal_document_trigger] Batch processing failed")
-       
-        raise
-
-
-
-@_app.function_name(name="nsipdocument_trigger")
-@_app.service_bus_topic_trigger(
-    arg_name="messages",
-    topic_name=config["global"]["entities"]["nsip-document"]["topic"],
-    subscription_name=config["global"]["entities"]["nsip-document"]["subscription"],
-    connection="ServiceBusConnection",
-    data_type=func.DataType.STRING,
-    cardinality=func.Cardinality.MANY
-)
-def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
-    _SCHEMA = _SCHEMAS["nsip-document.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-document"]["topic"]
-
-    try:
-        if not messages:
-            logging.warning("[nsipdocument_trigger] Empty batch received")
-            return
-
-        data = validate_trigger_messages(messages, _SCHEMA)
-
-        # Optional guard (see note above)
-        if not data:
-            for msg in messages:
-                try:
-                    msg.dead_letter(
-                        reason="Validation error",
-                        error_description="Failed schema validation"
-                    )
-                except Exception:
-                    logging.warning(
-                        "[nsipdocument_trigger] Dead-letter call failed; runtime may handle settlement."
-                    )
-            logging.warning("[nsipdocument_trigger] Messages moved to DLQ due to validation failure")
-            return
-
-        count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=data
-        )
-
-        logging.info(
-            f"[nsipdocument_trigger] Batch processed: {len(messages)} received, {count} stored"
-        )
-
-    except Exception:
-        logging.exception("[nsipdocument_trigger] Batch processing failed")
-       
         raise
 
 
