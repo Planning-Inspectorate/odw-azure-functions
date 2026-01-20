@@ -15,13 +15,6 @@ from validate_messages import validate_data
 
 
 
-from typing import List, Optional, Union
-import json
-import logging
-from azure.identity import DefaultAzureCredential
-from azure.servicebus import ServiceBusClient
-
-
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
