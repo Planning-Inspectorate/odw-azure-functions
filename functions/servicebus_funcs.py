@@ -12,7 +12,7 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 import json
 from validate_messages import validate_data
-
+from typing import List, Dict
 
 def get_messages_and_validate(
     namespace: str,
@@ -126,6 +126,51 @@ def get_messages_and_validate(
     except Exception as e:
         print(f"Error processing messages\n{e}")
         raise e
+
+    return valid_with_properties
+
+
+def validate_trigger_messages(messages: List, schema: dict) -> List[Dict]:
+    """
+    Trigger-safe replacement for get_messages_and_validate.
+
+    - Uses messages provided by the Service Bus trigger
+    - Injects metadata fields
+    - Reuses existing schema validation logic
+    - Does NOT receive or settle messages
+    """
+
+    valid_with_properties: List[Dict] = []
+
+    for msg in messages:
+        payload = json.loads(msg.get_body().decode("utf-8"))
+
+        # Metadata injection
+        payload["message_id"] = msg.message_id
+        payload["message_enqueued_time_utc"] = (
+            msg.enqueued_time_utc.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+        )
+
+        properties = msg.application_properties or {}
+        message_type = properties.get(b"type")
+        payload["message_type"] = (
+            message_type.decode("utf-8") if message_type else None
+        )
+
+        # Schema validation (reuse existing logic)
+        validation_errors = validate_data(payload, schema)
+
+        if validation_errors:
+            logging.error(
+                f"Message ID {payload['message_id']} failed validation: "
+                f"{validation_errors}"
+            )
+            # Pilot/simple approach: raise and let runtime retry / DLQ
+            raise ValueError(
+                f"Schema validation failed for message {payload['message_id']}"
+            )
+
+        valid_with_properties.append(payload)
 
     return valid_with_properties
 

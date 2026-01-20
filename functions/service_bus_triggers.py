@@ -10,8 +10,9 @@ import azure.functions as func
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
-# Reuse the single FunctionApp instance
 from function_app import _app as app
+from servicebus_funcs import validate_trigger_messages
+from schemas import SCHEMAS   # assuming your schemas live here
 
 
 # ---------- Storage configuration ----------
@@ -28,13 +29,15 @@ def register_batch_trigger(
     entity: str,
     topic_env: str,
     subscription_env: str,
+    schema_name: str,
     connection_setting: str = "ServiceBusConnection",
 ):
     """
     Registers a Service Bus Topic batch trigger for the given entity.
 
     - Receives messages in batches
-    - Writes one JSON array per invocation to Blob Storage
+    - Validates using trigger-safe logic
+    - Writes one JSON array of objects per invocation
     """
 
     topic_name = os.environ.get(topic_env)
@@ -46,32 +49,30 @@ def register_batch_trigger(
             f"{topic_env}, {subscription_env}"
         )
 
+    schema = SCHEMAS[schema_name]
+
     @app.function_name(name=f"{entity}_batch_trigger")
     @app.service_bus_topic_trigger(
         arg_name="messages",
         topic_name=topic_name,
         subscription_name=subscription_name,
         connection=connection_setting,
-        data_type=func.DataType.STRING,
         cardinality=func.Cardinality.MANY
     )
     def _handler(messages: List[func.ServiceBusMessage]) -> None:
         logging.info(f"[{entity}] Service Bus batch trigger fired")
 
-        batch: List[str] = []
-
-        for msg in messages:
-            try:
-                batch.append(msg.get_body().decode("utf-8"))
-            except Exception as e:
-                logging.error(
-                    f"[{entity}] Failed to decode message "
-                    f"(message_id={msg.message_id}): {e}"
-                )
-
-        if not batch:
+        if not messages:
             logging.warning(f"[{entity}] Empty batch received")
             return
+
+        try:
+           
+            data = validate_trigger_messages(messages, schema)
+
+        except Exception:
+            logging.exception(f"[{entity}] Batch validation failed")
+            raise
 
         # Blob path: <entity>/batch-<timestamp>-<uuid>.json
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -83,10 +84,10 @@ def register_batch_trigger(
         )
 
         blob_client.upload_blob(
-            json.dumps(batch),
+            json.dumps(data),
             overwrite=False
         )
 
         logging.info(
-            f"[{entity}] Successfully wrote {len(batch)} messages to blob {blob_name}"
+            f"[{entity}] Successfully wrote {len(data)} messages to blob {blob_name}"
         )

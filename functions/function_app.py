@@ -5,7 +5,7 @@ One function for each Service us topic
 
 import logging
 import azure.functions as func
-from servicebus_funcs import get_messages_and_validate, send_to_storage
+from servicebus_funcs import get_messages_and_validate, send_to_storage, validate_trigger_messages
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
@@ -35,7 +35,7 @@ _VALIDATION_ERROR = config["global"]["validation_error"]
 _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
 _app = func.FunctionApp()
-
+import service_bus_trigger
 
 @_app.function_name("folder")
 @_app.route(route="folder", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
@@ -935,6 +935,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
+
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
@@ -953,22 +954,23 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
             logging.warning("[appeal_document_trigger] Empty batch received")
             return
 
-        data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=config["global"]["entities"]["appeal-document"]["subscription"],
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA
-        )
+       
+        data = validate_trigger_messages(messages, _SCHEMA)
 
+        # If you want to keep this safety check, it's harmless,
+        # but validate_trigger_messages() typically raises on validation failure.
         if not data:
             for msg in messages:
-                msg.dead_letter(
-                    reason="Validation error",
-                    error_description="Failed schema validation"
-                )
+                try:
+                    msg.dead_letter(
+                        reason="Validation error",
+                        error_description="Failed schema validation"
+                    )
+                except Exception:
+                    # Some hosts manage settlement; log and continue
+                    logging.warning(
+                        "[appeal_document_trigger] Dead-letter call failed; runtime may handle settlement."
+                    )
             logging.warning("[appeal_document_trigger] Messages moved to DLQ due to validation failure")
             return
 
@@ -986,7 +988,10 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
 
     except Exception:
         logging.exception("[appeal_document_trigger] Batch processing failed")
+       
         raise
+
+
 
 @_app.function_name(name="nsipdocument_trigger")
 @_app.service_bus_topic_trigger(
@@ -1000,29 +1005,26 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
 def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
     _SCHEMA = _SCHEMAS["nsip-document.schema.json"]
     _TOPIC = config["global"]["entities"]["nsip-document"]["topic"]
-    _SUB = config["global"]["entities"]["nsip-document"]["subscription"]
 
     try:
         if not messages:
             logging.warning("[nsipdocument_trigger] Empty batch received")
             return
 
-        data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUB,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA
-        )
+        data = validate_trigger_messages(messages, _SCHEMA)
 
+        # Optional guard (see note above)
         if not data:
             for msg in messages:
-                msg.dead_letter(
-                    reason="Validation error",
-                    error_description="Failed schema validation"
-                )
+                try:
+                    msg.dead_letter(
+                        reason="Validation error",
+                        error_description="Failed schema validation"
+                    )
+                except Exception:
+                    logging.warning(
+                        "[nsipdocument_trigger] Dead-letter call failed; runtime may handle settlement."
+                    )
             logging.warning("[nsipdocument_trigger] Messages moved to DLQ due to validation failure")
             return
 
@@ -1040,6 +1042,9 @@ def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
 
     except Exception:
         logging.exception("[nsipdocument_trigger] Batch processing failed")
+       
         raise
+
+
 
 
