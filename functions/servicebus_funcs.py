@@ -135,30 +135,49 @@ def get_messages_and_validate(
     return valid_with_properties
 
 
+
+from typing import List, Dict, Any
+import json
+import logging
+
 def get_payloads_and_validate(
-    messages: List[func.ServiceBusMessage],
+    messages: List[Any],           # keep this framework‑agnostic
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
-    Take a batch of ServiceBusMessage from a trigger, inject metadata,
-    validate each against schema, and return only valid payloads.
+    Service Bus trigger equivalent of get_messages_and_validate:
+    - validate RAW payload only
+    - enrich AFTER validation
+    - identical schema behaviour
     """
     valid_with_properties: List[Dict[str, Any]] = []
     invalid: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
+            
             payload = json.loads(m.get_body().decode())
+
+          
+            validation_errors = validate_data(payload, schema)
+            if validation_errors:
+                invalid.append({
+                    "message_id": m.message_id,
+                    "errors": validation_errors,
+                })
+                continue
 
             enriched = {
                 **payload,
                 "message_id": m.message_id,
                 "enqueued_time_utc": (
-                    m.enqueued_time_utc.isoformat() if m.enqueued_time_utc else None
+                    m.enqueued_time_utc.isoformat()
+                    if m.enqueued_time_utc
+                    else None
                 ),
                 "delivery_count": m.delivery_count,
                 "content_type": m.content_type,
-                "type": (
+                "message_type": (
                     m.application_properties.get(b"type").decode("utf-8")
                     if getattr(m, "application_properties", None)
                     and b"type" in m.application_properties
@@ -166,19 +185,17 @@ def get_payloads_and_validate(
                 ),
             }
 
-            validation_errors = validate_data(enriched, schema)
-            if validation_errors:
-                invalid.append(
-                    {"message_id": m.message_id, "errors": validation_errors}
-                )
-            else:
-                valid_with_properties.append(enriched)
+            valid_with_properties.append(enriched)
 
         except Exception as e:
             logging.exception(
-                "[get_payloads_and_validate] Failed to process message %s", m.message_id
+                "[get_payloads_and_validate] Failed to process message %s",
+                getattr(m, "message_id", "<unknown>")
             )
-            invalid.append({"message_id": m.message_id, "errors": [str(e)]})
+            invalid.append({
+                "message_id": getattr(m, "message_id", None),
+                "errors": [str(e)],
+            })
 
     if invalid:
         logging.error(
@@ -189,6 +206,7 @@ def get_payloads_and_validate(
         raise RuntimeError("Validation failed for one or more messages")
 
     return valid_with_properties
+
 
 
 def send_to_storage(
