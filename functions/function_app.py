@@ -774,7 +774,6 @@ def appeals78(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
-
 @_app.function_name("appealrepresentation")
 @_app.route(route="appealrepresentation", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def appealrepresentation(req: func.HttpRequest) -> func.HttpResponse:
@@ -973,8 +972,3 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
         len(messages),
         count,
     )
-
-
-
-
-
