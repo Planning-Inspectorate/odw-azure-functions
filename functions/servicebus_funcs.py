@@ -162,7 +162,6 @@ def get_payloads_and_validate(
                 ),
             }
 
-            # use your actual validator name
             validation_errors = validate_data(enriched, schema)
             if validation_errors:
                 invalid.append(
@@ -186,7 +185,6 @@ def get_payloads_and_validate(
         raise RuntimeError("Validation failed for one or more messages")
 
     return valid_with_properties
-
 
 
 def send_to_storage(

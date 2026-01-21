@@ -936,6 +936,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
+
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
@@ -953,7 +954,6 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
         logging.warning("[appeal_document_trigger] Empty batch received")
         return
 
-    # new helper replaces get_messages_and_validate
     payloads = get_payloads_and_validate(messages, _SCHEMA)
 
     if not payloads:
@@ -965,7 +965,7 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
         credential=_CREDENTIAL,
         container=_CONTAINER,
         entity=_TOPIC,
-        data=payloads,  # list of objects → JSON array of objects
+        data=payloads,
     )
 
     logging.info(
