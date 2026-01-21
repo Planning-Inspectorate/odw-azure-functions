@@ -935,40 +935,41 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
-
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    data_type=func.DataType.STRING,
     cardinality=func.Cardinality.MANY,
 )
-def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
-    _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
+def appealdocument_servicebus(messages) -> None:
+    """
+    DEAD-LETTER SAFE SERVICE BUS TRIGGER
+    """
+
+    schema = _SCHEMAS["appeal-document.schema.json"]
+    topic = config["global"]["entities"]["appeal-document"]["topic"]
 
     if not messages:
-        logging.warning("[appeal_document_trigger] Empty batch received")
+        logging.warning("Empty batch received")
         return
 
-    payloads = get_payloads_and_validate(messages, _SCHEMA)
+    payloads = get_payloads_and_validate(messages, schema)
 
     if not payloads:
-        logging.warning("[appeal_document_trigger] No valid messages after validation")
+        logging.warning("No valid messages in batch")
         return
-
-    count = sendtostorage(
-        accounturl=_STORAGE,
+    send_to_storage(
+        account_url=_STORAGE,
         credential=_CREDENTIAL,
         container=_CONTAINER,
-        entity=_TOPIC,
+        entity=topic,
         data=payloads,
     )
 
     logging.info(
-        "[appeal_document_trigger] Batch processed: %d received, %d stored",
+        "Processed batch: received=%d stored=%d",
         len(messages),
-        count,
+        len(payloads),
     )

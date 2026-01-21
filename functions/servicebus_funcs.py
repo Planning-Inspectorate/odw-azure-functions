@@ -17,6 +17,8 @@ from azure.servicebus import ServiceBusClient
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from validate_messages import validate_data
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient
 
 
 def get_messages_and_validate(
@@ -136,36 +138,30 @@ def get_messages_and_validate(
 
 
 
-from typing import List, Dict, Any
-import json
-import logging
-
 def get_payloads_and_validate(
-    messages: List[Any],           # keep this framework‑agnostic
+    messages: List[Any],
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
-    """
-    Service Bus trigger equivalent of get_messages_and_validate:
-    - validate RAW payload only
-    - enrich AFTER validation
-    - identical schema behaviour
-    """
+
+
     valid_with_properties: List[Dict[str, Any]] = []
-    invalid: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            
-            payload = json.loads(m.get_body().decode())
 
-          
+            payload = json.loads(m.get_body().decode("utf-8"))
+
+            # Step 2: validate RAW payload
             validation_errors = validate_data(payload, schema)
             if validation_errors:
-                invalid.append({
-                    "message_id": m.message_id,
-                    "errors": validation_errors,
-                })
+                logging.error(
+                    "[Validation Failed] message_id=%s errors=%s",
+                    m.message_id,
+                    validation_errors,
+                )
+
                 continue
+
 
             enriched = {
                 **payload,
@@ -179,7 +175,7 @@ def get_payloads_and_validate(
                 "content_type": m.content_type,
                 "message_type": (
                     m.application_properties.get(b"type").decode("utf-8")
-                    if getattr(m, "application_properties", None)
+                    if m.application_properties
                     and b"type" in m.application_properties
                     else None
                 ),
@@ -188,24 +184,53 @@ def get_payloads_and_validate(
             valid_with_properties.append(enriched)
 
         except Exception as e:
+        
             logging.exception(
-                "[get_payloads_and_validate] Failed to process message %s",
-                getattr(m, "message_id", "<unknown>")
+                "[Processing Error] message_id=%s",
+                getattr(m, "message_id", "<unknown>"),
             )
-            invalid.append({
-                "message_id": getattr(m, "message_id", None),
-                "errors": [str(e)],
-            })
-
-    if invalid:
-        logging.error(
-            "[get_payloads_and_validate] %d invalid messages: %s",
-            len(invalid),
-            invalid,
-        )
-        raise RuntimeError("Validation failed for one or more messages")
+            continue
 
     return valid_with_properties
+
+
+def send_to_storage(
+    account_url: str,
+    credential: DefaultAzureCredential,
+    container: str,
+    entity: str,
+    data: List[Dict[str, Any]],
+) -> int:
+    """
+    Safe blob uploader.
+    Never raises to caller.
+    """
+
+    if not data:
+        logging.warning("No valid data to upload")
+        return 0
+
+    from var_funcs import current_date, current_time
+
+    filename = (
+        f"{entity}/{current_date()}/"
+        f"{entity}_{current_time()}.json"
+    )
+
+    try:
+        blob_service = BlobServiceClient(account_url, credential)
+        blob_client = blob_service.get_blob_client(container, filename)
+        blob_client.upload_blob(
+            json.dumps(data),
+            overwrite=True,
+        )
+        logging.info("Uploaded %d records to %s", len(data), filename)
+        return len(data)
+
+    except Exception:
+        logging.exception("Storage upload failed")
+        return 0
+
 
 
 
