@@ -12,7 +12,9 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 import json
 from validate_messages import validate_data
-
+from typing import List, Dict, Any
+from azure.functions import ServiceBusMessage
+from validatemessages import validatedata  # you already use this in getmessagesandvalidate [file:2]
 
 def get_messages_and_validate(
     namespace: str,
@@ -128,6 +130,64 @@ def get_messages_and_validate(
         raise e
 
     return valid_with_properties
+
+
+def get_payloads_and_validate(
+    messages: List[func.ServiceBusMessage],
+    schema: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """
+    Take a batch of ServiceBusMessage from a trigger, inject metadata,
+    validate each against schema, and return only valid payloads.
+    """
+    valid_with_properties: List[Dict[str, Any]] = []
+    invalid: List[Dict[str, Any]] = []
+
+    for m in messages:
+        try:
+            payload = json.loads(m.get_body().decode())
+
+            enriched = {
+                **payload,
+                "message_id": m.message_id,
+                "enqueued_time_utc": (
+                    m.enqueued_time_utc.isoformat() if m.enqueued_time_utc else None
+                ),
+                "delivery_count": m.delivery_count,
+                "content_type": m.content_type,
+                "type": (
+                    m.application_properties.get(b"type").decode("utf-8")
+                    if getattr(m, "application_properties", None)
+                    and b"type" in m.application_properties
+                    else None
+                ),
+            }
+
+            # use your actual validator name
+            validation_errors = validate_data(enriched, schema)
+            if validation_errors:
+                invalid.append(
+                    {"message_id": m.message_id, "errors": validation_errors}
+                )
+            else:
+                valid_with_properties.append(enriched)
+
+        except Exception as e:
+            logging.exception(
+                "[get_payloads_and_validate] Failed to process message %s", m.message_id
+            )
+            invalid.append({"message_id": m.message_id, "errors": [str(e)]})
+
+    if invalid:
+        logging.error(
+            "[get_payloads_and_validate] %d invalid messages: %s",
+            len(invalid),
+            invalid,
+        )
+        raise RuntimeError("Validation failed for one or more messages")
+
+    return valid_with_properties
+
 
 
 def send_to_storage(
