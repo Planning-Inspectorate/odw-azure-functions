@@ -142,40 +142,59 @@ def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
-
-
+    """
+    Service Bus trigger-safe validator:
+    - Validate RAW payload only
+    - Enrich AFTER validation
+    - Produce fields:
+        - message_id
+        - message_enqueued_time_utc (e.g. '2026-01-21T10:16:56.833000+0000')
+        - message_type
+    - Remove:
+        - delivery_count
+        - content_type
+    - Never raise (prevents DLQ)
+    """
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-
+            # 1) Extract raw body
             payload = json.loads(m.get_body().decode("utf-8"))
 
-            # Step 2: validate RAW payload
+            # 2) Validate RAW payload
             validation_errors = validate_data(payload, schema)
             if validation_errors:
                 logging.error(
                     "[Validation Failed] message_id=%s errors=%s",
-                    m.message_id,
+                    getattr(m, "message_id", "<unknown>"),
                     validation_errors,
                 )
-
+                # Do not raise in a trigger—skip invalid message
                 continue
 
+            # 3) Enrich AFTER validation (with requested fields only)
+            message_enqueued_time_utc = None
+            try:
+                if getattr(m, "enqueued_time_utc", None):
+                    # Format exactly like: 2026-01-21T10:16:56.833000+0000
+                    message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                        "%Y-%m-%dT%H:%M:%S.%f%z"
+                    )
+            except Exception:
+                # If a message lacks enqueued_time_utc, keep None and carry on
+                logging.debug(
+                    "No enqueued_time_utc available for message_id=%s",
+                    getattr(m, "message_id", "<unknown>"),
+                )
 
             enriched = {
                 **payload,
-                "message_id": m.message_id,
-                "enqueued_time_utc": (
-                    m.enqueued_time_utc.isoformat()
-                    if m.enqueued_time_utc
-                    else None
-                ),
-                "delivery_count": m.delivery_count,
-                "content_type": m.content_type,
+                "message_id": getattr(m, "message_id", None),
+                "message_enqueued_time_utc": message_enqueued_time_utc,
                 "message_type": (
                     m.application_properties.get(b"type").decode("utf-8")
-                    if m.application_properties
+                    if getattr(m, "application_properties", None)
                     and b"type" in m.application_properties
                     else None
                 ),
@@ -183,8 +202,8 @@ def get_payloads_and_validate(
 
             valid_with_properties.append(enriched)
 
-        except Exception as e:
-        
+        except Exception:
+            # Never raise from a Service Bus trigger handler
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
@@ -192,6 +211,7 @@ def get_payloads_and_validate(
             continue
 
     return valid_with_properties
+
 
 
 def send_to_storage(
