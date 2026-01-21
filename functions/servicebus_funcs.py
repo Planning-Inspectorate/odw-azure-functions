@@ -14,7 +14,7 @@ import json
 from validate_messages import validate_data
 from typing import List, Dict, Any
 from azure.functions import ServiceBusMessage
-from validatemessages import validatedata  # you already use this in getmessagesandvalidate [file:2]
+from validate_messages import validatedata  # you already use this in getmessagesandvalidate [file:2]
 
 def get_messages_and_validate(
     namespace: str,
