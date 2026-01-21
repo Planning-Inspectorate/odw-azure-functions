@@ -5,7 +5,7 @@ One function for each Service us topic
 
 import logging
 import azure.functions as func
-from servicebus_funcs import get_messages_and_validate, send_to_storage, validate_trigger_messages
+from servicebus_funcs import get_messages_and_validate, send_to_storage
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
@@ -35,7 +35,7 @@ _VALIDATION_ERROR = config["global"]["validation_error"]
 _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
 _app = func.FunctionApp()
-import service_bus_trigger
+
 
 @_app.function_name("folder")
 @_app.route(route="folder", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
@@ -935,13 +935,13 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
-
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
+    data_type=func.DataType.STRING,
     cardinality=func.Cardinality.MANY
 )
 def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
@@ -949,13 +949,28 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
     _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
 
     try:
-        logging.info("[appeal_document_trigger] Service Bus trigger fired")
-
         if not messages:
             logging.warning("[appeal_document_trigger] Empty batch received")
             return
 
-        data = validate_trigger_messages(messages, _SCHEMA)
+        data = get_messages_and_validate(
+            namespace=_NAMESPACE_APPEALS,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=config["global"]["entities"]["appeal-document"]["subscription"],
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA
+        )
+
+        if not data:
+            for msg in messages:
+                msg.dead_letter(
+                    reason="Validation error",
+                    error_description="Failed schema validation"
+                )
+            logging.warning("[appeal_document_trigger] Messages moved to DLQ due to validation failure")
+            return
 
         count = send_to_storage(
             account_url=_STORAGE,
@@ -966,14 +981,65 @@ def appealdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
         )
 
         logging.info(
-            f"[appeal_document_trigger] Batch processed: "
-            f"{len(messages)} received, {count} stored"
+            f"[appeal_document_trigger] Batch processed: {len(messages)} received, {count} stored"
         )
 
     except Exception:
         logging.exception("[appeal_document_trigger] Batch processing failed")
         raise
 
+@_app.function_name(name="nsipdocument_trigger")
+@_app.service_bus_topic_trigger(
+    arg_name="messages",
+    topic_name=config["global"]["entities"]["nsip-document"]["topic"],
+    subscription_name=config["global"]["entities"]["nsip-document"]["subscription"],
+    connection="ServiceBusConnection",
+    data_type=func.DataType.STRING,
+    cardinality=func.Cardinality.MANY
+)
+def nsipdocument_servicebus(messages: List[func.ServiceBusMessage]) -> None:
+    _SCHEMA = _SCHEMAS["nsip-document.schema.json"]
+    _TOPIC = config["global"]["entities"]["nsip-document"]["topic"]
+    _SUB = config["global"]["entities"]["nsip-document"]["subscription"]
 
+    try:
+        if not messages:
+            logging.warning("[nsipdocument_trigger] Empty batch received")
+            return
+
+        data = get_messages_and_validate(
+            namespace=_NAMESPACE,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=_SUB,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA
+        )
+
+        if not data:
+            for msg in messages:
+                msg.dead_letter(
+                    reason="Validation error",
+                    error_description="Failed schema validation"
+                )
+            logging.warning("[nsipdocument_trigger] Messages moved to DLQ due to validation failure")
+            return
+
+        count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=data
+        )
+
+        logging.info(
+            f"[nsipdocument_trigger] Batch processed: {len(messages)} received, {count} stored"
+        )
+
+    except Exception:
+        logging.exception("[nsipdocument_trigger] Batch processing failed")
+        raise
 
 
