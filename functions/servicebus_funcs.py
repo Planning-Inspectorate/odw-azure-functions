@@ -136,6 +136,7 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
+
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -145,7 +146,7 @@ def get_payloads_and_validate(
       - Validate RAW payload (not enriched)
       - Enrich AFTER validation
       - Field order: message_type, message_enqueued_time_utc, message_id, <payload fields>
-      - Robust message_type extraction for bytes/str keys & values
+      - Robust message_type extraction (matches existing function)
       - Excludes delivery_count and content_type
       - Never raises (prevents retries/DLQ)
     """
@@ -156,7 +157,7 @@ def get_payloads_and_validate(
             # 1) RAW payload only
             payload = json.loads(m.get_body().decode("utf-8"))
 
-            # 2) Use your existing validator on RAW payload
+            # 2) Validate RAW payload
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -164,33 +165,30 @@ def get_payloads_and_validate(
                     getattr(m, "message_id", "<unknown>"),
                     errors,
                 )
-                # Do not raise in a trigger—skip invalid message
                 continue
 
-            # 3) Extract metadata you want (robust & safe)
+            # 3) Extract metadata safely (MATCH EXISTING FUNCTION)
 
-            # message_type: handle both bytes and string keys/values
+            # ✅ FIX: message_type from application_properties[b"type"]
             message_type = None
             props = getattr(m, "application_properties", None)
+
             if props:
                 raw_type = None
+
+                # Match existing implementation exactly
                 if b"type" in props:
                     raw_type = props.get(b"type")
-                elif "type" in props:
+                elif "type" in props:  # fallback only
                     raw_type = props.get("type")
 
                 if raw_type is not None:
                     if isinstance(raw_type, (bytes, bytearray)):
-                        try:
-                            message_type = raw_type.decode("utf-8")
-                        except Exception:
-                            message_type = str(raw_type)
-                    elif isinstance(raw_type, str):
-                        message_type = raw_type
+                        message_type = raw_type.decode("utf-8")
                     else:
                         message_type = str(raw_type)
 
-            # message_enqueued_time_utc in 'YYYY-MM-DDTHH:MM:SS.mmmmmm+0000' format
+            # message_enqueued_time_utc (same format as existing function)
             message_enqueued_time_utc = None
             try:
                 if getattr(m, "enqueued_time_utc", None):
@@ -199,26 +197,26 @@ def get_payloads_and_validate(
                     )
             except Exception:
                 logging.debug(
-                    "No/invalid enqueued_time_utc for message_id=%s",
+                    "Invalid enqueued_time_utc for message_id=%s",
                     getattr(m, "message_id", "<unknown>"),
                 )
 
-            # message_id (string)
+            # message_id
             message_id = getattr(m, "message_id", None)
 
-            # 4) Enrich in the ORDER you requested
+            # 4) Enrich AFTER validation (order preserved)
             enriched: Dict[str, Any] = {
                 "message_type": message_type,
                 "message_enqueued_time_utc": message_enqueued_time_utc,
                 "message_id": message_id,
             }
-            # Add original payload fields last (order preserved in Python 3.7+)
+
             enriched.update(payload)
 
             valid_with_properties.append(enriched)
 
         except Exception:
-            # Never raise from a Service Bus trigger path
+            # Never raise in trigger path
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
@@ -226,6 +224,7 @@ def get_payloads_and_validate(
             continue
 
     return valid_with_properties
+
 
 
 def send_to_storage(
