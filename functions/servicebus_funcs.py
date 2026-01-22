@@ -136,40 +136,27 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
-
 def get_payloads_and_validate(
-    messages: Any,
+    messages: List[Any],
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
     Trigger-safe validator:
-      - Handles single OR batch Service Bus messages
-      - Validate RAW payload only
+      - Validate RAW payload (not enriched)
       - Enrich AFTER validation
-      - Append metadata at END of body
-      - message_type from application_properties[b"type"]
-      - Guaranteed UTC timestamp with +0000
+      - Field order: message_type, message_enqueued_time_utc, message_id, <payload fields>
+      - Robust message_type extraction for bytes/str keys & values
+      - Excludes delivery_count and content_type
       - Never raises (prevents retries/DLQ)
     """
-
-    # ✅ FIX 1: Normalize single message to list
-    if not isinstance(messages, list):
-        messages = [messages]
-
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            # -----------------------------
-            # 1) Read RAW payload
-            # -----------------------------
-            body = m.get_body()
-            body_bytes = body if isinstance(body, (bytes, bytearray)) else body.read()
-            payload = json.loads(body_bytes.decode("utf-8"))
+            # 1) RAW payload only
+            payload = json.loads(m.get_body().decode("utf-8"))
 
-            # -----------------------------
-            # 2) Validate RAW payload
-            # -----------------------------
+            # 2) Use existing validator on RAW payload
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -177,58 +164,69 @@ def get_payloads_and_validate(
                     getattr(m, "message_id", "<unknown>"),
                     errors,
                 )
+                # Do not raise in a trigger—skip invalid message
                 continue
 
-            # -----------------------------
-            # 3) message_type (EXACT MATCH)
-            # -----------------------------
+            # 3) Extract metadata you want (robust & safe)
+
+            # message_type: handle both bytes and string keys/values
             message_type = None
-            props = getattr(m, "application_properties", {}) or {}
+            props = getattr(m, "application_properties", None)
+            if props:
+                raw_type = None
+                if b"type" in props:
+                    raw_type = props.get(b"type")
+                elif "type" in props:
+                    raw_type = props.get("type")
 
-            raw_type = props.get(b"type") or props.get("type")
-            if raw_type is not None:
-                if isinstance(raw_type, (bytes, bytearray)):
-                    message_type = raw_type.decode("utf-8", errors="replace")
-                else:
-                    message_type = str(raw_type)
+                if raw_type is not None:
+                    if isinstance(raw_type, (bytes, bytearray)):
+                        try:
+                            message_type = raw_type.decode("utf-8")
+                        except Exception:
+                            message_type = str(raw_type)
+                    elif isinstance(raw_type, str):
+                        message_type = raw_type
+                    else:
+                        message_type = str(raw_type)
 
-            # -----------------------------
-            # 4) enqueued_time (FORCE UTC)
-            # -----------------------------
+            # message_enqueued_time_utc in 'YYYY-MM-DDTHH:MM:SS.mmmmmm+0000' format
             message_enqueued_time_utc = None
-            dt = getattr(m, "enqueued_time_utc", None)
-
-            if dt:
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-
-                message_enqueued_time_utc = dt.strftime(
-                    "%Y-%m-%dT%H:%M:%S.%f%z"
+            try:
+                if getattr(m, "enqueued_time_utc", None):
+                    message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                        "%Y-%m-%dT%H:%M:%S.%f%z"
+                    )
+            except Exception:
+                logging.debug(
+                    "No/invalid enqueued_time_utc for message_id=%s",
+                    getattr(m, "message_id", "<unknown>"),
                 )
 
-            # -----------------------------
-            # 5) message_id
-            # -----------------------------
+            # message_id (string)
             message_id = getattr(m, "message_id", None)
 
-            # -----------------------------
-            # 6) Enrich at END
-            # -----------------------------
-            enriched = dict(payload)
-            enriched["message_type"] = message_type
-            enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
-            enriched["message_id"] = message_id
+            # 4) Enrich in the requested order
+            enriched: Dict[str, Any] = {
+                "message_type": message_type,
+                "message_enqueued_time_utc": message_enqueued_time_utc,
+                "message_id": message_id,
+            }
+
+            # Add original payload fields last (order preserved in Python 3.7+)
+            enriched.update(payload)
 
             valid_with_properties.append(enriched)
 
         except Exception:
+            # Never raise from a Service Bus trigger path
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
             )
-            continue
 
     return valid_with_properties
+
 
 
 
