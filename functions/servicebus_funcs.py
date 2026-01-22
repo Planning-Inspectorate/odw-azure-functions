@@ -1,10 +1,3 @@
-"""
-Module containing functions to read messages from Service Bus and send them to Azure Storage.
-
-Functions:
-- get_messages: Retrieve messages from a Service Bus topic subscription.
-- send_to_storage: Upload data to Azure Blob Storage.
-"""
 import logging
 import json
 from typing import List, Dict, Any
@@ -136,7 +129,7 @@ def get_messages_and_validate(
     return valid_with_properties
 
 
-def send_to_storage(
+def send_to_storage_trigger(
     account_url: str,
     credential: DefaultAzureCredential,
     container: str,
@@ -227,103 +220,76 @@ def send_to_storage(
 
 
 def get_payloads_and_validate(
-    messages: List[func.ServiceBusMessage],
+    messages: List[Any],
     schema: Dict[str, Any],
-    actions: func.ServiceBusMessageActions,
 ) -> List[Dict[str, Any]]:
     """
-    ✅ SINGLE function with BOTH advantages:
-      - Dead‑Letter works (explicit per‑message DLQ)
-      - Payload fields FIRST
-      - Metadata fields LAST:
-          message_type
-          message_enqueued_time_utc
-          message_id
-      - Safe for batch processing
-      - No retries lost, no silent failures
+    Trigger-safe validator:
+      - Validate RAW payload (not enriched)
+      - Enrich AFTER validation
+      - Payload fields first, metadata fields LAST
+      - ABSOLUTE order lock using OrderedDict
+      - Never raises (prevents retries/DLQ)
     """
 
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            # -------------------------------------------------
             # 1) RAW payload
-            # -------------------------------------------------
             payload = json.loads(m.get_body().decode("utf-8"))
 
-            # -------------------------------------------------
             # 2) Validate RAW payload
-            # -------------------------------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
                     "[Validation Failed] message_id=%s errors=%s",
-                    m.message_id,
+                    getattr(m, "message_id", "<unknown>"),
                     errors,
-                )
-
-                # ✅ Explicit DEAD‑LETTER
-                actions.dead_letter(
-                    message=m,
-                    reason="ValidationFailed",
-                    error_description=str(errors),
                 )
                 continue
 
-            # -------------------------------------------------
-            # 3) Extract metadata
-            # -------------------------------------------------
+            # 3) Metadata extraction
             message_type = None
-            props = m.application_properties or {}
-            raw_type = props.get(b"type") or props.get("type")
-
-            if raw_type is not None:
-                message_type = (
-                    raw_type.decode("utf-8")
-                    if isinstance(raw_type, (bytes, bytearray))
-                    else str(raw_type)
-                )
+            props = getattr(m, "application_properties", None)
+            if props:
+                raw_type = props.get(b"type") or props.get("type")
+                if raw_type is not None:
+                    message_type = (
+                        raw_type.decode("utf-8")
+                        if isinstance(raw_type, (bytes, bytearray))
+                        else str(raw_type)
+                    )
 
             message_enqueued_time_utc = None
-            if m.enqueued_time_utc:
+            if getattr(m, "enqueued_time_utc", None):
                 message_enqueued_time_utc = m.enqueued_time_utc.strftime(
                     "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            message_id = m.message_id
+            message_id = getattr(m, "message_id", None)
 
-            # -------------------------------------------------
-            # 4) Enrich – ORDER GUARANTEED
-            # -------------------------------------------------
+            # ✅ Order is now BULLETPROOF
             enriched = OrderedDict()
 
-            # Payload fields FIRST
+            # payload fields first
             for k, v in payload.items():
                 enriched[k] = v
 
-            # Metadata fields LAST
+            # metadata LAST
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
 
             valid_with_properties.append(enriched)
 
-        except Exception as ex:
+        except Exception:
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
             )
 
-            # ✅ Explicit DEAD‑LETTER for unexpected errors
-            actions.dead_letter(
-                message=m,
-                reason="ProcessingError",
-                error_description=str(ex),
-            )
-
     return valid_with_properties
-
 
 
 

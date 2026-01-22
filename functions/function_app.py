@@ -960,7 +960,7 @@ def appealdocument_servicebus(messages) -> None:
     if not payloads:
         logging.warning("No valid messages in batch")
         return
-    send_to_storage(
+    send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
         container=_CONTAINER,
