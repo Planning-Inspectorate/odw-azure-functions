@@ -226,7 +226,6 @@ def send_to_storage(
 
     return len(data)
 
-
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -235,19 +234,25 @@ def get_payloads_and_validate(
     Trigger-safe validator:
       - Validate RAW payload (not enriched)
       - Enrich AFTER validation
-      - Field order: message_type, message_enqueued_time_utc, message_id, <payload fields>
+      - Payload fields first, metadata fields LAST
+      - Field order at end: message_type, message_enqueued_time_utc, message_id
       - Robust message_type extraction for bytes/str keys & values
       - Excludes delivery_count and content_type
       - Never raises (prevents retries/DLQ)
     """
+
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            # 1) RAW payload only
+            # ---------------------------------------------------------
+            # 1) Load RAW payload only
+            # ---------------------------------------------------------
             payload = json.loads(m.get_body().decode("utf-8"))
 
+            # ---------------------------------------------------------
             # 2) Validate RAW payload
+            # ---------------------------------------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -255,13 +260,17 @@ def get_payloads_and_validate(
                     getattr(m, "message_id", "<unknown>"),
                     errors,
                 )
+                # Skip invalid message without raising
                 continue
 
+            # ---------------------------------------------------------
             # 3) Extract metadata
+            # ---------------------------------------------------------
 
-            # message_type (robust: bytes or str)
+            # message_type (supports bytes or string keys/values)
             message_type = None
             props = getattr(m, "application_properties", None)
+
             if props:
                 raw_type = None
                 if b"type" in props:
@@ -279,13 +288,12 @@ def get_payloads_and_validate(
                         message_type = str(raw_type)
 
             # message_enqueued_time_utc
-          
+            # Format: 2024-05-24T09:29:20.479000+0000
             message_enqueued_time_utc = None
             try:
                 if getattr(m, "enqueued_time_utc", None):
-                    message_enqueued_time_utc = (
-                        m.enqueued_time_utc.replace(tzinfo=None)
-                        .strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+                    message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                        "%Y-%m-%dT%H:%M:%S.%f%z"
                     )
             except Exception:
                 logging.debug(
@@ -296,23 +304,28 @@ def get_payloads_and_validate(
             # message_id
             message_id = getattr(m, "message_id", None)
 
-            # 4) Enrich in REQUIRED ORDER
-            enriched: Dict[str, Any] = {
-                "message_type": message_type,                    # e.g. "Create"
-                "message_enqueued_time_utc": message_enqueued_time_utc,  # e.g. 2026-01-22T10:22:44.931000
-                "message_id": message_id,                        # e.g. c7623b2f67f24af1926fd18c312bae39
-            }
+            # ---------------------------------------------------------
+            # 4) Enrich AFTER validation – metadata at END of body
+            # ---------------------------------------------------------
+            enriched: Dict[str, Any] = dict(payload)
 
-            # ✅ Add payload fields at the END of the body
-            enriched.update(payload)
+            enriched.update(
+                {
+                    "message_type": message_type,
+                    "message_enqueued_time_utc": message_enqueued_time_utc,
+                    "message_id": message_id,
+                }
+            )
 
             valid_with_properties.append(enriched)
 
         except Exception:
+            # Never raise in a Service Bus trigger path
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
             )
 
     return valid_with_properties
+
 
