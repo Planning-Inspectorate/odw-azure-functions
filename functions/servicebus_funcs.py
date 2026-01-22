@@ -19,7 +19,6 @@ from azure.storage.blob import BlobServiceClient
 from validate_messages import validate_data
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
-from datetime import timezone
 
 
 def get_messages_and_validate(
@@ -137,7 +136,6 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
-
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -146,19 +144,24 @@ def get_payloads_and_validate(
     Trigger-safe validator:
       - Validate RAW payload (not enriched)
       - Enrich AFTER validation
-      - Field order: message_type, message_enqueued_time_utc, message_id, <payload fields>
-      - Robust message_type extraction (matches existing function)
-      - Excludes delivery_count and content_type
+      - Metadata appended at END of body:
+          message_type, message_enqueued_time_utc, message_id
+      - message_type extracted from application_properties[b"type"]
       - Never raises (prevents retries/DLQ)
     """
+
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            # 1) RAW payload only
+            # ---------------------------------------------------------
+            # 1) Read RAW payload (no enrichment before validation)
+            # ---------------------------------------------------------
             payload = json.loads(m.get_body().decode("utf-8"))
 
+            # ---------------------------------------------------------
             # 2) Validate RAW payload
+            # ---------------------------------------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -166,21 +169,24 @@ def get_payloads_and_validate(
                     getattr(m, "message_id", "<unknown>"),
                     errors,
                 )
+                # Do not raise in trigger path
                 continue
 
-            # 3) Extract metadata safely (MATCH EXISTING FUNCTION)
+            # ---------------------------------------------------------
+            # 3) Extract metadata (match existing function exactly)
+            # ---------------------------------------------------------
 
-            # ✅ FIX: message_type from application_properties[b"type"]
+            # message_type from application properties (b"type")
             message_type = None
             props = getattr(m, "application_properties", None)
 
             if props:
                 raw_type = None
 
-                # Match existing implementation exactly
+                # ✅ THIS MATCHES THE EXISTING WORKING IMPLEMENTATION
                 if b"type" in props:
                     raw_type = props.get(b"type")
-                elif "type" in props:  # fallback only
+                elif "type" in props:  # fallback (safety)
                     raw_type = props.get("type")
 
                 if raw_type is not None:
@@ -189,35 +195,31 @@ def get_payloads_and_validate(
                     else:
                         message_type = str(raw_type)
 
-            # message_enqueued_time_utc (same format as existing function)
+            # message_enqueued_time_utc
             message_enqueued_time_utc = None
-            try:
-                if getattr(m, "enqueued_time_utc", None):
-                    message_enqueued_time_utc = m.enqueued_time_utc.strftime(
-                        "%Y-%m-%dT%H:%M:%S.%f%z"
-                    )
-            except Exception:
-                logging.debug(
-                    "Invalid enqueued_time_utc for message_id=%s",
-                    getattr(m, "message_id", "<unknown>"),
+            if getattr(m, "enqueued_time_utc", None):
+                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                    "%Y-%m-%dT%H:%M:%S.%f"
                 )
 
             # message_id
             message_id = getattr(m, "message_id", None)
 
-            # 4) Enrich AFTER validation (order preserved)
-            enriched: Dict[str, Any] = {
-                "message_type": message_type,
-                "message_enqueued_time_utc": message_enqueued_time_utc,
-                "message_id": message_id,
-            }
+            # ---------------------------------------------------------
+            # 4) Enrich AFTER validation (append metadata at END)
+            # ---------------------------------------------------------
+            enriched: Dict[str, Any] = dict(payload)  # payload FIRST
 
-            enriched.update(payload)
+            enriched["message_type"] = message_type
+            enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+            enriched["message_id"] = message_id
 
             valid_with_properties.append(enriched)
 
         except Exception:
-            # Never raise in trigger path
+            # ---------------------------------------------------------
+            # NEVER raise in Service Bus trigger path
+            # ---------------------------------------------------------
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
