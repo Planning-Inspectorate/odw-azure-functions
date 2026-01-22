@@ -10,7 +10,6 @@ Functions:
 import logging
 import json
 from typing import List, Dict, Any
-
 import azure.functions as func            # ✅ add this
 from azure.functions import ServiceBusMessage
 from azure.servicebus import ServiceBusClient
@@ -19,6 +18,7 @@ from azure.storage.blob import BlobServiceClient
 from validate_messages import validate_data
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
+from datetime import timezone
 
 
 def get_messages_and_validate(
@@ -136,32 +136,40 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
+
 def get_payloads_and_validate(
-    messages: List[Any],
+    messages: Any,
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
     Trigger-safe validator:
-      - Validate RAW payload (not enriched)
+      - Handles single OR batch Service Bus messages
+      - Validate RAW payload only
       - Enrich AFTER validation
-      - Metadata appended at END of body:
-          message_type, message_enqueued_time_utc, message_id
-      - message_type extracted from application_properties[b"type"]
+      - Append metadata at END of body
+      - message_type from application_properties[b"type"]
+      - Guaranteed UTC timestamp with +0000
       - Never raises (prevents retries/DLQ)
     """
+
+    # ✅ FIX 1: Normalize single message to list
+    if not isinstance(messages, list):
+        messages = [messages]
 
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            # ---------------------------------------------------------
-            # 1) Read RAW payload (no enrichment before validation)
-            # ---------------------------------------------------------
-            payload = json.loads(m.get_body().decode("utf-8"))
+            # -----------------------------
+            # 1) Read RAW payload
+            # -----------------------------
+            body = m.get_body()
+            body_bytes = body if isinstance(body, (bytes, bytearray)) else body.read()
+            payload = json.loads(body_bytes.decode("utf-8"))
 
-            # ---------------------------------------------------------
+            # -----------------------------
             # 2) Validate RAW payload
-            # ---------------------------------------------------------
+            # -----------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -169,47 +177,44 @@ def get_payloads_and_validate(
                     getattr(m, "message_id", "<unknown>"),
                     errors,
                 )
-                # Do not raise in trigger path
                 continue
 
-            # ---------------------------------------------------------
-            # 3) Extract metadata (match existing function exactly)
-            # ---------------------------------------------------------
-
-            # message_type from application properties (b"type")
+            # -----------------------------
+            # 3) message_type (EXACT MATCH)
+            # -----------------------------
             message_type = None
-            props = getattr(m, "application_properties", None)
+            props = getattr(m, "application_properties", {}) or {}
 
-            if props:
-                raw_type = None
+            raw_type = props.get(b"type") or props.get("type")
+            if raw_type is not None:
+                if isinstance(raw_type, (bytes, bytearray)):
+                    message_type = raw_type.decode("utf-8", errors="replace")
+                else:
+                    message_type = str(raw_type)
 
-                # ✅ THIS MATCHES THE EXISTING WORKING IMPLEMENTATION
-                if b"type" in props:
-                    raw_type = props.get(b"type")
-                elif "type" in props:  # fallback (safety)
-                    raw_type = props.get("type")
-
-                if raw_type is not None:
-                    if isinstance(raw_type, (bytes, bytearray)):
-                        message_type = raw_type.decode("utf-8")
-                    else:
-                        message_type = str(raw_type)
-
-            # message_enqueued_time_utc
+            # -----------------------------
+            # 4) enqueued_time (FORCE UTC)
+            # -----------------------------
             message_enqueued_time_utc = None
-            if getattr(m, "enqueued_time_utc", None):
-                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
-                    "%Y-%m-%dT%H:%M:%S.%f"
+            dt = getattr(m, "enqueued_time_utc", None)
+
+            if dt:
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+
+                message_enqueued_time_utc = dt.strftime(
+                    "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            # message_id
+            # -----------------------------
+            # 5) message_id
+            # -----------------------------
             message_id = getattr(m, "message_id", None)
 
-            # ---------------------------------------------------------
-            # 4) Enrich AFTER validation (append metadata at END)
-            # ---------------------------------------------------------
-            enriched: Dict[str, Any] = dict(payload)  # payload FIRST
-
+            # -----------------------------
+            # 6) Enrich at END
+            # -----------------------------
+            enriched = dict(payload)
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
@@ -217,9 +222,6 @@ def get_payloads_and_validate(
             valid_with_properties.append(enriched)
 
         except Exception:
-            # ---------------------------------------------------------
-            # NEVER raise in Service Bus trigger path
-            # ---------------------------------------------------------
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
