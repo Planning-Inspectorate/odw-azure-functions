@@ -19,6 +19,7 @@ from validate_messages import validate_data
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from datetime import timezone
+from collections import OrderedDict
 
 
 def get_messages_and_validate(
@@ -226,6 +227,7 @@ def send_to_storage(
 
     return len(data)
 
+
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -235,9 +237,7 @@ def get_payloads_and_validate(
       - Validate RAW payload (not enriched)
       - Enrich AFTER validation
       - Payload fields first, metadata fields LAST
-      - Field order at end: message_type, message_enqueued_time_utc, message_id
-      - Robust message_type extraction for bytes/str keys & values
-      - Excludes delivery_count and content_type
+      - ABSOLUTE order lock using OrderedDict
       - Never raises (prevents retries/DLQ)
     """
 
@@ -245,14 +245,10 @@ def get_payloads_and_validate(
 
     for m in messages:
         try:
-            # ---------------------------------------------------------
-            # 1) Load RAW payload only
-            # ---------------------------------------------------------
+            # 1) RAW payload
             payload = json.loads(m.get_body().decode("utf-8"))
 
-            # ---------------------------------------------------------
             # 2) Validate RAW payload
-            # ---------------------------------------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -260,72 +256,49 @@ def get_payloads_and_validate(
                     getattr(m, "message_id", "<unknown>"),
                     errors,
                 )
-                # Skip invalid message without raising
                 continue
 
-            # ---------------------------------------------------------
-            # 3) Extract metadata
-            # ---------------------------------------------------------
-
-            # message_type (supports bytes or string keys/values)
+            # 3) Metadata extraction
             message_type = None
             props = getattr(m, "application_properties", None)
-
             if props:
-                raw_type = None
-                if b"type" in props:
-                    raw_type = props.get(b"type")
-                elif "type" in props:
-                    raw_type = props.get("type")
-
+                raw_type = props.get(b"type") or props.get("type")
                 if raw_type is not None:
-                    if isinstance(raw_type, (bytes, bytearray)):
-                        try:
-                            message_type = raw_type.decode("utf-8")
-                        except Exception:
-                            message_type = str(raw_type)
-                    else:
-                        message_type = str(raw_type)
-
-            # message_enqueued_time_utc
-            # Format: 2024-05-24T09:29:20.479000+0000
-            message_enqueued_time_utc = None
-            try:
-                if getattr(m, "enqueued_time_utc", None):
-                    message_enqueued_time_utc = m.enqueued_time_utc.strftime(
-                        "%Y-%m-%dT%H:%M:%S.%f%z"
+                    message_type = (
+                        raw_type.decode("utf-8")
+                        if isinstance(raw_type, (bytes, bytearray))
+                        else str(raw_type)
                     )
-            except Exception:
-                logging.debug(
-                    "No/invalid enqueued_time_utc for message_id=%s",
-                    getattr(m, "message_id", "<unknown>"),
+
+            message_enqueued_time_utc = None
+            if getattr(m, "enqueued_time_utc", None):
+                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                    "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            # message_id
             message_id = getattr(m, "message_id", None)
 
-            # ---------------------------------------------------------
-            # 4) Enrich AFTER validation – metadata at END of body
-            # ---------------------------------------------------------
-            enriched: Dict[str, Any] = dict(payload)
+            # ✅ Order is now BULLETPROOF
+            enriched = OrderedDict()
 
-            enriched.update(
-                {
-                    "message_type": message_type,
-                    "message_enqueued_time_utc": message_enqueued_time_utc,
-                    "message_id": message_id,
-                }
-            )
+            # payload fields first
+            for k, v in payload.items():
+                enriched[k] = v
+
+            # metadata LAST
+            enriched["message_type"] = message_type
+            enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+            enriched["message_id"] = message_id
 
             valid_with_properties.append(enriched)
 
         except Exception:
-            # Never raise in a Service Bus trigger path
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
             )
 
     return valid_with_properties
+
 
 
