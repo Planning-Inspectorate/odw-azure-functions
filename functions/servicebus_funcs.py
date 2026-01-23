@@ -295,6 +295,7 @@ def get_payloads_and_validate(
             enriched["message_id"] = m.message_id
 
             valid_with_properties.append(enriched)
+            actions.complete(message=m)
 
         except Exception as ex:
             # ✅ LAST resort DLQ
