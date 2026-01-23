@@ -941,7 +941,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    cardinality=func.Cardinality.MANY,
+    cardinality=func.Cardinality.one,
 )
 def appealdocument_servicebus(messages) -> None:
     """
