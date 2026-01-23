@@ -19,7 +19,7 @@
   "extensions": {
     "serviceBus": {
       "messageHandlerOptions": {
-        "autoComplete": true,
+        "autoComplete": false,
         "maxConcurrentCalls": 8,
         "maxAutoRenewDuration": "00:05:00"
       }
