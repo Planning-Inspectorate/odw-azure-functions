@@ -214,73 +214,100 @@ def get_messages_and_validate(
 
 
 def get_payloads_and_validate(
-    messages: List[Any],
-    schema: Dict[str, Any],
+    messages: List[func.ServiceBusMessage],
+    actions: func.ServiceBusMessageActions,
 ) -> List[Dict[str, Any]]:
     """
-    Trigger-safe validator:
-      - Validate RAW payload (not enriched)
-      - Enrich AFTER validation
-      - Payload fields first, metadata fields LAST
-      - ABSOLUTE order lock using OrderedDict
-      - Never raises (prevents retries/DLQ)
+    ✅ Correct DLQ behavior:
+       - Explicit dead-letter
+       - No retries
+       - Custom DeadLetterReason preserved
+       - Payload fields first, metadata last
     """
 
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            # 1) RAW payload
-            payload = json.loads(m.get_body().decode("utf-8"))
+            # -------------------------------
+            # 1. Parse payload (NO raise)
+            # -------------------------------
+            try:
+                payload = json.loads(m.get_body().decode("utf-8"))
+            except Exception as ex:
+                logging.error(
+                    "Invalid JSON body. message_id=%s error=%s",
+                    m.message_id,
+                    ex,
+                )
 
-            # 2) Validate RAW payload
+                actions.dead_letter(
+                    message=m,
+                    reason="InvalidJson",
+                    error_description=str(ex),
+                )
+                continue  # ✅ critical: do NOT retry
+
+            # -------------------------------
+            # 2. Validate payload
+            # -------------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
-                    "[Validation Failed] message_id=%s errors=%s",
-                    getattr(m, "message_id", "<unknown>"),
+                    "Validation failed. message_id=%s errors=%s",
+                    m.message_id,
                     errors,
                 )
-                continue
 
-            # 3) Metadata extraction
+                actions.dead_letter(
+                    message=m,
+                    reason="ValidationFailed",
+                    error_description=str(errors),
+                )
+                continue  # ✅ critical
+
+            # -------------------------------
+            # 3. Extract metadata
+            # -------------------------------
             message_type = None
-            props = getattr(m, "application_properties", None)
-            if props:
-                raw_type = props.get(b"type") or props.get("type")
-                if raw_type is not None:
-                    message_type = (
-                        raw_type.decode("utf-8")
-                        if isinstance(raw_type, (bytes, bytearray))
-                        else str(raw_type)
-                    )
+            props = m.application_properties or {}
+            raw_type = props.get(b"type") or props.get("type")
 
-            message_enqueued_time_utc = None
-            if getattr(m, "enqueued_time_utc", None):
-                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
-                    "%Y-%m-%dT%H:%M:%S.%f%z"
+            if raw_type:
+                message_type = (
+                    raw_type.decode("utf-8")
+                    if isinstance(raw_type, (bytes, bytearray))
+                    else str(raw_type)
                 )
 
-            message_id = getattr(m, "message_id", None)
+            message_enqueued_time_utc = (
+                m.enqueued_time_utc.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+                if m.enqueued_time_utc
+                else None
+            )
 
-            # ✅ Order is now BULLETPROOF
-            enriched = OrderedDict()
-
-            # payload fields first
-            for k, v in payload.items():
-                enriched[k] = v
-
-            # metadata LAST
+            # -------------------------------
+            # 4. Enrich with fixed order
+            # -------------------------------
+            enriched = OrderedDict(payload)
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
-            enriched["message_id"] = message_id
+            enriched["message_id"] = m.message_id
 
             valid_with_properties.append(enriched)
 
-        except Exception:
+        except Exception as ex:
+            # ✅ LAST resort DLQ
             logging.exception(
-                "[Processing Error] message_id=%s",
+                "Unexpected processing error. message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
             )
+
+            actions.dead_letter(
+                message=m,
+                reason="ProcessingError",
+                error_description=str(ex),
+            )
+            continue  # ✅ no retries
 
     return valid_with_properties

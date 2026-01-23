@@ -935,6 +935,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
+
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
@@ -943,7 +944,10 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     connection="ServiceBusConnectionAppeals",
     cardinality=func.Cardinality.MANY,
 )
-def appealdocument_servicebus(messages) -> None:
+def appealdocument_servicebus(
+    messages: list[func.ServiceBusMessage],
+    actions: func.ServiceBusMessageActions,
+) -> None:
     """
     DEAD-LETTER SAFE SERVICE BUS TRIGGER
     """
@@ -955,11 +959,16 @@ def appealdocument_servicebus(messages) -> None:
         logging.warning("Empty batch received")
         return
 
-    payloads = get_payloads_and_validate(messages, schema)
+    # ✅ Pass actions to validator
+    payloads = get_payloads_and_validate(
+        messages=messages,
+        actions=actions,
+    )
 
     if not payloads:
         logging.warning("No valid messages in batch")
         return
+
     send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
@@ -973,3 +982,4 @@ def appealdocument_servicebus(messages) -> None:
         len(messages),
         len(payloads),
     )
+
