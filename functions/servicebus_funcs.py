@@ -211,35 +211,21 @@ def get_messages_and_validate(
         raise e
 
     return valid_with_properties
+
 def get_payloads_and_validate(
     messages: List[func.ServiceBusMessage],
     schema: Dict[str, Any],
     actions: func.ServiceBusMessageActions,
 ) -> List[Dict[str, Any]]:
-    """
-    ✅ SINGLE function with BOTH advantages:
-      - Dead‑Letter works (explicit per‑message DLQ)
-      - Payload fields FIRST
-      - Metadata fields LAST:
-          message_type
-          message_enqueued_time_utc
-          message_id
-      - Safe for batch processing
-      - No retries lost, no silent failures
-    """
 
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         try:
-            # -------------------------------------------------
             # 1) RAW payload
-            # -------------------------------------------------
             payload = json.loads(m.get_body().decode("utf-8"))
 
-            # -------------------------------------------------
             # 2) Validate RAW payload
-            # -------------------------------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -248,7 +234,7 @@ def get_payloads_and_validate(
                     errors,
                 )
 
-                # ✅ Explicit DEAD‑LETTER
+                # ✅ Explicit DEAD‑LETTER (ONLY invalid)
                 actions.dead_letter(
                     message=m,
                     reason="ValidationFailed",
@@ -256,43 +242,35 @@ def get_payloads_and_validate(
                 )
                 continue
 
-            # -------------------------------------------------
             # 3) Extract metadata
-            # -------------------------------------------------
-            message_type = None
             props = m.application_properties or {}
             raw_type = props.get(b"type") or props.get("type")
 
-            if raw_type is not None:
-                message_type = (
-                    raw_type.decode("utf-8")
-                    if isinstance(raw_type, (bytes, bytearray))
-                    else str(raw_type)
-                )
+            message_type = (
+                raw_type.decode("utf-8")
+                if isinstance(raw_type, (bytes, bytearray))
+                else str(raw_type)
+                if raw_type is not None
+                else None
+            )
 
-            message_enqueued_time_utc = None
-            if m.enqueued_time_utc:
-                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
-                    "%Y-%m-%dT%H:%M:%S.%f%z"
-                )
+            message_enqueued_time_utc = (
+                m.enqueued_time_utc.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+                if m.enqueued_time_utc
+                else None
+            )
 
-            message_id = m.message_id
-
-            # -------------------------------------------------
             # 4) Enrich – ORDER GUARANTEED
-            # -------------------------------------------------
             enriched = OrderedDict()
-
-            # Payload fields FIRST
-            for k, v in payload.items():
-                enriched[k] = v
-
-            # Metadata fields LAST
+            enriched.update(payload)
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
-            enriched["message_id"] = message_id
+            enriched["message_id"] = m.message_id
 
             valid_with_properties.append(enriched)
+
+            # ✅ THIS WAS MISSING
+            actions.complete(message=m)
 
         except Exception as ex:
             logging.exception(
@@ -308,5 +286,6 @@ def get_payloads_and_validate(
             )
 
     return valid_with_properties
+
 
 
