@@ -935,8 +935,6 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
-
-
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
@@ -945,12 +943,9 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     connection="ServiceBusConnectionAppeals",
     cardinality=func.Cardinality.MANY,
 )
-def appealdocument_servicebus(
-    messages: list[func.ServiceBusMessage],
-    actions: func.ServiceBusMessageActions,
-) -> None:
+def appealdocument_servicebus(messages) -> None:
     """
-    DEAD-LETTER SAFE SERVICE BUS TRIGGER (BATCH-SAFE)
+    DEAD-LETTER SAFE SERVICE BUS TRIGGER
     """
 
     schema = _SCHEMAS["appeal-document.schema.json"]
@@ -960,30 +955,21 @@ def appealdocument_servicebus(
         logging.warning("Empty batch received")
         return
 
-    #  PHASE 1: Validate & settle messages ONLY
-    payloads = get_payloads_and_validate(
-        messages=messages,
-        schema=schema,
-        actions=actions,
+    payloads = get_payloads_and_validate(messages, schema)
+
+    if not payloads:
+        logging.warning("No valid messages in batch")
+        return
+    send_to_storage_trigger(
+        account_url=_STORAGE,
+        credential=_CREDENTIAL,
+        container=_CONTAINER,
+        entity=topic,
+        data=payloads,
     )
 
-    #  PHASE 2: Store valid messages (MUST NOT affect SB settlement)
-    if payloads:
-        try:
-            send_to_storage_trigger(
-                account_url=_STORAGE,
-                credential=_CREDENTIAL,
-                container=_CONTAINER,
-                entity=topic,
-                data=payloads,
-            )
-        except Exception:
-            # CRITICAL: log but DO NOT rethrow
-            logging.exception("Storage write failed — messages already settled")
-
     logging.info(
-        "Processed batch: received=%d valid=%d",
+        "Processed batch: received=%d stored=%d",
         len(messages),
         len(payloads),
     )
-
