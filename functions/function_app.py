@@ -5,7 +5,7 @@ One function for each Service us topic
 
 import logging
 import azure.functions as func
-from servicebus_funcs import get_messages_and_validate, send_to_storage,get_payloads_and_validate,send_to_storage_trigger
+from servicebus_funcs import send_to_storage,send_to_storage_trigger,get_messages_and_validate,get_payloads_and_validate
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas

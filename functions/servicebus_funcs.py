@@ -1,18 +1,102 @@
-import logging
+
+from __future__ import annotations
 import json
-from typing import List, Dict, Any
-import azure.functions as func            # ✅ add this
-from azure.functions import ServiceBusMessage
-from azure.servicebus import ServiceBusClient
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
-from validate_messages import validate_data
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
-from datetime import timezone
+import logging
 from collections import OrderedDict
+from typing import Any, Dict, List, Optional
+# Keep just this; don't also import ServiceBusMessage directly
+import azure.functions as func
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient
+from azure.servicebus import ServiceBusClient
+# Your validator (adjust the module path if different)
+from validate_messages import validate_data
 
+def send_to_storage(
+    account_url: str,
+    credential: DefaultAzureCredential,
+    container: str,
+    entity: str,
+    data: list[list | dict],
+) -> int:
+    """
+    Upload data to Azure Blob Storage.
 
+    Args:
+        account_url (str): The URL of the Azure Blob Storage account.
+        credential: The credential object for authentication.
+        container (str): The name of the container in Azure Blob Storage.
+        entity (str): The name of the entity, e.g. service-user, nsip-project
+        data: The data to be uploaded.
+
+    Returns:
+        int: a count of messages processed. This is used in the http response body.
+    """
+
+    from var_funcs import current_date, current_time
+
+    _CURRENT_DATE = current_date()
+    _CURRENT_TIME = current_time()
+    _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
+
+    try:
+        if data:
+            print("Creating blob service client...")
+            blob_service_client = BlobServiceClient(account_url, credential)
+            print("Blob service client created")
+            blob_client = blob_service_client.get_blob_client(container, blob=_FILENAME)
+            print("Converting data to json format...")
+            json_data = json.dumps(data)
+            print("Data converted to json")
+            print("Uploading file to storage...")
+            blob_client.upload_blob(json_data, overwrite=True)
+            print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
+
+        else:
+            print("No messages to send to storage")
+
+    except Exception as e:
+        print(f"Error sending to storage account\n{e}")
+        raise e
+
+    return len(data)
+
+def send_to_storage_trigger(
+    account_url: str,
+    credential: DefaultAzureCredential,
+    container: str,
+    entity: str,
+    data: List[Dict[str, Any]],
+) -> int:
+    """
+    Safe blob uploader.
+    Never raises to caller.
+    """
+
+    if not data:
+        logging.warning("No valid data to upload")
+        return 0
+
+    from var_funcs import current_date, current_time
+
+    filename = (
+        f"{entity}/{current_date()}/"
+        f"{entity}_{current_time()}.json"
+    )
+
+    try:
+        blob_service = BlobServiceClient(account_url, credential)
+        blob_client = blob_service.get_blob_client(container, filename)
+        blob_client.upload_blob(
+            json.dumps(data),
+            overwrite=True,
+        )
+        logging.info("Uploaded %d records to %s", len(data), filename)
+        return len(data)
+
+    except Exception:
+        logging.exception("Storage upload failed")
+        return 0
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
@@ -127,93 +211,6 @@ def get_messages_and_validate(
         raise e
 
     return valid_with_properties
-
-def send_to_storage(
-    account_url: str,
-    credential: DefaultAzureCredential,
-    container: str,
-    entity: str,
-    data: list[list | dict],
-) -> int:
-    """
-    Upload data to Azure Blob Storage.
-
-    Args:
-        account_url (str): The URL of the Azure Blob Storage account.
-        credential: The credential object for authentication.
-        container (str): The name of the container in Azure Blob Storage.
-        entity (str): The name of the entity, e.g. service-user, nsip-project
-        data: The data to be uploaded.
-
-    Returns:
-        int: a count of messages processed. This is used in the http response body.
-    """
-
-    from var_funcs import current_date, current_time
-
-    _CURRENT_DATE = current_date()
-    _CURRENT_TIME = current_time()
-    _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
-
-    try:
-        if data:
-            print("Creating blob service client...")
-            blob_service_client = BlobServiceClient(account_url, credential)
-            print("Blob service client created")
-            blob_client = blob_service_client.get_blob_client(container, blob=_FILENAME)
-            print("Converting data to json format...")
-            json_data = json.dumps(data)
-            print("Data converted to json")
-            print("Uploading file to storage...")
-            blob_client.upload_blob(json_data, overwrite=True)
-            print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
-
-        else:
-            print("No messages to send to storage")
-
-    except Exception as e:
-        print(f"Error sending to storage account\n{e}")
-        raise e
-
-    return len(data)
-
-def send_to_storage_trigger(
-    account_url: str,
-    credential: DefaultAzureCredential,
-    container: str,
-    entity: str,
-    data: List[Dict[str, Any]],
-) -> int:
-    """
-    Safe blob uploader.
-    Never raises to caller.
-    """
-
-    if not data:
-        logging.warning("No valid data to upload")
-        return 0
-
-    from var_funcs import current_date, current_time
-
-    filename = (
-        f"{entity}/{current_date()}/"
-        f"{entity}_{current_time()}.json"
-    )
-
-    try:
-        blob_service = BlobServiceClient(account_url, credential)
-        blob_client = blob_service.get_blob_client(container, filename)
-        blob_client.upload_blob(
-            json.dumps(data),
-            overwrite=True,
-        )
-        logging.info("Uploaded %d records to %s", len(data), filename)
-        return len(data)
-
-    except Exception:
-        logging.exception("Storage upload failed")
-        return 0
-
 def get_payloads_and_validate(
     messages: List[func.ServiceBusMessage],
     schema: Dict[str, Any],
