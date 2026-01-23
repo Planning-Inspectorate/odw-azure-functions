@@ -936,6 +936,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     
 
 
+
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
@@ -949,7 +950,7 @@ def appealdocument_servicebus(
     actions: func.ServiceBusMessageActions,
 ) -> None:
     """
-    DEAD-LETTER SAFE SERVICE BUS TRIGGER
+    DEAD-LETTER SAFE SERVICE BUS TRIGGER (BATCH-SAFE)
     """
 
     schema = _SCHEMAS["appeal-document.schema.json"]
@@ -959,27 +960,29 @@ def appealdocument_servicebus(
         logging.warning("Empty batch received")
         return
 
-    # ✅ Validator now behaves like the FIRST (SDK) function
+    #  PHASE 1: Validate & settle messages ONLY
     payloads = get_payloads_and_validate(
         messages=messages,
         schema=schema,
         actions=actions,
     )
 
-    if not payloads:
-        logging.warning("No valid messages in batch")
-        return
-
-    send_to_storage_trigger(
-        account_url=_STORAGE,
-        credential=_CREDENTIAL,
-        container=_CONTAINER,
-        entity=topic,
-        data=payloads,
-    )
+    #  PHASE 2: Store valid messages (MUST NOT affect SB settlement)
+    if payloads:
+        try:
+            send_to_storage_trigger(
+                account_url=_STORAGE,
+                credential=_CREDENTIAL,
+                container=_CONTAINER,
+                entity=topic,
+                data=payloads,
+            )
+        except Exception:
+            # CRITICAL: log but DO NOT rethrow
+            logging.exception("Storage write failed — messages already settled")
 
     logging.info(
-        "Processed batch: received=%d stored=%d",
+        "Processed batch: received=%d valid=%d",
         len(messages),
         len(payloads),
     )
