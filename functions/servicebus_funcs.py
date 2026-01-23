@@ -213,17 +213,22 @@ def get_messages_and_validate(
     return valid_with_properties
 
 
+
+from typing import List, Dict, Any
+from collections import OrderedDict
+import json
+import logging
+
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
+    actions,  # ← reference equivalent to subscription_receiver
 ) -> List[Dict[str, Any]]:
     """
-    Trigger-safe validator:
-      - Validate RAW payload (not enriched)
-      - Enrich AFTER validation
-      - Payload fields first, metadata fields LAST
-      - ABSOLUTE order lock using OrderedDict
-      - Never raises (prevents retries/DLQ)
+    Trigger-safe validator using FIRST function behaviour:
+      - Explicit dead-letter for invalid payloads
+      - No auto-delete
+      - Payload first, metadata last
     """
 
     valid_with_properties: List[Dict[str, Any]] = []
@@ -231,7 +236,21 @@ def get_payloads_and_validate(
     for m in messages:
         try:
             # 1) RAW payload
-            payload = json.loads(m.get_body().decode("utf-8"))
+            try:
+                payload = json.loads(m.get_body().decode("utf-8"))
+            except Exception as ex:
+                logging.error(
+                    "[Invalid JSON] message_id=%s error=%s",
+                    getattr(m, "message_id", "<unknown>"),
+                    ex,
+                )
+                # ✅ SAME AS subscription_receiver.dead_letter_message(...)
+                actions.dead_letter(
+                    message=m,
+                    reason="InvalidJson",
+                    error_description=str(ex),
+                )
+                continue
 
             # 2) Validate RAW payload
             errors = validate_data(payload, schema)
@@ -241,46 +260,56 @@ def get_payloads_and_validate(
                     getattr(m, "message_id", "<unknown>"),
                     errors,
                 )
+                # ✅ SAME AS FIRST FUNCTION
+                actions.dead_letter(
+                    message=m,
+                    reason="SchemaValidationFailed",
+                    error_description="; ".join(map(str, errors)),
+                )
                 continue
 
             # 3) Metadata extraction
             message_type = None
-            props = getattr(m, "application_properties", None)
-            if props:
-                raw_type = props.get(b"type") or props.get("type")
-                if raw_type is not None:
-                    message_type = (
-                        raw_type.decode("utf-8")
-                        if isinstance(raw_type, (bytes, bytearray))
-                        else str(raw_type)
-                    )
-
-            message_enqueued_time_utc = None
-            if getattr(m, "enqueued_time_utc", None):
-                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
-                    "%Y-%m-%dT%H:%M:%S.%f%z"
+            props = getattr(m, "application_properties", None) or {}
+            raw_type = props.get(b"type") or props.get("type")
+            if raw_type:
+                message_type = (
+                    raw_type.decode("utf-8")
+                    if isinstance(raw_type, (bytes, bytearray))
+                    else str(raw_type)
                 )
+
+            message_enqueued_time_utc = (
+                m.enqueued_time_utc.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+                if getattr(m, "enqueued_time_utc", None)
+                else None
+            )
 
             message_id = getattr(m, "message_id", None)
 
-            # ✅ Order is now BULLETPROOF
+            # 4) Enrich payload (same behaviour as FIRST)
             enriched = OrderedDict()
-
-            # payload fields first
             for k, v in payload.items():
                 enriched[k] = v
 
-            # metadata LAST
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
 
             valid_with_properties.append(enriched)
 
-        except Exception:
+            # ✅ SAME AS subscription_receiver.complete_message(...)
+            actions.complete(message=m)
+
+        except Exception as ex:
             logging.exception(
                 "[Processing Error] message_id=%s",
                 getattr(m, "message_id", "<unknown>"),
+            )
+            actions.dead_letter(
+                message=m,
+                reason="ProcessingError",
+                error_description=str(ex),
             )
 
     return valid_with_properties
