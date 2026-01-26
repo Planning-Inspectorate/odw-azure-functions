@@ -10,7 +10,7 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from azure.servicebus import ServiceBusClient
 # Your validator (adjust the module path if different)
-from validate_messages import validate_data,validate_data_trigger
+from validate_messages import validate_data
 
 def send_to_storage(
     account_url: str,
@@ -234,7 +234,7 @@ def get_payloads_and_validate(
             payload = json.loads(m.get_body().decode("utf-8"))
 
             # 2) Validate RAW payload
-            errors = validate_data_trigger(payload, schema)
+            errors = validate_data(payload, schema)
             if errors:
                 logging.error(
                     "[Validation Failed] message_id=%s errors=%s",
