@@ -231,6 +231,12 @@ import azure.functions as func
 # _app
 
 
+
+import json
+import logging
+from typing import Any, Dict, List
+import azure.functions as func
+
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -239,7 +245,7 @@ def get_payloads_and_validate(
     Trigger-safe validator:
       - Validate RAW payload (not enriched)
       - Enrich AFTER validation
-      - Field order: message_type, message_enqueued_time_utc, message_id, <payload fields>
+      - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
       - Robust message_type extraction (matches existing function)
       - Excludes delivery_count and content_type
 
@@ -269,10 +275,8 @@ def get_payloads_and_validate(
                 raise ValueError(f"Schema validation failed: {errors}")
 
             # 3) Extract metadata (unchanged logic)
-
             message_type = None
             props = getattr(m, "application_properties", None)
-
             if props:
                 raw_type = None
                 if b"type" in props:
@@ -293,14 +297,14 @@ def get_payloads_and_validate(
                     "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            # 4) Enrich AFTER validation (order preserved)
-            enriched: Dict[str, Any] = {
-                "message_type": message_type,
-                "message_enqueued_time_utc": message_enqueued_time_utc,
-                "message_id": message_id,
-            }
+            # 4) Enrich AFTER validation (metadata appended at the END)
+            #    - Start with the original payload to preserve its field order
+            #    - Then add metadata so it appears at the end of the dict
+            enriched: Dict[str, Any] = dict(payload)  # make a shallow copy to avoid mutating original
+            enriched["message_type"] = message_type
+            enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+            enriched["message_id"] = message_id
 
-            enriched.update(payload)
             valid_with_properties.append(enriched)
 
         except Exception:
