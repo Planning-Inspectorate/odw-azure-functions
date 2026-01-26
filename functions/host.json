@@ -18,11 +18,16 @@
 
   "extensions": {
     "serviceBus": {
-      "messageHandlerOptions": {
-        "autoComplete": true,
-        "maxConcurrentCalls": 1,
-        "maxAutoRenewDuration": "00:05:00"
-      }
+      "autoCompleteMessages": true,
+
+      "maxConcurrentCalls": 1,
+
+      "maxMessageBatchSize": 5,
+      "minMessageBatchSize": 1,
+      "maxBatchWaitTime": "00:00:05",
+
+      "prefetchCount": 50,
+      "maxAutoLockRenewalDuration": "00:05:00"
     }
   }
 }

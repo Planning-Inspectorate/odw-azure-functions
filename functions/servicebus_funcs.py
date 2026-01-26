@@ -213,6 +213,24 @@ def get_messages_and_validate(
     return valid_with_properties
 
 
+import json
+import logging
+from typing import Any, Dict, List
+
+import azure.functions as func
+
+# These already exist in your project
+# -----------------------------------
+# validate_data
+# send_to_storage_trigger
+# _SCHEMAS
+# _STORAGE
+# _CREDENTIAL
+# _CONTAINER
+# config
+# _app
+
+
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -224,13 +242,19 @@ def get_payloads_and_validate(
       - Field order: message_type, message_enqueued_time_utc, message_id, <payload fields>
       - Robust message_type extraction (matches existing function)
       - Excludes delivery_count and content_type
-      - Never raises (prevents retries/DLQ)
+
+    IMPORTANT:
+      - Validation and processing failures RAISE
+      - This enables retry + DLQ and prevents silent data loss
     """
+
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
+        message_id = getattr(m, "message_id", "<unknown>")
+
         try:
-            # 1) RAW payload only
+            # 1) Decode RAW payload
             payload = json.loads(m.get_body().decode("utf-8"))
 
             # 2) Validate RAW payload
@@ -238,47 +262,36 @@ def get_payloads_and_validate(
             if errors:
                 logging.error(
                     "[Validation Failed] message_id=%s errors=%s",
-                    getattr(m, "message_id", "<unknown>"),
+                    message_id,
                     errors,
                 )
-                continue
+                # RAISE -> retry + DLQ
+                raise ValueError(f"Schema validation failed: {errors}")
 
-            # 3) Extract metadata safely (MATCH EXISTING FUNCTION)
+            # 3) Extract metadata (unchanged logic)
 
-            # ✅ FIX: message_type from application_properties[b"type"]
             message_type = None
             props = getattr(m, "application_properties", None)
 
             if props:
                 raw_type = None
-
-                # Match existing implementation exactly
                 if b"type" in props:
                     raw_type = props.get(b"type")
-                elif "type" in props:  # fallback only
+                elif "type" in props:
                     raw_type = props.get("type")
 
                 if raw_type is not None:
-                    if isinstance(raw_type, (bytes, bytearray)):
-                        message_type = raw_type.decode("utf-8")
-                    else:
-                        message_type = str(raw_type)
-
-            # message_enqueued_time_utc (same format as existing function)
-            message_enqueued_time_utc = None
-            try:
-                if getattr(m, "enqueued_time_utc", None):
-                    message_enqueued_time_utc = m.enqueued_time_utc.strftime(
-                        "%Y-%m-%dT%H:%M:%S.%f%z"
+                    message_type = (
+                        raw_type.decode("utf-8")
+                        if isinstance(raw_type, (bytes, bytearray))
+                        else str(raw_type)
                     )
-            except Exception:
-                logging.debug(
-                    "Invalid enqueued_time_utc for message_id=%s",
-                    getattr(m, "message_id", "<unknown>"),
-                )
 
-            # message_id
-            message_id = getattr(m, "message_id", None)
+            message_enqueued_time_utc = None
+            if getattr(m, "enqueued_time_utc", None):
+                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                    "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
 
             # 4) Enrich AFTER validation (order preserved)
             enriched: Dict[str, Any] = {
@@ -288,15 +301,19 @@ def get_payloads_and_validate(
             }
 
             enriched.update(payload)
-
             valid_with_properties.append(enriched)
 
         except Exception:
-            # Never raise in trigger path
             logging.exception(
                 "[Processing Error] message_id=%s",
-                getattr(m, "message_id", "<unknown>"),
+                message_id,
             )
-            continue
+            # RAISE so Azure retries / DLQs
+            raise
 
     return valid_with_properties
+
+
+
+
+

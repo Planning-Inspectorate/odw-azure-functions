@@ -15,6 +15,7 @@ import os
 from typing import List
 
 
+
 _STORAGE = ""
 _CONTAINER = ""
 _NAMESPACE = ""
@@ -943,7 +944,9 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     connection="ServiceBusConnectionAppeals",
     cardinality=func.Cardinality.MANY,
 )
-def appealdocument_servicebus(messages) -> None:
+def appealdocument_servicebus(
+    messages: List[func.ServiceBusMessage],
+) -> None:
     """
     DEAD-LETTER SAFE SERVICE BUS TRIGGER
     """
@@ -957,16 +960,17 @@ def appealdocument_servicebus(messages) -> None:
 
     payloads = get_payloads_and_validate(messages, schema)
 
-    if not payloads:
-        logging.warning("No valid messages in batch")
-        return
-    send_to_storage_trigger(
+    success = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
         container=_CONTAINER,
         entity=topic,
         data=payloads,
     )
+
+    # Storage failure MUST raise
+    if not success:
+        raise RuntimeError("Storage upload failed")
 
     logging.info(
         "Processed batch: received=%d stored=%d",
