@@ -19,15 +19,13 @@
   "extensions": {
     "serviceBus": {
       "autoCompleteMessages": false,
-
       "maxConcurrentCalls": 1,
-
       "maxMessageBatchSize": 5,
       "minMessageBatchSize": 1,
       "maxBatchWaitTime": "00:00:05",
-
-      "prefetchCount": 50,
+      "prefetchCount": 0,
       "maxAutoLockRenewalDuration": "00:05:00"
+
     }
   }
 }
