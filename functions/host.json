@@ -18,7 +18,7 @@
 
   "extensions": {
     "serviceBus": {
-      "autoCompleteMessages": true,
+      "autoCompleteMessages": false,
 
       "maxConcurrentCalls": 1,
 

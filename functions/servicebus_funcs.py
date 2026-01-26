@@ -212,31 +212,6 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
-
-import json
-import logging
-from typing import Any, Dict, List
-
-import azure.functions as func
-
-# These already exist in your project
-# -----------------------------------
-# validate_data
-# send_to_storage_trigger
-# _SCHEMAS
-# _STORAGE
-# _CREDENTIAL
-# _CONTAINER
-# config
-# _app
-
-
-
-import json
-import logging
-from typing import Any, Dict, List
-import azure.functions as func
-
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
