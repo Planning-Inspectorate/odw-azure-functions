@@ -958,22 +958,41 @@ def appealdocument_servicebus(
         logging.warning("Empty batch received")
         return
 
-    payloads = get_payloads_and_validate(messages, schema)
+    # --- added wrapper, existing logic left intact ---
+    try:
+        payloads = get_payloads_and_validate(messages, schema)
 
-    success = send_to_storage_trigger(
-        account_url=_STORAGE,
-        credential=_CREDENTIAL,
-        container=_CONTAINER,
-        entity=topic,
-        data=payloads,
-    )
+        success = send_to_storage_trigger(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=topic,
+            data=payloads,
+        )
 
-    # Storage failure MUST raise
-    if not success:
-        raise RuntimeError("Storage upload failed")
+        # Storage failure MUST raise
+        if not success:
+            raise RuntimeError("Storage upload failed")
 
-    logging.info(
-        "Processed batch: received=%d stored=%d",
-        len(messages),
-        len(payloads),
-    )
+        logging.info(
+            "Processed batch: received=%d stored=%d",
+            len(messages),
+            len(payloads),
+        )
+
+    except Exception as exc:
+        # Log all message_ids in this batch + the original exception text
+        ids = []
+        for m in messages:
+            try:
+                ids.append(getattr(m, "message_id", "<unknown>"))
+            except Exception:
+                ids.append("<error-reading-id>")
+
+        logging.error(
+            "appeal-document batch failed, message_ids=%s, error=%s",
+            ids,
+            repr(exc),
+        )
+        # Re-raise so Service Bus still retries and eventually DLQs
+        raise
