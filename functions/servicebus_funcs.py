@@ -3,14 +3,15 @@ from __future__ import annotations
 import json
 import logging
 from collections import OrderedDict
-from typing import Any, Dict, List, NamedTuple,Optional
+from typing import Any, Dict, List, Optional
 # Keep just this; don't also import ServiceBusMessage directly
 import azure.functions as func
 from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient,ContentSettings
+from azure.storage.blob import BlobServiceClient
 from azure.servicebus import ServiceBusClient
 # Your validator (adjust the module path if different)
 from validate_messages import validate_data
+
 def send_to_storage(
     account_url: str,
     credential: DefaultAzureCredential,
@@ -59,6 +60,14 @@ def send_to_storage(
         raise e
 
     return len(data)
+
+from typing import Any, Dict, List, Optional
+import json
+import logging
+import uuid
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient, ContentSettings
+
 
 def send_to_storage_trigger(
     account_url: str,
@@ -227,56 +236,39 @@ def get_payloads_and_validate(
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
-    Trigger-safe validator (batch-friendly):
+    Trigger-safe validator:
+      - Validate RAW payload (not enriched)
+      - Enrich AFTER validation
+      - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
+      - Robust message_type extraction (matches existing function)
+      - Excludes delivery_count and content_type
 
-    - Never raises for per-message validation/parse errors.
-    - Returns only valid payloads (enriched), skipping invalid ones.
-    - Enrichment happens AFTER validation for the valid ones only.
-    - Excludes delivery_count and content_type as requested.
-    - Metadata fields appended at the END in this order:
-        message_type, message_enqueued_time_utc, message_id
-
-    Assumes a callable `validate_data(payload: Dict, schema: Dict) -> List[str]`
-    is available; it should return [] when valid or a list of error strings when invalid.
+    IMPORTANT:
+      - Validation and processing failures RAISE
+      - This enables retry + DLQ and prevents silent data loss
     """
+
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         message_id = getattr(m, "message_id", "<unknown>")
-        raw_text: Optional[str] = None
 
         try:
-            # ---- 1) Decode RAW payload
-            body = m.get_body() if hasattr(m, "get_body") else getattr(m, "body", None)
+            # 1) Decode RAW payload
+            payload = json.loads(m.get_body().decode("utf-8"))
 
-            if isinstance(body, (bytes, bytearray)):
-                raw_text = body.decode("utf-8")
-                payload = json.loads(raw_text)
-
-            elif isinstance(body, str):
-                raw_text = body
-                payload = json.loads(raw_text)
-
-            elif isinstance(body, dict):
-                payload = body
-                raw_text = json.dumps(body, ensure_ascii=False)
-
-            else:
-                raise ValueError(f"Unsupported message body type: {type(body)}")
-
-            # ---- 2) Validate RAW payload (no enrichment yet)
+            # 2) Validate RAW payload
             errors = validate_data(payload, schema)
             if errors:
-                logging.warning(
-                    "[Validation Failed] message_id=%s errors=%s raw=%s",
+                logging.error(
+                    "[Validation Failed] message_id=%s errors=%s",
                     message_id,
                     errors,
-                    raw_text,
                 )
-                # Skip this message; do NOT raise
-                continue
+                # RAISE -> retry + DLQ
+                raise ValueError(f"Schema validation failed: {errors}")
 
-            # ---- 3) Extract metadata (robust type extraction)
+            # 3) Extract metadata (unchanged logic)
             message_type = None
             props = getattr(m, "application_properties", None)
             if props:
@@ -294,26 +286,28 @@ def get_payloads_and_validate(
                     )
 
             message_enqueued_time_utc = None
-            enq = getattr(m, "enqueued_time_utc", None)
-            if enq:
-                try:
-                    message_enqueued_time_utc = enq.strftime("%Y-%m-%dT%H:%M:%S.%f%z") or None
-                except Exception:
-                    message_enqueued_time_utc = str(enq)
+            if getattr(m, "enqueued_time_utc", None):
+                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                    "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
 
-            # ---- 4) Enrich AFTER validation; append metadata at the end
-            enriched: Dict[str, Any] = dict(payload)  # preserve payload order
+            # 4) Enrich AFTER validation (metadata appended at the END)
+            #    - Start with the original payload to preserve its field order
+            #    - Then add metadata so it appears at the end of the dict
+            enriched: Dict[str, Any] = dict(payload)  # make a shallow copy to avoid mutating original
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
 
             valid_with_properties.append(enriched)
 
-        except Exception as ex:
-            # Per-message processing error: capture & continue (no raise)
-            logging.exception("[Processing Error] message_id=%s raw=%s", message_id, raw_text)
-            # Skip this message
-            continue
+        except Exception:
+            logging.exception(
+                "[Processing Error] message_id=%s",
+                message_id,
+            )
+            # RAISE so Azure retries / DLQs
+            raise
 
     return valid_with_properties
 
