@@ -1,4 +1,3 @@
-
 {
   "version": "2.0",
 
@@ -13,22 +12,16 @@
 
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
-    "version": "[4.*, 5.0.0)"
+    "version": "[4.0.0, 5.0.0)"
   },
 
-"extensions": {
-  "serviceBus": {
-    "messageProcessingOptions": {
-      "autoCompleteMessages": false,
-      "maxConcurrentCalls": 1,
-      "maxAutoLockRenewalDuration": "00:05:00"
-    },
-    "batchOptions": {
-      "maxMessageCount": 5,
-      "minMessageCount": 1,
-      "maxWaitTime": "00:00:05",
-      "prefetchCount": 0
+  "extensions": {
+    "serviceBus": {
+      "messageProcessingOptions": {
+        "autoCompleteMessages": false,
+        "maxConcurrentCalls": 1,
+        "maxMessageBatchSize": 5
+      }
     }
   }
-}
 }
