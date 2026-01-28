@@ -16,16 +16,19 @@
     "version": "[4.*, 5.0.0)"
   },
 
-  "extensions": {
-    "serviceBus": {
+"extensions": {
+  "serviceBus": {
+    "messageProcessingOptions": {
       "autoCompleteMessages": false,
       "maxConcurrentCalls": 1,
-      "maxMessageBatchSize": 5,
-      "minMessageBatchSize": 1,
-      "maxBatchWaitTime": "00:00:05",
-      "prefetchCount": 0,
       "maxAutoLockRenewalDuration": "00:05:00"
-
+    },
+    "batchOptions": {
+      "maxMessageCount": 5,
+      "minMessageCount": 1,
+      "maxWaitTime": "00:00:05",
+      "prefetchCount": 0
     }
   }
+}
 }

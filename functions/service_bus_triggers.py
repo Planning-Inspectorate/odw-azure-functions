@@ -21,35 +21,10 @@ blob_service = BlobServiceClient(
     account_url=ACCOUNT_URL,
     credential=DefaultAzureCredential()
 )
-
-
-def register_batch_trigger(
-    entity: str,
-    topic_env: str,
-    subscription_env: str,
-    connection_setting: str = "ServiceBusConnection",
-):
-    """
-    Registers a Service Bus Topic batch trigger for the given entity.
-
-    - Receives messages in batches
-    - Writes one JSON array per invocation to Blob Storage
-    - FAILS FAST:
-      * Any decode/validation failure -> raise (retry entire batch)
-      * Any storage upload failure -> raise (retry entire batch)
-    """
-
-    topic_name = os.environ.get(topic_env)
-    subscription_name = os.environ.get(subscription_env)
-
-    if not topic_name or not subscription_name:
-        raise RuntimeError(
-            f"Missing required environment variables: "
-            f"{topic_env}, {subscription_env}"
-        )
-
-    @app.function_name(name=f"{entity}_batch_trigger")
-    @app.service_bus_topic_trigger(
+topic_name = os.environ.get(topic_env)
+subscription_name = os.environ.get(subscription_env)
+@app.function_name(name=f"{entity}_batch_trigger")
+@app.service_bus_topic_trigger(
         arg_name="messages",
         topic_name=topic_name,
         subscription_name=subscription_name,
@@ -57,13 +32,12 @@ def register_batch_trigger(
         data_type=func.DataType.STRING,
         cardinality=func.Cardinality.MANY
     )
-    def _handler(messages: List[func.ServiceBusMessage]) -> None:
+def _handler(messages: List[func.ServiceBusMessage]) -> None:
         logging.info(f"[{entity}] Service Bus batch trigger fired: {len(messages)} message(s)")
 
         decoded_payloads: List[str] = []
         failed: List[Tuple[str, str]] = []  # (message_id, error_text)
-
-        # 1) Decode all messages first (no storage yet)
+        # Decode all messages first (no storage yet)
         for msg in messages:
             mid = getattr(msg, "message_id", "<unknown>")
             try:
@@ -74,7 +48,7 @@ def register_batch_trigger(
                 logging.error(f"[{entity}] {err}")
                 failed.append((mid, str(e)))
 
-        # 2) If any decode failed -> raise to force retry/DLQ path
+        # If any decode failed -> raise to force retry/DLQ path
         if failed:
             # Raising ensures:
             # - With autoCompleteMessages=false, the batch is NOT completed
