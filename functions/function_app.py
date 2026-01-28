@@ -938,6 +938,7 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
+
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="messages",
@@ -961,9 +962,12 @@ def appealdocument_servicebus(messages) -> None:
     payloads = get_payloads_and_validate(messages, schema)
 
     if not payloads:
+        # Valid no-op; do not raise or retry.
         logging.warning("No valid messages in batch")
+        logging.info("Processed batch: received=%d stored=%d", len(messages), 0)
         return
-    send_to_storage_trigger(
+
+    uploaded = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
         container=_CONTAINER,
@@ -971,8 +975,10 @@ def appealdocument_servicebus(messages) -> None:
         data=payloads,
     )
 
-    logging.info(
-        "Processed batch: received=%d stored=%d",
-        len(messages),
-        len(payloads),
-    )
+    # Only raise on actual storage failure (None), not on empty payloads (0)
+    if uploaded is None:
+        # Real failure: let Functions runtime perform retries; may eventually DLQ.
+        raise RuntimeError("Storage upload failed")
+
+    logging.info("Processed batch: received=%d stored=%d", len(messages), uploaded or 0)
+

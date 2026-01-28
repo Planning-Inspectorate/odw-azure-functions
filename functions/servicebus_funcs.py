@@ -61,42 +61,61 @@ def send_to_storage(
 
     return len(data)
 
+from typing import Any, Dict, List, Optional
+import json
+import logging
+import uuid
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient, ContentSettings
+
+
 def send_to_storage_trigger(
     account_url: str,
     credential: DefaultAzureCredential,
     container: str,
     entity: str,
     data: List[Dict[str, Any]],
-) -> int:
+) -> Optional[int]:
     """
     Safe blob uploader.
+
+    Returns:
+        - positive int: number of records uploaded (success)
+        - 0: no valid payloads (nothing to upload)
+        - None: upload attempt failed (transient/permanent storage error)
+
     Never raises to caller.
     """
 
     if not data:
-        logging.warning("No valid data to upload")
+        # Important: this is not a failure; just nothing to do.
+        logging.info("No valid data to upload for entity '%s'; skipping blob write.", entity)
         return 0
 
+    # Keep your date/time partitioning but ensure uniqueness with a GUID.
     from var_funcs import current_date, current_time
 
-    filename = (
-        f"{entity}/{current_date()}/"
-        f"{entity}_{current_time()}.json"
-    )
+    guid = uuid.uuid4().hex  # 32 chars, no hyphens
+    filename = f"{entity}/{current_date()}/{entity}_{current_time()}_{guid}.json"
 
     try:
-        blob_service = BlobServiceClient(account_url, credential)
-        blob_client = blob_service.get_blob_client(container, filename)
+        blob_service = BlobServiceClient(account_url=account_url, credential=credential)
+        blob_client = blob_service.get_blob_client(container=container, blob=filename)
+
         blob_client.upload_blob(
-            json.dumps(data),
-            overwrite=True,
+            json.dumps(data, ensure_ascii=False),
+            overwrite=False,  # with GUID we do not expect collisions; fail fast if it ever happens
+            content_settings=ContentSettings(content_type="application/json; charset=utf-8"),
         )
+
         logging.info("Uploaded %d records to %s", len(data), filename)
         return len(data)
 
     except Exception:
-        logging.exception("Storage upload failed")
-        return 0
+        # This is a real failure and should cause the trigger to retry.
+        logging.exception("Storage upload failed for blob %s", filename)
+        return None
+    
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
