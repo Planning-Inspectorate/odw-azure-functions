@@ -224,28 +224,26 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
-
 def get_payloads_and_validate(
-    messages: List[ServiceBusMessage],
+    messages: List[Any],
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
-    Trigger-safe validator for Service Bus batch processing:
+    Trigger-safe validator:
       - Validate RAW payload (not enriched)
-      - Enrich AFTER validation 
+      - Enrich AFTER validation
       - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
       - Robust message_type extraction (matches existing function)
       - Excludes delivery_count and content_type
-      - **Invalid messages → DLQ individually** (no data loss)
-      - Valid messages → process normally
 
     IMPORTANT:
-      - Schema failures → deadletter individual message (preserves data)
-      - Processing failures → deadletter individual message  
-      - Function succeeds → good messages auto-complete, bad ones in DLQ
+      - Collects ALL validation errors across batch
+      - Raises AT END if ANY failures → entire batch retries → Azure Service Bus → DLQ
+      - Preserves all valid messages for retry
     """
+
     valid_with_properties: List[Dict[str, Any]] = []
-    deadlettered_count = 0
+    validation_errors = []
 
     for m in messages:
         message_id = getattr(m, "message_id", "<unknown>")
@@ -258,19 +256,14 @@ def get_payloads_and_validate(
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
-                    "[Validation Failed → DLQ] message_id=%s errors=%s",
+                    "[Validation Failed] message_id=%s errors=%s",
                     message_id,
                     errors,
                 )
-                # DEAD-LETTER THIS SPECIFIC MESSAGE (preserves for investigation)
-                m.deadletter(
-                    reason="SchemaValidationFailed",
-                    description=json.dumps({"errors": errors, "message_id": message_id})
-                )
-                deadlettered_count += 1
-                continue
+                validation_errors.append({"message_id": message_id, "errors": errors})
+                continue  # Skip but preserve for batch retry
 
-            # 3) Extract metadata (unchanged logic)
+            # 3) Extract metadata (UNCHANGED logic)
             message_type = None
             props = getattr(m, "application_properties", None)
             if props:
@@ -301,31 +294,19 @@ def get_payloads_and_validate(
 
             valid_with_properties.append(enriched)
 
-        except json.JSONDecodeError as e:
-            logging.error("[JSON Decode Failed → DLQ] message_id=%s error=%s", message_id, str(e))
-            m.deadletter(
-                reason="JSONDecodeError", 
-                description=f"Failed to decode message body: {str(e)}"
-            )
-            deadlettered_count += 1
-            continue
         except Exception:
-            logging.exception("[Processing Error → DLQ] message_id=%s", message_id)
-            m.deadletter(
-                reason="ProcessingFailed",
-                description="Unexpected processing error during validation/enrichment"
-            )
-            deadlettered_count += 1
+            logging.exception("[Processing Error] message_id=%s", message_id)
+            validation_errors.append({"message_id": message_id, "error": "Processing failed"})
             continue
 
-    if deadlettered_count > 0:
-        logging.warning(
-            "[Batch Summary] Processed %d valid, DLQ'd %d invalid messages", 
-            len(valid_with_properties), 
-            deadlettered_count
-        )
+    # **RAISE AT END** → Azure retries entire batch → goes to DLQ after maxDeliveryCount
+    if validation_errors:
+        error_summary = json.dumps(validation_errors, indent=2)
+        logging.error("[BATCH FAILED] %d validation errors: %s", len(validation_errors), error_summary)
+        raise ValueError(f"Batch validation failed: {len(validation_errors)} errors. Details logged.")
 
     return valid_with_properties
+
 
 
 
