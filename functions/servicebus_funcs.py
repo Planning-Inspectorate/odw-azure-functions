@@ -4,7 +4,6 @@ import json
 import logging
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
-# Keep just this; don't also import ServiceBusMessage directly
 import azure.functions as func
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient,ContentSettings
@@ -237,13 +236,11 @@ def get_payloads_and_validate(
       - Excludes delivery_count and content_type
 
     IMPORTANT:
-      - Collects ALL validation errors across batch
-      - Raises AT END if ANY failures → entire batch retries → Azure Service Bus → DLQ
-      - Preserves all valid messages for retry
+      - Validation and processing failures RAISE
+      - This enables retry + DLQ and prevents silent data loss
     """
 
     valid_with_properties: List[Dict[str, Any]] = []
-    validation_errors = []
 
     for m in messages:
         message_id = getattr(m, "message_id", "<unknown>")
@@ -260,10 +257,10 @@ def get_payloads_and_validate(
                     message_id,
                     errors,
                 )
-                validation_errors.append({"message_id": message_id, "errors": errors})
-                continue  # Skip but preserve for batch retry
+                # RAISE -> retry + DLQ
+                raise ValueError(f"Schema validation failed: {errors}")
 
-            # 3) Extract metadata (UNCHANGED logic)
+            # 3) Extract metadata (unchanged logic)
             message_type = None
             props = getattr(m, "application_properties", None)
             if props:
@@ -286,8 +283,10 @@ def get_payloads_and_validate(
                     "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            # 4) Enrich AFTER validation (metadata appended at END)
-            enriched: Dict[str, Any] = dict(payload)  # shallow copy preserves field order
+            # 4) Enrich AFTER validation (metadata appended at the END)
+            #    - Start with the original payload to preserve its field order
+            #    - Then add metadata so it appears at the end of the dict
+            enriched: Dict[str, Any] = dict(payload)  # make a shallow copy to avoid mutating original
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
@@ -295,19 +294,14 @@ def get_payloads_and_validate(
             valid_with_properties.append(enriched)
 
         except Exception:
-            logging.exception("[Processing Error] message_id=%s", message_id)
-            validation_errors.append({"message_id": message_id, "error": "Processing failed"})
-            continue
-
-    # **RAISE AT END** → Azure retries entire batch → goes to DLQ after maxDeliveryCount
-    if validation_errors:
-        error_summary = json.dumps(validation_errors, indent=2)
-        logging.error("[BATCH FAILED] %d validation errors: %s", len(validation_errors), error_summary)
-        raise ValueError(f"Batch validation failed: {len(validation_errors)} errors. Details logged.")
+            logging.exception(
+                "[Processing Error] message_id=%s",
+                message_id,
+            )
+            # RAISE so Azure retries / DLQs
+            raise
 
     return valid_with_properties
-
-
 
 
 

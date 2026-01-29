@@ -10,8 +10,6 @@ import azure.functions as func
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
-# Reuse the single FunctionApp instance
-from function_app import _app as app
 
 # ---------- Storage configuration ----------
 ACCOUNT_URL = os.environ["MESSAGE_STORAGE_ACCOUNT"]
@@ -36,8 +34,7 @@ def _handler(messages: List[func.ServiceBusMessage]) -> None:
         logging.info(f"[{entity}] Service Bus batch trigger fired: {len(messages)} message(s)")
 
         decoded_payloads: List[str] = []
-        failed: List[Tuple[str, str]] = []  # (message_id, error_text)
-        # Decode all messages first (no storage yet)
+        failed: List[Tuple[str, str]] = []  # (message_id, error_text)# Decode all messages first (no storage yet)
         for msg in messages:
             mid = getattr(msg, "message_id", "<unknown>")
             try:
