@@ -223,6 +223,9 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
+
+import time  # ✅ added
+
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -239,6 +242,9 @@ def get_payloads_and_validate(
       - Validation and processing failures RAISE
       - This enables retry + DLQ and prevents silent data loss
     """
+
+    # ⏳ wait 10 minutes before processing
+    time.sleep(600)  # ✅ added
 
     valid_with_properties: List[Dict[str, Any]] = []
 
@@ -284,8 +290,6 @@ def get_payloads_and_validate(
                 )
 
             # 4) Enrich AFTER validation (metadata appended at the END)
-            #    - Start with the original payload to preserve its field order
-            #    - Then add metadata so it appears at the end of the dict
             enriched: Dict[str, Any] = dict(payload)  # make a shallow copy to avoid mutating original
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
@@ -302,6 +306,7 @@ def get_payloads_and_validate(
             raise
 
     return valid_with_properties
+
 
 
 
