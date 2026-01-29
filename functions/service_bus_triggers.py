@@ -48,7 +48,7 @@ def _handler(messages: List[func.ServiceBusMessage]) -> None:
                 logging.error(f"[{entity}] {err}")
                 failed.append((mid, str(e)))
 
-        # If any decode failed -> raise to force retry/DLQ path
+        # 2) If any decode failed -> raise to force retry/DLQ path
         if failed:
             # Raising ensures:
             # - With autoCompleteMessages=false, the batch is NOT completed

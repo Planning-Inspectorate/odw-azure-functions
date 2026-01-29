@@ -13,7 +13,6 @@ from azure.functions.decorators.core import DataType
 import json
 import os
 from typing import List
-import service_bus_triggers
 
 
 
