@@ -7,10 +7,11 @@ from typing import Any, Dict, List, Optional
 # Keep just this; don't also import ServiceBusMessage directly
 import azure.functions as func
 from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient,ContentSettings
 from azure.servicebus import ServiceBusClient
 # Your validator (adjust the module path if different)
 from validate_messages import validate_data
+from azure.functions import ServiceBusMessage
 
 def send_to_storage(
     account_url: str,
@@ -60,14 +61,6 @@ def send_to_storage(
         raise e
 
     return len(data)
-
-from typing import Any, Dict, List, Optional
-import json
-import logging
-import uuid
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient, ContentSettings
-
 
 def send_to_storage_trigger(
     account_url: str,
@@ -230,26 +223,29 @@ def get_messages_and_validate(
         raise e
 
     return valid_with_properties
+
+
 def get_payloads_and_validate(
-    messages: List[Any],
+    messages: List[ServiceBusMessage],
     schema: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
-    Trigger-safe validator:
+    Trigger-safe validator for Service Bus batch processing:
       - Validate RAW payload (not enriched)
-      - Enrich AFTER validation
+      - Enrich AFTER validation 
       - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
       - Robust message_type extraction (matches existing function)
       - Excludes delivery_count and content_type
+      - **Invalid messages → DLQ individually** (no data loss)
+      - Valid messages → process normally
 
     IMPORTANT:
-      - Validation and processing failures RAISE at **batch** level only if something
-        outside per‑message validation fails.
-      - Individual invalid messages are logged and skipped, so other valid messages
-        in the batch can still be processed.
+      - Schema failures → deadletter individual message (preserves data)
+      - Processing failures → deadletter individual message  
+      - Function succeeds → good messages auto-complete, bad ones in DLQ
     """
-
     valid_with_properties: List[Dict[str, Any]] = []
+    deadlettered_count = 0
 
     for m in messages:
         message_id = getattr(m, "message_id", "<unknown>")
@@ -262,12 +258,16 @@ def get_payloads_and_validate(
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
-                    "[Validation Failed] message_id=%s errors=%s",
+                    "[Validation Failed → DLQ] message_id=%s errors=%s",
                     message_id,
                     errors,
                 )
-                # DO NOT raise here – skip this message so the rest of the batch
-                # can complete without sending all messages to DLQ.
+                # DEAD-LETTER THIS SPECIFIC MESSAGE (preserves for investigation)
+                m.deadletter(
+                    reason="SchemaValidationFailed",
+                    description=json.dumps({"errors": errors, "message_id": message_id})
+                )
+                deadlettered_count += 1
                 continue
 
             # 3) Extract metadata (unchanged logic)
@@ -293,28 +293,40 @@ def get_payloads_and_validate(
                     "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            # 4) Enrich AFTER validation (metadata appended at the END)
-            #    - Start with the original payload to preserve its field order
-            #    - Then add metadata so it appears at the end of the dict
-            enriched: Dict[str, Any] = dict(
-                payload
-            )  # make a shallow copy to avoid mutating original
+            # 4) Enrich AFTER validation (metadata appended at END)
+            enriched: Dict[str, Any] = dict(payload)  # shallow copy preserves field order
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
 
             valid_with_properties.append(enriched)
 
-        except Exception:
-            logging.exception(
-                "[Processing Error] message_id=%s",
-                message_id,
+        except json.JSONDecodeError as e:
+            logging.error("[JSON Decode Failed → DLQ] message_id=%s error=%s", message_id, str(e))
+            m.deadletter(
+                reason="JSONDecodeError", 
+                description=f"Failed to decode message body: {str(e)}"
             )
-            # RAISE so Azure retries / DLQs only when there's a real processing error
-            # (deserialisation, unexpected exception, etc.).
-            raise
+            deadlettered_count += 1
+            continue
+        except Exception:
+            logging.exception("[Processing Error → DLQ] message_id=%s", message_id)
+            m.deadletter(
+                reason="ProcessingFailed",
+                description="Unexpected processing error during validation/enrichment"
+            )
+            deadlettered_count += 1
+            continue
+
+    if deadlettered_count > 0:
+        logging.warning(
+            "[Batch Summary] Processed %d valid, DLQ'd %d invalid messages", 
+            len(valid_with_properties), 
+            deadlettered_count
+        )
 
     return valid_with_properties
+
 
 
 
