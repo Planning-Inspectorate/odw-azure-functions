@@ -230,7 +230,6 @@ def get_messages_and_validate(
         raise e
 
     return valid_with_properties
-
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -244,8 +243,10 @@ def get_payloads_and_validate(
       - Excludes delivery_count and content_type
 
     IMPORTANT:
-      - Validation and processing failures RAISE
-      - This enables retry + DLQ and prevents silent data loss
+      - Validation and processing failures RAISE at **batch** level only if something
+        outside per‑message validation fails.
+      - Individual invalid messages are logged and skipped, so other valid messages
+        in the batch can still be processed.
     """
 
     valid_with_properties: List[Dict[str, Any]] = []
@@ -265,8 +266,9 @@ def get_payloads_and_validate(
                     message_id,
                     errors,
                 )
-                # RAISE -> retry + DLQ
-                raise ValueError(f"Schema validation failed: {errors}")
+                # DO NOT raise here – skip this message so the rest of the batch
+                # can complete without sending all messages to DLQ.
+                continue
 
             # 3) Extract metadata (unchanged logic)
             message_type = None
@@ -294,7 +296,9 @@ def get_payloads_and_validate(
             # 4) Enrich AFTER validation (metadata appended at the END)
             #    - Start with the original payload to preserve its field order
             #    - Then add metadata so it appears at the end of the dict
-            enriched: Dict[str, Any] = dict(payload)  # make a shallow copy to avoid mutating original
+            enriched: Dict[str, Any] = dict(
+                payload
+            )  # make a shallow copy to avoid mutating original
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
@@ -306,7 +310,8 @@ def get_payloads_and_validate(
                 "[Processing Error] message_id=%s",
                 message_id,
             )
-            # RAISE so Azure retries / DLQs
+            # RAISE so Azure retries / DLQs only when there's a real processing error
+            # (deserialisation, unexpected exception, etc.).
             raise
 
     return valid_with_properties
