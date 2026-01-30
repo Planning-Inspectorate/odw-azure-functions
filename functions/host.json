@@ -12,16 +12,20 @@
 
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
-    "version": "[4.0.0, 5.0.0)"
+    "version": "[4.*, 5.0.0)"
   },
 
   "extensions": {
     "serviceBus": {
-      "messageProcessingOptions": {
-        "autoCompleteMessages": false,
-        "maxConcurrentCalls": 1,
-        "maxMessageBatchSize": 8
-      }
+      "autoCompleteMessages": false,
+      "maxConcurrentCalls": 1,
+      "maxMessageBatchSize": 5,
+      "minMessageBatchSize": 1,
+      "maxBatchWaitTime": "00:00:05",
+      "prefetchCount": 0,
+      "maxAutoLockRenewalDuration": "00:05:00"
+
     }
   }
 }
+
