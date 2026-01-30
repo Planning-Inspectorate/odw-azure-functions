@@ -941,44 +941,52 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
 
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
-    arg_name="messages",
+    arg_name="message",  # Single message now
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    cardinality=func.Cardinality.MANY
+    cardinality=func.Cardinality.ONE  # ← Single message per invocation
 )
-def appealdocument_servicebus(messages) -> None:
+def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
     """
-    DEAD-LETTER SAFE SERVICE BUS TRIGGER
+    DEAD-LETTER SAFE SERVICE BUS TRIGGER (SINGLE MESSAGE)
     """
-
     schema = _SCHEMAS["appeal-document.schema.json"]
-    topic = config["global"]["entities"]["appeal-document"]["topic"]
-
-    if not messages:
-        logging.warning("Empty batch received")
-        return
-
-    payloads = get_payloads_and_validate(messages, schema)
-
-    if not payloads:
-        # Valid no-op; do not raise or retry.
-        logging.warning("No valid messages in batch")
-        logging.info("Processed batch: received=%d stored=%d", len(messages), 0)
-        return
-
-    uploaded = send_to_storage_trigger(
-        account_url=_STORAGE,
-        credential=_CREDENTIAL,
-        container=_CONTAINER,
-        entity=topic,
-        data=payloads,
-    )
-
-    # Only raise on actual storage failure (None), not on empty payloads (0)
-    if uploaded is None:
-        # Real failure: let Functions runtime perform retries; may eventually DLQ.
-        raise RuntimeError("Storage upload failed")
-
-    logging.info("Processed batch: received=%d stored=%d", len(messages), uploaded or 0)
+    
+    try:
+        # Validate single message
+        payload = get_payload_and_validate(message, schema)
+        
+        if not payload:
+            # Invalid payload → Dead-letter immediately (no retries)
+            message.deadletter(
+                dead_letter_reason="ValidationFailed",
+                dead_letter_description="Schema validation failed"
+            )
+            logging.warning("Dead-lettered invalid message: %s", message.message_id)
+            return
+        
+        # Storage upload
+        uploaded = send_to_storage_trigger(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=config["global"]["entities"]["appeal-document"]["topic"],
+            data=[payload],  # Single payload wrapped as list
+        )
+        
+        if uploaded is None:
+            # Storage failure → Abandon for retry (don't dead-letter)
+            message.abandon()
+            logging.error("Storage failure, abandoning message: %s", message.message_id)
+            return
+        
+        # Success → Complete
+        message.complete()
+        logging.info("Processed message: %s", message.message_id)
+        
+    except Exception as ex:
+        # Catch-all: abandon for retry
+        message.abandon()
+        logging.error("Unexpected error, abandoning: %s - %s", message.message_id, ex)
 
