@@ -222,7 +222,7 @@ def get_payloads_and_validate(
       - This enables retry + DLQ and prevents silent data loss
     """
     # ⏳ wait 10 minutes before processing
-    time.sleep(600)  # ✅ added
+    #time.sleep(600)  # ✅ added
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
