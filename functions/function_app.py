@@ -938,55 +938,62 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
-
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
-    arg_name="message",  # Single message now
+    arg_name="message",  # Single message 
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    cardinality=func.Cardinality.ONE  # ← Single message per invocation
+    cardinality=func.Cardinality.ONE  # Single message per invocation
 )
 def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
     """
     DEAD-LETTER SAFE SERVICE BUS TRIGGER (SINGLE MESSAGE)
     """
     schema = _SCHEMAS["appeal-document.schema.json"]
+    topic = config["global"]["entities"]["appeal-document"]["topic"]
+    
+    message_id = getattr(message, 'message_id', 'unknown')
+    logging.info(f"🔄 Processing message: {message_id}")
     
     try:
-        # Validate single message
-        payload = get_payload_and_validate(message, schema)
+        # FIXED: Call batch function with single message wrapped in list
+        payloads = get_payloads_and_validate([message], schema)
         
-        if not payload:
+        if not payloads:
             # Invalid payload → Dead-letter immediately (no retries)
             message.deadletter(
                 dead_letter_reason="ValidationFailed",
                 dead_letter_description="Schema validation failed"
             )
-            logging.warning("Dead-lettered invalid message: %s", message.message_id)
+            logging.warning(f"❌ Dead-lettered invalid message: {message_id}")
             return
         
-        # Storage upload
+        payload = payloads[0]  # Extract single payload
+        
+        # Storage upload - pass as list (your function expects batch format)
         uploaded = send_to_storage_trigger(
             account_url=_STORAGE,
             credential=_CREDENTIAL,
             container=_CONTAINER,
-            entity=config["global"]["entities"]["appeal-document"]["topic"],
+            entity=topic,
             data=[payload],  # Single payload wrapped as list
         )
         
-        if uploaded is None:
+        if uploaded is None or uploaded == 0:
             # Storage failure → Abandon for retry (don't dead-letter)
             message.abandon()
-            logging.error("Storage failure, abandoning message: %s", message.message_id)
+            logging.error(f"❌ Storage failure, abandoning message: {message_id}")
             return
         
-        # Success → Complete
+        # Success → Complete (CRITICAL: Always call this!)
         message.complete()
-        logging.info("Processed message: %s", message.message_id)
+        logging.info(f"✅ Processed message: {message_id} (stored: {uploaded})")
         
     except Exception as ex:
-        # Catch-all: abandon for retry
-        message.abandon()
-        logging.error("Unexpected error, abandoning: %s - %s", message.message_id, ex)
-
+        # Catch-all: abandon for retry (don't deadletter unexpected errors)
+        logging.error(f"💥 Unexpected error {message_id}: {str(ex)}", exc_info=True)
+        try:
+            message.abandon()
+        except:
+            pass  # If abandon fails, let lock expire (still retries)
