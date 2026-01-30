@@ -63,31 +63,47 @@ def send_to_storage(
 
     return len(data)
 
-def send_to_storage_trigger(
-    account_url: str, credential: DefaultAzureCredential,
-    container: str, entity: str, data: List[Dict[str, Any]]
-) -> Optional[int]:
+def send_to_storage_trigger(account_url, credential, container, entity, data):
     if not data:
-        logging.info("No valid data to upload for entity '%s'", entity)
+        logging.info("No data for %s", entity)
         return 0
-
-    from var_funcs import current_date, current_time
+        
     guid = uuid.uuid4().hex
     filename = f"{entity}/{current_date()}/{entity}_{current_time()}_{guid}.json"
-
+    
     try:
-        blob_service = BlobServiceClient(account_url=account_url, credential=credential)
-        blob_client = blob_service.get_blob_client(container=container, blob=filename)
+        blob_service = BlobServiceClient(account_url, credential)
+        container_client = blob_service.get_container_client(container)
+        
+        # DEBUG: Check container
+        try:
+            container_exists = container_client.exists()
+            logging.info("Container %s exists: %s", container, container_exists)
+        except Exception as ex:
+            logging.error("Container check failed: %s", ex)
+            return None
+        
+        blob_client = container_client.get_blob_client(filename)
+        
+        # DEBUG: Upload with overwrite
         blob_client.upload_blob(
             json.dumps(data, ensure_ascii=False),
-            overwrite=False,
-            content_settings=ContentSettings(content_type="application/json; charset=utf-8"),
+            overwrite=True,  # ← FIX: Force create
+            content_settings=ContentSettings(content_type="application/json")
         )
-        logging.info("Uploaded %d records to %s", len(data), filename)
-        return len(data)
-    except Exception:
-        logging.exception("Storage upload failed for blob %s", filename)
-        return None  # ✅ FIXED
+        
+        # VERIFY: Check blob was created
+        if blob_client.exists():
+            logging.info("✅ VERIFIED: Uploaded %d to %s", len(data), filename)
+            return len(data)
+        else:
+            logging.error("❌ UPLOAD FAILED - blob doesn't exist after upload!")
+            return None
+            
+    except Exception as ex:
+        logging.exception("Storage upload failed %s: %s", filename, ex)
+        return None
+
 
 
 def get_messages_and_validate(
