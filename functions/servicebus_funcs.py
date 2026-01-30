@@ -244,6 +244,8 @@ def get_payloads_and_validate(
       - This enables retry + DLQ and prevents silent data loss
     """
     
+    import time
+    time.sleep(600)
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
