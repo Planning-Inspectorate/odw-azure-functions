@@ -28,7 +28,9 @@ subscription_name = os.environ.get(subscription_env)
         subscription_name=subscription_name,
         connection=connection_setting,
         data_type=func.DataType.STRING,
-        cardinality=func.Cardinality.MANY
+        cardinality=func.Cardinality.ONE
+        #func.Cardinality.MANY
+        
     )
 def _handler(messages: List[func.ServiceBusMessage]) -> None:
         logging.info(f"[{entity}] Service Bus batch trigger fired: {len(messages)} message(s)")
