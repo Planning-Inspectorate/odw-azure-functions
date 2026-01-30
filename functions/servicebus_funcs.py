@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import OrderedDict
+from time import time
 from typing import Any, Dict, List, Optional
 import uuid
 import azure.functions as func
@@ -220,7 +221,8 @@ def get_payloads_and_validate(
       - Validation and processing failures RAISE
       - This enables retry + DLQ and prevents silent data loss
     """
-
+    # ⏳ wait 10 minutes before processing
+    time.sleep(600)  # ✅ added
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
