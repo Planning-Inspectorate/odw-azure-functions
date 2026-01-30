@@ -940,45 +940,41 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
 
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
-    arg_name="messages",
+    arg_name="message",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    cardinality=func.Cardinality.MANY,
+    cardinality=func.Cardinality.ONE,
 )
-def appealdocument_servicebus(messages) -> None:
+def appealdocument_servicebus(message):
+
     """
-    DEAD-LETTER SAFE SERVICE BUS TRIGGER
+    DEAD-LETTER SAFE SERVICE BUS TRIGGER (Single Message Mode)
     """
 
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
 
-    if not messages:
-        logging.warning("Empty batch received")
-        return
+    # 1️⃣ Extract and validate payload
+    payload = get_payloads_and_validate([message], schema)
 
-    payloads = get_payloads_and_validate(messages, schema)
+    if not payload:
+        # Invalid message → DO NOT RETRY → dead-letter manually
+        logging.warning("Invalid message; dead-lettering")
+        raise ValueError("Invalid message format")
 
-    if not payloads:
-        # Valid no-op; do not raise or retry.
-        logging.warning("No valid messages in batch")
-        logging.info("Processed batch: received=%d stored=%d", len(messages), 0)
-        return
-
+    # 2️⃣ Upload to storage
     uploaded = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
         container=_CONTAINER,
         entity=topic,
-        data=payloads,
+        data=payload,
     )
 
-    # Only raise on actual storage failure (None), not on empty payloads (0)
     if uploaded is None:
-        # Real failure: let Functions runtime perform retries; may eventually DLQ.
+        # Real failure → OK to retry → runtime will DLQ after MaxDeliveryCount
         raise RuntimeError("Storage upload failed")
 
-    logging.info("Processed batch: received=%d stored=%d", len(messages), uploaded or 0)
-
+    logging.info("Processed message successfully")
 
