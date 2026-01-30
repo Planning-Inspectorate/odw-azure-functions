@@ -18,7 +18,7 @@
   "extensions": {
     "serviceBus": {
       "messageProcessingOptions": {
-        "autoCompleteMessages": true,
+        "autoCompleteMessages": false,
         "maxConcurrentCalls": 1,
         "maxMessageBatchSize": 8
       }
