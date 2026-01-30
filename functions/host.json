@@ -20,7 +20,9 @@
       "messageProcessingOptions": {
         "autoCompleteMessages": true,
         "maxConcurrentCalls": 1,
-        "maxMessageBatchSize": 8
+        "maxMessageBatchSize": 8,
+        "maxAutoLockRenewalDuration": "00:15:00"
+        
       }
     }
   }
