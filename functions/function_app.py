@@ -940,56 +940,45 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
 
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
-    arg_name="message",
+    arg_name="messages",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    cardinality=func.Cardinality.ONE
+    cardinality=func.Cardinality.ONE,
 )
-def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
-    message_id = getattr(message, 'message_id', 'unknown')
-    logging.info(f"🚀 START {message_id}")
-    
-    try:
-        # Validate
-        payloads = get_payloads_and_validate([message], schema)
-        if not payloads:
-            logging.warning(f"❌ INVALID {message_id}")
-            message.deadletter("ValidationFailed", "Schema validation failed")
-            return
-        
-        payload = payloads[0]
-        logging.info(f"📤 Storage {message_id}")
-        
-        # Storage
-        uploaded = send_to_storage_trigger(
-            account_url=_STORAGE, credential=_CREDENTIAL, 
-            container=_CONTAINER, entity=topic, data=[payload]
-        )
-        
-        if uploaded is None or uploaded == 0:
-            logging.error(f"❌ STORAGE FAIL {message_id}")
-            message.abandon()
-            return
-        
-        # COMPLETE with retry (handles transient Service Bus issues)
-        logging.info(f"✅ COMPLETE {message_id}")
-        for attempt in range(3):
-            try:
-                message.complete()
-                logging.info(f"🎉 SUCCESS {message_id}")
-                return
-            except Exception as ex:
-                logging.warning(f"Complete attempt {attempt+1} failed: {ex}")
-                time.sleep(0.1)
-        
-        # Final abandon if complete keeps failing
-        message.abandon()
-        logging.error(f"💥 COMPLETE FAILED {message_id}")
-        
-    except Exception as ex:
-        logging.error(f"💥 EXCEPTION {message_id}: {ex}", exc_info=True)
-        try:
-            message.abandon()
-        except:
-            pass  # Let lock expire
+def appealdocument_servicebus(messages) -> None:
+    """
+    DEAD-LETTER SAFE SERVICE BUS TRIGGER
+    """
+
+    schema = _SCHEMAS["appeal-document.schema.json"]
+    topic = config["global"]["entities"]["appeal-document"]["topic"]
+
+    if not messages:
+        logging.warning("Empty batch received")
+        return
+
+    payloads = get_payloads_and_validate(messages, schema)
+
+    if not payloads:
+        # Valid no-op; do not raise or retry.
+        logging.warning("No valid messages in batch")
+        logging.info("Processed batch: received=%d stored=%d", len(messages), 0)
+        return
+
+    uploaded = send_to_storage_trigger(
+        account_url=_STORAGE,
+        credential=_CREDENTIAL,
+        container=_CONTAINER,
+        entity=topic,
+        data=payloads,
+    )
+
+    # Only raise on actual storage failure (None), not on empty payloads (0)
+    if uploaded is None:
+        # Real failure: let Functions runtime perform retries; may eventually DLQ.
+        raise RuntimeError("Storage upload failed")
+
+    logging.info("Processed batch: received=%d stored=%d", len(messages), uploaded or 0)
+
+
