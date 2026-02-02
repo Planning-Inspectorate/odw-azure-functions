@@ -951,21 +951,47 @@ def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
 
-    # Replace HTML entity with actual '<' default
     message_id = getattr(message, "message_id", "<unknown>")
 
     try:
-        payload = json.loads(message.get_body().decode("utf-8"))
+        # -------------------------------------------------------
+        # 1) Decode message
+        # -------------------------------------------------------
+        try:
+            payload = json.loads(message.get_body().decode("utf-8"))
+        except Exception as e:
+            logging.error(
+                "[appeal-document][INVALID_JSON] message_id=%s error=%s",
+                message_id,
+                str(e),
+            )
+            # Bad message → send to DLQ (no retries)
+            message.dead_letter(
+                reason="Invalid JSON",
+                error_description=str(e),
+            )
+            return
 
+        # -------------------------------------------------------
+        # 2) Schema validation
+        # -------------------------------------------------------
         errors = validate_data(payload, schema)
         if errors:
             logging.error(
-                "[appeal-document][INVALID] message_id=%s errors=%s",
+                "[appeal-document][INVALID_SCHEMA] message_id=%s errors=%s",
                 message_id,
                 errors,
             )
-            raise ValueError(f"Schema validation failed: {errors}")
+            # Bad message → send to DLQ (no retries)
+            message.dead_letter(
+                reason="Schema validation failed",
+                error_description=json.dumps(errors),
+            )
+            return
 
+        # -------------------------------------------------------
+        # 3) Extract metadata
+        # -------------------------------------------------------
         message_type = None
         props = getattr(message, "application_properties", None)
         if props:
@@ -980,7 +1006,7 @@ def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
         message_enqueued_time_utc = None
         if getattr(message, "enqueued_time_utc", None):
             message_enqueued_time_utc = message.enqueued_time_utc.strftime(
-                "%Y-%m-%dT%H:%M:%S.%f%z"
+                "%Y-%m-%dT%H:%M:%S.%fZ"
             )
 
         enriched = dict(payload)
@@ -988,13 +1014,26 @@ def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
         enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
         enriched["message_id"] = message_id
 
-        out_file = append_to_storage_batch(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=topic,
-            record=enriched,
-        )
+        # -------------------------------------------------------
+        # 4) Append to storage (transient errors should retry)
+        # -------------------------------------------------------
+        try:
+            out_file = append_to_storage_batch(
+                account_url=_STORAGE,
+                credential=_CREDENTIAL,
+                container=_CONTAINER,
+                entity=topic,
+                record=enriched,
+            )
+        except Exception as e:
+            logging.exception(
+                "[appeal-document][STORAGE_FAIL] message_id=%s error=%s",
+                message_id,
+                str(e),
+            )
+            # Transient error → retry, NOT DLQ
+            message.abandon()
+            return
 
         logging.info(
             "[appeal-document][OK] message_id=%s appended_to=%s",
@@ -1002,6 +1041,16 @@ def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
             out_file,
         )
 
-    except Exception:
-        logging.exception("[appeal-document][FAIL] message_id=%s", message_id)
-        raise
+        # -------------------------------------------------------
+        # 5) Success → complete message
+        # -------------------------------------------------------
+        message.complete()
+
+    except Exception as e:
+        # Anything unexpected → retry instead of DLQ
+        logging.exception(
+            "[appeal-document][FAIL_UNEXPECTED] message_id=%s error=%s",
+            message_id,
+            str(e),
+        )
+        message.abandon()
