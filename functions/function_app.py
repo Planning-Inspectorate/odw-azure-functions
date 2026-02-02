@@ -829,8 +829,10 @@ def appealrepresentation(req: func.HttpRequest) -> func.HttpResponse:
                 command_text="""
                 SELECT *
                 FROM odw_curated_db.dbo.dart_api
-                WHERE UPPER([applicationReference]) = UPPER(@applicationReference) 
-                AND UPPER([caseReference]) = UPPER(@caseReference)
+                WHERE 
+                    UPPER([caseReference]) = UPPER(@caseReference)
+                    AND 
+                    (ISNULL(@applicationReference, '') = '' OR UPPER([applicationReference]) = UPPER(@applicationReference))
                 """,
                 command_type="Text",
                 parameters="@caseReference={caseReference},@applicationReference={applicationReference}",
