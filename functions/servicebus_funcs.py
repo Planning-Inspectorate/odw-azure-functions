@@ -13,6 +13,8 @@ from azure.servicebus import ServiceBusClient
 # Your validator (adjust the module path if different)
 from validate_messages import validate_data
 from azure.functions import ServiceBusMessage
+from var_funcs import current_date  # keep your existing helper
+from azure.core.exceptions import ResourceExistsError, AzureError
 
 def send_to_storage(
     account_url: str,
@@ -178,52 +180,50 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
-def send_to_storage_trigger(
+def append_to_storage_batch(
     account_url: str,
     credential: DefaultAzureCredential,
     container: str,
     entity: str,
-    data: List[Dict[str, Any]],
-) -> Optional[int]:
+    record: Dict[str, Any],
+) -> str:
     """
-    Safe blob uploader.
-
-    Returns:
-        - positive int: number of records uploaded (success)
-        - 0: no valid payloads (nothing to upload)
-        - None: upload attempt failed (transient/permanent storage error)
-
-    Never raises to caller.
+    Append a single NDJSON record to an hourly-partitioned Append Blob.
+    Returns the blob path.
+    Raises AzureError for non-recoverable storage errors.
     """
+    now = datetime.now(timezone.utc)
+    hour = now.strftime("%H")
+    blob_name = f"{entity}/{current_date()}/{entity}_{hour}.ndjson"
 
-    if not data:
-        # Important: this is not a failure; just nothing to do.
-        logging.info("No valid data to upload for entity '%s'; skipping blob write.", entity)
-        return 0
+    blob_service = BlobServiceClient(account_url=account_url, credential=credential)
+    blob_client = blob_service.get_blob_client(container=container, blob=blob_name)
 
-    # Keep your date/time partitioning but ensure uniqueness with a GUID.
-    from var_funcs import current_date, current_time
+    # Create append blob if it doesn't exist (race-safe)
+    try:
+        blob_client.create_append_blob(
+            if_none_match="*",
+            content_settings=ContentSettings(
+                content_type="application/x-ndjson; charset=utf-8"
+            ),
+        )
+        # Optionally log "created"
+        logging.debug("Created append blob %s", blob_name)
+    except ResourceExistsError:
+        # Another writer already created it—fine to proceed
+        pass
 
-    guid = uuid.uuid4().hex  # 32 chars, no hyphens
-    filename = f"{entity}/{current_date()}/{entity}_{current_time()}_{guid}.json"
+    line = json.dumps(record, ensure_ascii=False) + "\n"
+    data = line.encode("utf-8")
 
     try:
-        blob_service = BlobServiceClient(account_url=account_url, credential=credential)
-        blob_client = blob_service.get_blob_client(container=container, blob=filename)
+        blob_client.append_block(data, timeout=30)
+    except AzureError:
+        logging.exception("Append failed for %s", blob_name)
+        raise
 
-        blob_client.upload_blob(
-            json.dumps(data, ensure_ascii=False),
-            overwrite=False,  # with GUID we do not expect collisions; fail fast if it ever happens
-            content_settings=ContentSettings(content_type="application/json; charset=utf-8"),
-        )
-
-        logging.info("Uploaded %d records to %s", len(data), filename)
-        return len(data)
-
-    except Exception:
-        # This is a real failure and should cause the trigger to retry.
-        logging.exception("Storage upload failed for blob %s", filename)
-        return None
+    logging.debug("Appended %d bytes to %s", len(data), blob_name)
+    return blob_name
 
 
 
@@ -306,8 +306,5 @@ def get_payloads_and_validate(
             raise
 
     return valid_with_properties
-
-
-
 
 

@@ -16,14 +16,15 @@
   },
 
   "extensions": {
-    "serviceBus": {
-      "ProcessingOptions": {
-        "autoCompleteMessages": true,
-        "maxConcurrentCalls": 1,
-        "maxMessageBatchSize": 8
+"serviceBus": {
+"prefetchCount": 50,
+"maxConcurrentCalls": 8,
+"autoCompleteMessages": true,
+"maxAutoLockRenewalDuration": "00:05:00"
         
       }
     }
   }
-}
+
+
 

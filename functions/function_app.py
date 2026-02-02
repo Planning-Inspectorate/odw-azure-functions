@@ -5,7 +5,7 @@ One function for each Service us topic
 
 import logging
 import azure.functions as func
-from servicebus_funcs import send_to_storage,send_to_storage_trigger,get_messages_and_validate,get_payloads_and_validate
+from servicebus_funcs import send_to_storage,append_to_storage_batch,get_messages_and_validate,get_payloads_and_validate
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
@@ -13,6 +13,7 @@ from azure.functions.decorators.core import DataType
 import json
 import os
 from typing import List
+from validate_messages import validate_data
 
 
 
@@ -946,35 +947,61 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     connection="ServiceBusConnectionAppeals",
     cardinality=func.Cardinality.ONE,
 )
-def appealdocument_servicebus(message):
-
-    """
-    DEAD-LETTER SAFE SERVICE BUS TRIGGER (Single Message Mode)
-    """
-
+def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
 
-    # 1️⃣ Extract and validate payload
-    payload = get_payloads_and_validate([message], schema)
+    # Replace HTML entity with actual '<' default
+    message_id = getattr(message, "message_id", "<unknown>")
 
-    if not payload:
-        # Invalid message → DO NOT RETRY → dead-letter manually
-        logging.warning("Invalid message; dead-lettering")
-        raise ValueError("Invalid message format")
+    try:
+        payload = json.loads(message.get_body().decode("utf-8"))
 
-    # 2️⃣ Upload to storage
-    uploaded = send_to_storage_trigger(
-        account_url=_STORAGE,
-        credential=_CREDENTIAL,
-        container=_CONTAINER,
-        entity=topic,
-        data=payload,
-    )
+        errors = validate_data(payload, schema)
+        if errors:
+            logging.error(
+                "[appeal-document][INVALID] message_id=%s errors=%s",
+                message_id,
+                errors,
+            )
+            raise ValueError(f"Schema validation failed: {errors}")
 
-    if uploaded is None:
-        # Real failure → OK to retry → runtime will DLQ after MaxDeliveryCount
-        raise RuntimeError("Storage upload failed")
+        message_type = None
+        props = getattr(message, "application_properties", None)
+        if props:
+            raw_type = props.get(b"type") if b"type" in props else props.get("type")
+            if raw_type is not None:
+                message_type = (
+                    raw_type.decode("utf-8")
+                    if isinstance(raw_type, (bytes, bytearray))
+                    else str(raw_type)
+                )
 
-    logging.info("Processed message successfully")
+        message_enqueued_time_utc = None
+        if getattr(message, "enqueued_time_utc", None):
+            message_enqueued_time_utc = message.enqueued_time_utc.strftime(
+                "%Y-%m-%dT%H:%M:%S.%f%z"
+            )
 
+        enriched = dict(payload)
+        enriched["message_type"] = message_type
+        enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+        enriched["message_id"] = message_id
+
+        out_file = append_to_storage_batch(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=topic,
+            record=enriched,
+        )
+
+        logging.info(
+            "[appeal-document][OK] message_id=%s appended_to=%s",
+            message_id,
+            out_file,
+        )
+
+    except Exception:
+        logging.exception("[appeal-document][FAIL] message_id=%s", message_id)
+        raise
