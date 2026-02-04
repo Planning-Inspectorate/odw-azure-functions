@@ -5,13 +5,18 @@ One function for each Service us topic
 
 import logging
 import azure.functions as func
-from servicebus_funcs import get_messages_and_validate, send_to_storage
+from servicebus_funcs import send_to_storage,send_to_storage_trigger,get_messages_and_validate,get_payloads_and_validate
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
 from azure.functions.decorators.core import DataType
 import json
 import os
+from typing import List
+
+
+
+
 
 _STORAGE = ""
 _CONTAINER = ""
@@ -22,7 +27,7 @@ try:
     _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
     _CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
     _NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
-    _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
+    _NAMESPACE_APPEALS = os.environ["ServiceBusConnectionAppeals__fullyQualifiedNamespace"]
 except:
     print("Warning: Missing Environment Variables")
 
@@ -772,7 +777,6 @@ def appeals78(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
-
 @_app.function_name("appealrepresentation")
 @_app.route(route="appealrepresentation", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def appealrepresentation(req: func.HttpRequest) -> func.HttpResponse:
@@ -932,3 +936,45 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
+    
+
+@_app.function_name(name="appeal_document_trigger")
+@_app.service_bus_topic_trigger(
+    arg_name="message",
+    topic_name=config["global"]["entities"]["appeal-document"]["topic"],
+    subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
+    connection="ServiceBusConnectionAppeals",
+    cardinality=func.Cardinality.ONE,
+)
+def appealdocument_servicebus(message):
+
+    """
+    DEAD-LETTER SAFE SERVICE BUS TRIGGER (Single Message Mode)
+    """
+
+    schema = _SCHEMAS["appeal-document.schema.json"]
+    topic = config["global"]["entities"]["appeal-document"]["topic"]
+
+    # 1️⃣ Extract and validate payload
+    payload = get_payloads_and_validate([message], schema)
+
+    if not payload:
+        # Invalid message → DO NOT RETRY → dead-letter manually
+        logging.warning("Invalid message; dead-lettering")
+        raise ValueError("Invalid message format")
+
+    # 2️⃣ Upload to storage
+    uploaded = send_to_storage_trigger(
+        account_url=_STORAGE,
+        credential=_CREDENTIAL,
+        container=_CONTAINER,
+        entity=topic,
+        data=payload,
+    )
+
+    if uploaded is None:
+        # Real failure → OK to retry → runtime will DLQ after MaxDeliveryCount
+        raise RuntimeError("Storage upload failed")
+
+    logging.info("Processed message successfully")
+
