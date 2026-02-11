@@ -18,7 +18,7 @@
   "extensions": {
     "serviceBus": {
       "ProcessingOptions": {
-        "maxConcurrentCalls": 8,
+        "maxConcurrentCalls": 4,
         "autoCompleteMessages": true,
         "maxAutoLockRenewalDuration": "00:05:00"
       }

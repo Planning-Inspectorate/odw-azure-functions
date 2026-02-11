@@ -226,7 +226,6 @@ def send_to_storage_trigger(
         return None
 
 
-
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
@@ -243,17 +242,44 @@ def get_payloads_and_validate(
       - Validation and processing failures RAISE
       - This enables retry + DLQ and prevents silent data loss
     """
-    
+
     valid_with_properties: List[Dict[str, Any]] = []
 
     for m in messages:
         message_id = getattr(m, "message_id", "<unknown>")
 
         try:
-            # 1) Decode RAW payload
-            payload = json.loads(m.get_body().decode("utf-8"))
+            # ------------------------------------------------------------------
+            # 0) RAW Body extraction + debug log
+            # ------------------------------------------------------------------
+            raw_bytes = m.get_body()
+            raw_payload = raw_bytes.decode("utf-8", errors="replace")
 
-            # 2) Validate RAW payload
+            logging.info(
+                "[DEBUG] Raw message received message_id=%s raw_preview=%s",
+                message_id,
+                raw_payload[:300],  # safe preview
+            )
+
+            # ------------------------------------------------------------------
+            # 1) Decode RAW JSON with explicit error handler
+            # ------------------------------------------------------------------
+            try:
+                payload = json.loads(raw_payload)
+            except json.JSONDecodeError as ex:
+                logging.error(
+                    "[Invalid JSON] message_id=%s error='%s' raw_preview=%s",
+                    message_id,
+                    str(ex),
+                    raw_payload[:300],
+                )
+                # RAISE => triggers retry until maxDeliveryCount is hit
+                # If maxDeliveryCount = 1, message will DLQ immediately.
+                raise ValueError(f"JSON decode failed: {ex}") from ex
+
+            # ------------------------------------------------------------------
+            # 2) Validate RAW payload (unchanged)
+            # ------------------------------------------------------------------
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -261,12 +287,15 @@ def get_payloads_and_validate(
                     message_id,
                     errors,
                 )
-                # RAISE -> retry + DLQ
+                # RAISE => retry + DLQ
                 raise ValueError(f"Schema validation failed: {errors}")
 
+            # ------------------------------------------------------------------
             # 3) Extract metadata (unchanged logic)
+            # ------------------------------------------------------------------
             message_type = None
             props = getattr(m, "application_properties", None)
+
             if props:
                 raw_type = None
                 if b"type" in props:
@@ -287,10 +316,10 @@ def get_payloads_and_validate(
                     "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            # 4) Enrich AFTER validation (metadata appended at the END)
-            #    - Start with the original payload to preserve its field order
-            #    - Then add metadata so it appears at the end of the dict
-            enriched: Dict[str, Any] = dict(payload)  # make a shallow copy to avoid mutating original
+            # ------------------------------------------------------------------
+            # 4) Enrich AFTER validation (unchanged)
+            # ------------------------------------------------------------------
+            enriched: Dict[str, Any] = dict(payload)
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
             enriched["message_id"] = message_id
@@ -298,12 +327,12 @@ def get_payloads_and_validate(
             valid_with_properties.append(enriched)
 
         except Exception:
+            # Generic catch — keep for retry/DLQ handling
             logging.exception(
                 "[Processing Error] message_id=%s",
                 message_id,
             )
-            # RAISE so Azure retries / DLQs
-            raise
+            raise  # IMPORTANT: do not swallow exceptions
 
     return valid_with_properties
 
