@@ -954,11 +954,18 @@ def appealdocument_servicebus(message):
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
 
+    # Validation failure → DO NOT RETRY → dead-letter immediately
     payload = get_payloads_and_validate([message], schema)
     if not payload:
         logging.warning("Invalid message; dead-lettering")
-        raise ValueError("Invalid message format")
+        dead_letter_message(
+            message,
+            reason="Invalid schema",
+            description="Schema validation failed for appeal-document"
+        )
+        return   # Important: avoid retries
 
+    # Normal processing
     uploaded = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
@@ -967,6 +974,7 @@ def appealdocument_servicebus(message):
         data=payload,
     )
 
+    # Upload failure → real operational issue → allow retries
     if uploaded is None:
         raise RuntimeError("Storage upload failed")
 
@@ -989,11 +997,18 @@ def nsipdocument_servicebus(message):
     schema = _SCHEMAS["nsip-document.schema.json"]
     topic = config["global"]["entities"]["nsip-document"]["topic"]
 
+    # Validation failure → DO NOT RETRY → dead-letter immediately
     payload = get_payloads_and_validate([message], schema)
     if not payload:
         logging.warning("Invalid message; dead-lettering")
-        raise ValueError("Invalid message format")
+        dead_letter_message(
+            message,
+            reason="Invalid schema",
+            description="Schema validation failed for nsip-document"
+        )
+        return
 
+    # Normal processing
     uploaded = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
@@ -1002,6 +1017,7 @@ def nsipdocument_servicebus(message):
         data=payload,
     )
 
+    # Upload failure → real operational issue → allow retries
     if uploaded is None:
         raise RuntimeError("Storage upload failed")
 
