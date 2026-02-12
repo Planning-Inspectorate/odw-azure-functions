@@ -938,6 +938,9 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
+# -------------------------------
+# APPEAL DOCUMENT TRIGGER
+# -------------------------------
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="message",
@@ -948,22 +951,14 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
 )
 def appealdocument_servicebus(message):
 
-    """
-    DEAD-LETTER SAFE SERVICE BUS TRIGGER (Single Message Mode)
-    """
-
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
 
-    # 1️⃣ Extract and validate payload
     payload = get_payloads_and_validate([message], schema)
-
     if not payload:
-        # Invalid message → DO NOT RETRY → dead-letter manually
         logging.warning("Invalid message; dead-lettering")
         raise ValueError("Invalid message format")
 
-    # 2️⃣ Upload to storage
     uploaded = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
@@ -973,33 +968,32 @@ def appealdocument_servicebus(message):
     )
 
     if uploaded is None:
-        # Real failure → OK to retry → runtime will DLQ after MaxDeliveryCount
         raise RuntimeError("Storage upload failed")
 
     logging.info("Processed message successfully")
 
-    @_app.function_name(name="nsip_document_trigger")
-    @_app.service_bus_topic_trigger(
-        arg_name="message",
-        topic_name=config["global"]["entities"]["nsip-document"]["topic"],
-        subscription_name=config["global"]["entities"]["nsip-document"]["subscription"],
-        connection="ServiceBusConnection",
-        cardinality=func.Cardinality.ONE, )
-    def nsipdocument_servicebus(message):
-        """DEAD-LETTER SAFE SERVICE BUS TRIGGER (Single Message Mode)"""
+
+# -------------------------------
+# NSIP DOCUMENT TRIGGER
+# -------------------------------
+@_app.function_name(name="nsip_document_trigger")
+@_app.service_bus_topic_trigger(
+    arg_name="message",
+    topic_name=config["global"]["entities"]["nsip-document"]["topic"],
+    subscription_name=config["global"]["entities"]["nsip-document"]["subscription"],
+    connection="ServiceBusConnection",
+    cardinality=func.Cardinality.ONE,
+)
+def nsipdocument_servicebus(message):
 
     schema = _SCHEMAS["nsip-document.schema.json"]
     topic = config["global"]["entities"]["nsip-document"]["topic"]
 
-    # 1️⃣ Extract and validate payload
     payload = get_payloads_and_validate([message], schema)
-
     if not payload:
-        # Invalid message → DO NOT RETRY → dead-letter manually
         logging.warning("Invalid message; dead-lettering")
         raise ValueError("Invalid message format")
 
-    # 2️⃣ Upload to storage
     uploaded = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
@@ -1009,8 +1003,6 @@ def appealdocument_servicebus(message):
     )
 
     if uploaded is None:
-        # Real failure → OK to retry → runtime will DLQ after MaxDeliveryCount
         raise RuntimeError("Storage upload failed")
 
     logging.info("Processed message successfully")
-
