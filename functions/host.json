@@ -1,6 +1,5 @@
 {
   "version": "2.0",
-
   "logging": {
     "applicationInsights": {
       "samplingSettings": {
@@ -9,19 +8,15 @@
       }
     }
   },
-
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.0.0, 5.0.0)"
   },
-
   "extensions": {
     "serviceBus": {
-      "ProcessingOptions": {
-        "maxConcurrentCalls": 4,
-        "autoCompleteMessages": true,
-        "maxAutoLockRenewalDuration": "00:05:00"
-      }
+      "autoCompleteMessages": false,
+      "maxConcurrentCalls": 4,
+      "maxAutoLockRenewalDuration": "00:05:00"
     }
   }
 }
