@@ -13,11 +13,7 @@ from azure.functions.decorators.core import DataType
 import json
 import os
 from typing import List
-from azure.servicebus import ServiceBusReceivedMessage
-
-
-
-
+from azure.servicebus import ServiceBusClient, ServiceBusMessage
 
 _STORAGE = ""
 _CONTAINER = ""
@@ -939,89 +935,79 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
         )
     
 
-# ============================================================
-#  APPEAL DOCUMENT TRIGGER  (real DLQ via settlement)
-# ============================================================
+
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="receivedmessage",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
-    cardinality=func.Cardinality.ONE
+    cardinality=func.Cardinality.ONE,
 )
-def appealdocument_servicebus(receivedmessage:  func.ServiceBusMessage):
+def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
 
+    # Get schema and topic configurations
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
 
-    # Validate (your validator RAISES on invalid)
     try:
-        payload = get_payloads_and_validate([receivedmessage], schema)
-    except ValueError as ex:
-        # ❌ Invalid: send to REAL Service Bus DLQ (no retries)
-        logging.warning(f"[appeal] invalid payload → DLQ; error={ex}")
-        # Settlement: dead-letter through the underlying receiver
-        receivedmessage.message_receiver.dead_letter_message(
-            message=receivedmessage,
-            reason="Invalid schema",
-            error_description=str(ex)
-        )
-        return  # success return => no retry
+        # Decode message body
+        body = receivedmessage.get_body().decode("utf-8")
+        msg_obj = json.loads(body)
 
-    # Process → upload to storage
-    uploaded = send_to_storage_trigger(
+        # Validate message
+        payload = get_payloads_and_validate([msg_obj], schema)
+
+        # Upload to blob storage
+        uploaded = send_to_storage_trigger(
         account_url=_STORAGE,
         credential=_CREDENTIAL,
         container=_CONTAINER,
         entity=topic,
         data=payload,
     )
-    if uploaded is None:
-        # REAL transient failure → allow retry
-        raise RuntimeError("Storage upload failed for appeal-document")
 
-    # ✅ Success: explicitly COMPLETE the message (optional; with autoComplete=false you control it)
-    receivedmessage.message_receiver.complete_message(receivedmessage)
-    logging.info("[appeal] processed OK")
+        # If upload fails, raise an exception to trigger DLQ
+        if uploaded is None:
+            raise RuntimeError("Blob upload returned None")
 
+        logging.info(f"[appeal-document] Message processed successfully.")
 
-# ============================================================
-#  NSIP DOCUMENT TRIGGER  (real DLQ via settlement)
-# ============================================================
-@_app.function_name(name="nsip_document_trigger")
-@_app.service_bus_topic_trigger(
-    arg_name="receivedmessage",
-    topic_name=config["global"]["entities"]["nsip-document"]["topic"],
-    subscription_name=config["global"]["entities"]["nsip-document"]["subscription"],
-    connection="ServiceBusConnection",
-    cardinality=func.Cardinality.ONE
-)
-def nsipdocument_servicebus(receivedmessage:  func.ServiceBusMessage):
-
-    schema = _SCHEMAS["nsip-document.schema.json"]
-    topic = config["global"]["entities"]["nsip-document"]["topic"]
-
-    try:
-        payload = get_payloads_and_validate([receivedmessage], schema)
     except ValueError as ex:
-        logging.warning(f"[nsip] invalid payload → DLQ; error={ex}")
-        receivedmessage.message_receiver.dead_letter_message(
-            message=receivedmessage,
+        # If validation fails, log detailed info and explicitly dead-letter the message
+        error_reason = f"Schema validation failed: {str(ex)}"
+        logging.error(f"[appeal-document] {error_reason}")
+
+        # Move to DLQ immediately with user-friendly headers and reason
+        receivedmessage.dead_letter(
             reason="Invalid schema",
-            error_description=str(ex)
+            error_description=error_reason
         )
         return
 
-    uploaded = send_to_storage_trigger(
-        account_url=_STORAGE,
-        credential=_CREDENTIAL,
-        container=_CONTAINER,
-        entity=topic,
-        data=payload,
-    )
-    if uploaded is None:
-        raise RuntimeError("Storage upload failed for nsip-document")
+    except json.JSONDecodeError as ex:
+        # Handle invalid JSON payload
+        error_reason = f"Invalid JSON payload: {str(ex)}"
+        logging.error(f"[appeal-document] {error_reason}")
 
-    receivedmessage.message_receiver.complete_message(receivedmessage)
-    logging.info("[nsip] processed OK")
+        receivedmessage.dead_letter(
+            reason="Invalid JSON",
+            error_description=error_reason
+        )
+        return
+
+    except Exception as ex:
+        # Catch-all for any other issues (blob, runtime, etc.)
+        error_reason = f"Unexpected error: {str(ex)}"
+        logging.error(f"[appeal-document] {error_reason}")
+
+        receivedmessage.dead_letter(
+            reason="Processing error",
+            error_description=error_reason
+        )
+        return
+
+
+
+
+
