@@ -226,21 +226,144 @@ def send_to_storage_trigger(
         return None
 
 
+# def get_payloads_and_validate(
+#     messages: List[Any],
+#     schema: Dict[str, Any],
+# ) -> List[Dict[str, Any]]:
+#     """
+#     Trigger-safe validator:
+#       - Validate RAW payload (not enriched)
+#       - Enrich AFTER validation
+#       - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
+#       - Robust message_type extraction (matches existing function)
+#       - Excludes delivery_count and content_type
+
+#     IMPORTANT:
+#       - Validation and processing failures RAISE
+#       - This enables retry + DLQ and prevents silent data loss
+#     """
+
+#     valid_with_properties: List[Dict[str, Any]] = []
+
+#     for m in messages:
+#         message_id = getattr(m, "message_id", "<unknown>")
+
+#         try:
+#             # ------------------------------------------------------------------
+#             # 0) RAW Body extraction + debug log
+#             # ------------------------------------------------------------------
+#             raw_bytes = m.get_body()
+#             raw_payload = raw_bytes.decode("utf-8", errors="replace")
+
+#             logging.info(
+#                 "[DEBUG] Raw message received message_id=%s raw_preview=%s",
+#                 message_id,
+#                 raw_payload[:300],  # safe preview
+#             )
+
+#             # ------------------------------------------------------------------
+#             # 1) Decode RAW JSON with explicit error handler
+#             # ------------------------------------------------------------------
+#             try:
+#                 payload = json.loads(raw_payload)
+#             except json.JSONDecodeError as ex:
+#                 logging.error(
+#                     "[Invalid JSON] message_id=%s error='%s' raw_preview=%s",
+#                     message_id,
+#                     str(ex),
+#                     raw_payload[:300],
+#                 )
+#                 # RAISE => triggers retry until maxDeliveryCount is hit
+#                 # If maxDeliveryCount = 1, message will DLQ immediately.
+#                 raise ValueError(f"JSON decode failed: {ex}") from ex
+
+#             # ------------------------------------------------------------------
+#             # 2) Validate RAW payload (unchanged)
+#             # ------------------------------------------------------------------
+#             errors = validate_data(payload, schema)
+#             if errors:
+#                 logging.error(
+#                     "[Validation Failed] message_id=%s errors=%s",
+#                     message_id,
+#                     errors,
+#                 )
+#                 # RAISE => retry + DLQ
+#                 raise ValueError(f"Schema validation failed: {errors}")
+
+#             # ------------------------------------------------------------------
+#             # 3) Extract metadata (unchanged logic)
+#             # ------------------------------------------------------------------
+#             message_type = None
+#             props = getattr(m, "application_properties", None)
+
+#             if props:
+#                 raw_type = None
+#                 if b"type" in props:
+#                     raw_type = props.get(b"type")
+#                 elif "type" in props:
+#                     raw_type = props.get("type")
+
+#                 if raw_type is not None:
+#                     message_type = (
+#                         raw_type.decode("utf-8")
+#                         if isinstance(raw_type, (bytes, bytearray))
+#                         else str(raw_type)
+#                     )
+
+#             message_enqueued_time_utc = None
+#             if getattr(m, "enqueued_time_utc", None):
+#                 message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+#                     "%Y-%m-%dT%H:%M:%S.%f%z"
+#                 )
+
+#             # ------------------------------------------------------------------
+#             # 4) Enrich AFTER validation (unchanged)
+#             # ------------------------------------------------------------------
+#             enriched: Dict[str, Any] = dict(payload)
+#             enriched["message_type"] = message_type
+#             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+#             enriched["message_id"] = message_id
+
+#             valid_with_properties.append(enriched)
+
+#         except Exception:
+#             # Generic catch — keep for retry/DLQ handling
+#             logging.exception(
+#                 "[Processing Error] message_id=%s",
+#                 message_id,
+#             )
+#             raise  # IMPORTANT: do not swallow exceptions
+
+#     return valid_with_properties
+
+
+class ValidationResult:
+    """Container for validation results"""
+    def __init__(self, is_valid: bool, reason: str = None, description: str = None, payload: Dict[str, Any] = None):
+        self.is_valid = is_valid
+        self.reason = reason
+        self.description = description
+        self.payload = payload
+
+
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
+    raise_on_error: bool = True,
 ) -> List[Dict[str, Any]]:
     """
-    Trigger-safe validator:
-      - Validate RAW payload (not enriched)
-      - Enrich AFTER validation
-      - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
-      - Robust message_type extraction (matches existing function)
-      - Excludes delivery_count and content_type
-
-    IMPORTANT:
-      - Validation and processing failures RAISE
-      - This enables retry + DLQ and prevents silent data loss
+    Trigger-safe validator with optional error raising.
+    
+    Args:
+        messages: List of Service Bus messages
+        schema: JSON schema to validate against
+        raise_on_error: If True, raises exceptions (for retry). If False, returns empty list on error.
+    
+    Returns:
+        List of validated and enriched payloads
+        
+    When raise_on_error=False, check the returned list length.
+    If empty and message was invalid, the function will have logged the error details.
     """
 
     valid_with_properties: List[Dict[str, Any]] = []
@@ -273,9 +396,13 @@ def get_payloads_and_validate(
                     str(ex),
                     raw_payload[:300],
                 )
-                # RAISE => triggers retry until maxDeliveryCount is hit
-                # If maxDeliveryCount = 1, message will DLQ immediately.
-                raise ValueError(f"JSON decode failed: {ex}") from ex
+                if raise_on_error:
+                    raise ValueError(f"JSON decode failed: {ex}") from ex
+                else:
+                    # Store error info in message metadata for dead-lettering
+                    setattr(m, '_validation_error_reason', 'InvalidJSON')
+                    setattr(m, '_validation_error_description', f"JSON decode failed: {str(ex)}")
+                    return []  # Return empty to signal validation failure
 
             # ------------------------------------------------------------------
             # 2) Validate RAW payload (unchanged)
@@ -287,8 +414,13 @@ def get_payloads_and_validate(
                     message_id,
                     errors,
                 )
-                # RAISE => retry + DLQ
-                raise ValueError(f"Schema validation failed: {errors}")
+                if raise_on_error:
+                    raise ValueError(f"Schema validation failed: {errors}")
+                else:
+                    # Store error info in message metadata for dead-lettering
+                    setattr(m, '_validation_error_reason', 'SchemaValidationFailed')
+                    setattr(m, '_validation_error_description', f"Schema validation failed: {str(errors)[:4000]}")
+                    return []  # Return empty to signal validation failure
 
             # ------------------------------------------------------------------
             # 3) Extract metadata (unchanged logic)
@@ -326,17 +458,20 @@ def get_payloads_and_validate(
 
             valid_with_properties.append(enriched)
 
-        except Exception:
+        except Exception as ex:
             # Generic catch — keep for retry/DLQ handling
             logging.exception(
                 "[Processing Error] message_id=%s",
                 message_id,
             )
-            raise  # IMPORTANT: do not swallow exceptions
+            if raise_on_error:
+                raise  # IMPORTANT: do not swallow exceptions
+            else:
+                # Store error info in message metadata for dead-lettering
+                setattr(m, '_validation_error_reason', 'UnexpectedError')
+                setattr(m, '_validation_error_description', f"Unexpected error: {type(ex).__name__}: {str(ex)[:4000]}")
+                return []  # Return empty to signal validation failure
 
     return valid_with_properties
-
-
-
 
 

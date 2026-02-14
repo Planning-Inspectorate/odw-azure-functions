@@ -948,96 +948,122 @@ def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
     Validates against schema and uploads to blob storage.
     Dead-letters invalid messages immediately on first attempt.
     """
-    # Get schema and topic configurations
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
     
-    # Get message metadata
     message_id = receivedmessage.message_id or "unknown"
     delivery_count = receivedmessage.delivery_count or 0
     
-    logging.info(f"[appeal-document] Processing message {message_id}, delivery count: {delivery_count}")
+    logging.info(
+        f"[appeal-document] Processing message {message_id}, "
+        f"delivery count: {delivery_count}"
+    )
     
-    # Track if we should dead-letter
-    should_dead_letter = False
-    dead_letter_reason = None
-    dead_letter_description = None
-    
+    # =================================================================
+    # STEP 1: Validate message (don't raise exceptions yet)
+    # =================================================================
     try:
-        # --- Step 1: Decode message body ---
-        try:
-            body = receivedmessage.get_body().decode("utf-8")
-        except Exception as decode_ex:
-            should_dead_letter = True
-            dead_letter_reason = "BodyDecodeFailed"
-            dead_letter_description = f"Unable to decode message body as UTF-8: {str(decode_ex)}"
-            logging.error(f"[appeal-document] {dead_letter_description} - Message ID: {message_id}")
-            raise ValueError(dead_letter_description)
+        payload = get_payloads_and_validate(
+            [receivedmessage], 
+            schema, 
+            raise_on_error=False  # Don't raise, just return empty list
+        )
+    except Exception as validation_ex:
+        # This shouldn't happen with raise_on_error=False, but just in case
+        dlq_reason = "UnexpectedValidationError"
+        dlq_description = f"Unexpected validation error: {type(validation_ex).__name__}: {str(validation_ex)}"
         
-        # --- Step 2: Parse JSON ---
-        try:
-            msg_obj = json.loads(body)
-        except json.JSONDecodeError as json_ex:
-            should_dead_letter = True
-            dead_letter_reason = "InvalidJSON"
-            dead_letter_description = f"Invalid JSON payload: {str(json_ex)}"
-            logging.error(f"[appeal-document] {dead_letter_description} - Message ID: {message_id}")
-            raise ValueError(dead_letter_description)
+        logging.error(
+            f"[appeal-document] {dlq_description} - Message ID: {message_id}"
+        )
         
-        # --- Step 3: Validate against schema ---
-        try:
-            payload = get_payloads_and_validate([msg_obj], schema)
-        except ValueError as val_ex:
-            should_dead_letter = True
-            dead_letter_reason = "SchemaValidationFailed"
-            dead_letter_description = f"Schema validation failed: {str(val_ex)}"
-            logging.error(f"[appeal-document] {dead_letter_description} - Message ID: {message_id}")
-            raise ValueError(dead_letter_description)
+        receivedmessage.dead_letter(
+            reason=dlq_reason,
+            error_description=dlq_description[:4096]
+        )
+        logging.warning(
+            f"[appeal-document] Message {message_id} moved to dead-letter queue. "
+            f"Reason: {dlq_reason}"
+        )
         
-        # --- Step 4: Upload to blob storage ---
-        try:
-            uploaded = send_to_storage_trigger(
-                account_url=_STORAGE,
-                credentials=_CREDENTIAL,
-                container=_CONTAINER,
-                entity=topic,
-                data=payload,
-            )
-            
-            if uploaded is None or not uploaded:
-                raise RuntimeError("Blob upload returned None or False")
-            
-        except Exception as upload_ex:
-            should_dead_letter = True
-            dead_letter_reason = "BlobUploadFailed"
-            dead_letter_description = f"Blob upload failed: {str(upload_ex)}"
-            logging.error(f"[appeal-document] {dead_letter_description} - Message ID: {message_id}")
-            raise RuntimeError(dead_letter_description)
+        # CRITICAL: Raise exception to prevent auto-complete
+        raise ValueError(f"Message dead-lettered: {dlq_reason}")
+    
+    # Check if validation failed (empty list returned)
+    if not payload or len(payload) == 0:
+        # Validation failed - get error details from message attributes
+        dlq_reason = getattr(receivedmessage, '_validation_error_reason', 'ValidationFailed')
+        dlq_description = getattr(receivedmessage, '_validation_error_description', 'Unknown validation error')
         
-        # --- SUCCESS: Complete the message ---
-        logging.info(f"[appeal-document] Message {message_id} processed successfully and uploaded to blob storage.")
+        logging.error(
+            f"[appeal-document] Validation failed for message {message_id}. "
+            f"Reason: {dlq_reason}, Description: {dlq_description}"
+        )
         
-    except Exception as ex:
-        # Handle any exception
-        if not should_dead_letter:
-            # This is an unexpected error
-            should_dead_letter = True
-            dead_letter_reason = "UnexpectedError"
-            dead_letter_description = f"Unexpected processing error: {type(ex).__name__}: {str(ex)}"
-            logging.error(f"[appeal-document] {dead_letter_description} - Message ID: {message_id}", exc_info=True)
-        
-        # Dead-letter the message with proper reason
         try:
             receivedmessage.dead_letter(
-                reason=dead_letter_reason,
-                error_description=(dead_letter_description or str(ex))[:4096]
+                reason=dlq_reason,
+                error_description=dlq_description[:4096]
             )
-            logging.warning(f"[appeal-document] Message {message_id} moved to dead-letter queue. Reason: {dead_letter_reason}")
+            logging.warning(
+                f"[appeal-document] Message {message_id} moved to dead-letter queue. "
+                f"Reason: {dlq_reason}"
+            )
         except Exception as dlq_ex:
-            logging.error(f"[appeal-document] CRITICAL: Failed to dead-letter message {message_id}: {str(dlq_ex)}")
-            # Re-raise to let Service Bus handle it (will retry and eventually DLQ)
+            logging.error(
+                f"[appeal-document] CRITICAL: Failed to dead-letter message {message_id}: "
+                f"{str(dlq_ex)}"
+            )
+            # Re-raise so message will be retried and eventually DLQ'd by Service Bus
             raise
         
-        # CRITICAL: After dead-lettering, raise the original exception
-        # This prevents auto-completion when autoCompleteMessages=false
-        raise
+        # CRITICAL: Raise exception to prevent auto-complete
+        raise ValueError(f"Message dead-lettered: {dlq_reason}")
+    
+    # =================================================================
+    # STEP 2: Upload to blob storage (only if validation passed)
+    # =================================================================
+    try:
+        uploaded = send_to_storage_trigger(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=topic,
+            data=payload,
+        )
+        
+        if uploaded is None or not uploaded:
+            raise RuntimeError("Blob upload returned None or False")
+        
+        logging.info(
+            f"[appeal-document] Message {message_id} processed successfully "
+            f"and uploaded to blob storage."
+        )
+        
+    except Exception as upload_ex:
+        # Blob upload failed - dead-letter immediately
+        dlq_reason = "BlobUploadFailed"
+        dlq_description = f"Blob upload failed: {type(upload_ex).__name__}: {str(upload_ex)}"
+        
+        logging.error(
+            f"[appeal-document] {dlq_description} - Message ID: {message_id}"
+        )
+        
+        try:
+            receivedmessage.dead_letter(
+                reason=dlq_reason,
+                error_description=dlq_description[:4096]
+            )
+            logging.warning(
+                f"[appeal-document] Message {message_id} moved to dead-letter queue. "
+                f"Reason: {dlq_reason}"
+            )
+        except Exception as dlq_ex:
+            logging.error(
+                f"[appeal-document] CRITICAL: Failed to dead-letter message {message_id}: "
+                f"{str(dlq_ex)}"
+            )
+            raise
+        
+        # CRITICAL: Raise exception to prevent auto-complete
+        raise ValueError(f"Message dead-lettered: {dlq_reason}")
