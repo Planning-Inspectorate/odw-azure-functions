@@ -861,7 +861,7 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
 
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
-    arg_name="receivedmessage",
+    arg_name="message",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
@@ -869,15 +869,15 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
     data_type=DataType.STRING
 )
 @_app.generic_input_binding(
-    arg_name="messageActions",
+    arg_name="messageReceiver",
     type="serviceBus",
     direction="in",
     data_type=DataType.STRING,
     connection="ServiceBusConnectionAppeals"
 )
 def appeal_document_servicebus(
-    receivedmessage: func.ServiceBusMessage,
-    messageActions
+    message: func.ServiceBusMessage,
+    messageReceiver
 ):
     """
     Process appeal document messages using Python v2 SDK bindings.
@@ -886,8 +886,8 @@ def appeal_document_servicebus(
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
     
-    message_id = receivedmessage.message_id or "unknown"
-    delivery_count = receivedmessage.delivery_count or 0
+    message_id = message.message_id or "unknown"
+    delivery_count = message.delivery_count or 0
     
     logging.info(
         f"[appeal-document] Processing message_id={message_id}, "
@@ -898,7 +898,7 @@ def appeal_document_servicebus(
     # STEP 1: Validate message
     # ========================================================
     payloads, error_reason, error_description = get_payloads_and_validate(
-        [receivedmessage],
+        [message],
         schema
     )
     
@@ -910,9 +910,9 @@ def appeal_document_servicebus(
         )
         
         try:
-            # Use messageActions to dead-letter with custom reason
-            messageActions.dead_letter_message(
-                receivedmessage,
+            # Use messageReceiver to dead-letter with custom reason
+            messageReceiver.dead_letter_message(
+                message,
                 reason=error_reason,
                 error_description=error_description[:4096]
             )
@@ -963,9 +963,9 @@ def appeal_document_servicebus(
         )
         
         try:
-            # Use messageActions to dead-letter
-            messageActions.dead_letter_message(
-                receivedmessage,
+            # Use messageReceiver to dead-letter
+            messageReceiver.dead_letter_message(
+                message,
                 reason=error_reason,
                 error_description=error_description[:4096]
             )
@@ -981,3 +981,22 @@ def appeal_document_servicebus(
                 f"[appeal-document] Failed to dead-letter: {str(dlq_ex)}"
             )
             raise RuntimeError(f"{error_reason}: {error_description}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

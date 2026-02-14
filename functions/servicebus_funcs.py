@@ -347,89 +347,16 @@ One function for each Service Bus topic
 # DEAD-LETTER HELPER FUNCTION
 # ============================================================================
 
-def dead_letter_with_reason(
-    connection_string: str,
-    topic_name: str,
-    subscription_name: str,
-    lock_token: str,
-    reason: str,
-    description: str
-) -> bool:
-    """
-    Dead-letter a message using the Azure Service Bus SDK with proper reason.
-    
-    Args:
-        connection_string: Service Bus connection string
-        topic_name: Topic name
-        subscription_name: Subscription name
-        lock_token: Message lock token from the received message
-        reason: Dead-letter reason (e.g., "InvalidJSON", "SchemaValidationFailed")
-        description: Detailed error description
-    
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        servicebus_client = ServiceBusClient.from_connection_string(
-            conn_str=connection_string,
-            logging_enable=True
-        )
-        
-        with servicebus_client:
-            receiver = servicebus_client.get_subscription_receiver(
-                topic_name=topic_name,
-                subscription_name=subscription_name
-            )
-            
-            with receiver:
-                # Dead-letter the message with custom reason
-                receiver.dead_letter_message(
-                    lock_token,
-                    reason=reason,
-                    error_description=description[:4096]  # Azure limit is 4096 chars
-                )
-                
-                logging.info(
-                    f"✓ Successfully dead-lettered message with lock_token ending in "
-                    f"...{str(lock_token)[-8:]} | Reason: {reason}"
-                )
-                return True
-                
-    except ServiceBusError as sb_ex:
-        logging.error(
-            f"✗ ServiceBus error during dead-lettering: {str(sb_ex)}",
-            exc_info=True
-        )
-        return False
-    except Exception as ex:
-        logging.error(
-            f"✗ Unexpected error during dead-lettering: {str(ex)}",
-            exc_info=True
-        )
-        return False
-
-
-# ============================================================================
-# UPDATED VALIDATION FUNCTION - RETURNS TUPLE WITH ERROR INFO
-# ============================================================================
-
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
 ) -> Tuple[List[Dict[str, Any]], Optional[str], Optional[str]]:
     """
-    Trigger-safe validator:
-      - Validate RAW payload (not enriched)
-      - Enrich AFTER validation
-      - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
-      - Robust message_type extraction
-      - Excludes delivery_count and content_type
-
-    UPDATED:
-      - Returns tuple: (payloads, error_reason, error_description)
-      - On success: ([valid_payloads], None, None)
-      - On failure: ([], "ErrorReason", "Error description")
-      - This enables immediate dead-lettering with proper reason
+    Validates messages and returns (payloads, error_reason, error_description).
+    
+    Returns:
+        - ([valid_payloads], None, None) on success
+        - ([], "ErrorReason", "Error description") on failure
     """
     valid_with_properties: List[Dict[str, Any]] = []
 
@@ -437,9 +364,7 @@ def get_payloads_and_validate(
         message_id = getattr(m, "message_id", "<unknown>")
 
         try:
-            # ------------------------------------------------------------------
-            # 0) RAW Body extraction + debug log
-            # ------------------------------------------------------------------
+            # Decode body
             try:
                 raw_bytes = m.get_body()
                 raw_payload = raw_bytes.decode("utf-8", errors="replace")
@@ -451,12 +376,10 @@ def get_payloads_and_validate(
             logging.info(
                 "[DEBUG] Raw message received message_id=%s raw_preview=%s",
                 message_id,
-                raw_payload[:300],  # safe preview
+                raw_payload[:300],
             )
 
-            # ------------------------------------------------------------------
-            # 1) Decode RAW JSON with explicit error handler
-            # ------------------------------------------------------------------
+            # Parse JSON
             try:
                 payload = json.loads(raw_payload)
             except json.JSONDecodeError as ex:
@@ -469,9 +392,7 @@ def get_payloads_and_validate(
                 )
                 return ([], "InvalidJSON", error_msg)
 
-            # ------------------------------------------------------------------
-            # 2) Validate RAW payload (unchanged)
-            # ------------------------------------------------------------------
+            # Validate schema
             from pins_data_model import validate_data
             errors = validate_data(payload, schema)
             if errors:
@@ -483,9 +404,7 @@ def get_payloads_and_validate(
                 )
                 return ([], "SchemaValidationFailed", error_msg)
 
-            # ------------------------------------------------------------------
-            # 3) Extract metadata (unchanged logic)
-            # ------------------------------------------------------------------
+            # Extract metadata
             message_type = None
             props = getattr(m, "application_properties", None)
 
@@ -509,9 +428,7 @@ def get_payloads_and_validate(
                     "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
 
-            # ------------------------------------------------------------------
-            # 4) Enrich AFTER validation (unchanged)
-            # ------------------------------------------------------------------
+            # Enrich payload
             enriched: Dict[str, Any] = dict(payload)
             enriched["message_type"] = message_type
             enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
@@ -520,7 +437,6 @@ def get_payloads_and_validate(
             valid_with_properties.append(enriched)
 
         except Exception as ex:
-            # Generic catch — for unexpected errors
             error_msg = f"Unexpected processing error: {type(ex).__name__}: {str(ex)[:3900]}"
             logging.exception(
                 "[Processing Error] message_id=%s",
@@ -528,21 +444,4 @@ def get_payloads_and_validate(
             )
             return ([], "UnexpectedError", error_msg)
 
-    # Success - return valid payloads with no error
     return (valid_with_properties, None, None)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
