@@ -861,33 +861,22 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
 
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
-    arg_name="message",
+    arg_name="receivedmessage",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
     cardinality=func.Cardinality.ONE,
-    data_type=DataType.STRING
 )
-@_app.generic_input_binding(
-    arg_name="messageReceiver",
-    type="serviceBus",
-    direction="in",
-    data_type=DataType.STRING,
-    connection="ServiceBusConnectionAppeals"
-)
-def appeal_document_servicebus(
-    message: func.ServiceBusMessage,
-    messageReceiver
-):
+def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
     """
-    Process appeal document messages using Python v2 SDK bindings.
-    Dead-letters invalid messages immediately with proper reason.
+    Process appeal document messages.
+    Dead-letters invalid messages on first attempt.
     """
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
     
-    message_id = message.message_id or "unknown"
-    delivery_count = message.delivery_count or 0
+    message_id = receivedmessage.message_id or "unknown"
+    delivery_count = receivedmessage.delivery_count or 0
     
     logging.info(
         f"[appeal-document] Processing message_id={message_id}, "
@@ -898,40 +887,32 @@ def appeal_document_servicebus(
     # STEP 1: Validate message
     # ========================================================
     payloads, error_reason, error_description = get_payloads_and_validate(
-        [message],
+        [receivedmessage],
         schema
     )
     
     if error_reason:
-        # Validation failed - dead-letter immediately with custom reason
+        # Validation failed - add custom properties and raise exception
         logging.error(
             f"[appeal-document] Validation failed for message_id={message_id}. "
-            f"Reason: {error_reason}"
+            f"Reason: {error_reason}, Description: {error_description}"
         )
         
+        # Add custom dead-letter reason to application properties
+        # (These will be visible in Azure Portal on the dead-lettered message)
         try:
-            # Use messageReceiver to dead-letter with custom reason
-            messageReceiver.dead_letter_message(
-                message,
-                reason=error_reason,
-                error_description=error_description[:4096]
-            )
+            if receivedmessage.application_properties is None:
+                receivedmessage.application_properties = {}
             
-            logging.warning(
-                f"[appeal-document] ✓ Message {message_id} dead-lettered. "
-                f"Reason: {error_reason}"
-            )
-            
-            # Return successfully - message is already dead-lettered
-            return
-            
-        except Exception as dlq_ex:
-            logging.error(
-                f"[appeal-document] Failed to dead-letter: {str(dlq_ex)}",
-                exc_info=True
-            )
-            # Fall back to raising exception
-            raise ValueError(f"{error_reason}: {error_description}")
+            receivedmessage.application_properties['DeadLetterReason'] = error_reason
+            receivedmessage.application_properties['DeadLetterErrorDescription'] = error_description[:4000]
+            receivedmessage.application_properties['ProcessingTimestamp'] = str(receivedmessage.enqueued_time_utc)
+        except Exception as prop_ex:
+            logging.warning(f"Could not set application properties: {str(prop_ex)}")
+        
+        # Raise exception to trigger dead-lettering
+        # With maxDeliveryCount=1, this goes to DLQ immediately
+        raise ValueError(f"[{error_reason}] {error_description}")
     
     # ========================================================
     # STEP 2: Upload to blob storage
@@ -953,7 +934,7 @@ def appeal_document_servicebus(
         )
         
     except Exception as upload_ex:
-        # Upload failed - dead-letter immediately
+        # Upload failed - add custom properties and raise
         error_reason = "BlobUploadFailed"
         error_description = f"Upload failed: {type(upload_ex).__name__}: {str(upload_ex)}"
         
@@ -963,40 +944,12 @@ def appeal_document_servicebus(
         )
         
         try:
-            # Use messageReceiver to dead-letter
-            messageReceiver.dead_letter_message(
-                message,
-                reason=error_reason,
-                error_description=error_description[:4096]
-            )
+            if receivedmessage.application_properties is None:
+                receivedmessage.application_properties = {}
             
-            logging.warning(
-                f"[appeal-document] ✓ Message {message_id} dead-lettered. "
-                f"Reason: {error_reason}"
-            )
-            return
-            
-        except Exception as dlq_ex:
-            logging.error(
-                f"[appeal-document] Failed to dead-letter: {str(dlq_ex)}"
-            )
-            raise RuntimeError(f"{error_reason}: {error_description}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            receivedmessage.application_properties['DeadLetterReason'] = error_reason
+            receivedmessage.application_properties['DeadLetterErrorDescription'] = error_description[:4000]
+        except Exception as prop_ex:
+            logging.warning(f"Could not set application properties: {str(prop_ex)}")
+        
+        raise RuntimeError(f"[{error_reason}] {error_description}")

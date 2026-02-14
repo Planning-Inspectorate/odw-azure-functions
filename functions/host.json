@@ -19,7 +19,7 @@
   "extensions": {
     "serviceBus": {
       "prefetchCount": 0,
-      "autoCompleteMessages": false,
+      "autoCompleteMessages": true,
       "maxConcurrentCalls": 1,
       "maxAutoLockRenewalDuration": "00:05:00"
     }
