@@ -14,9 +14,9 @@
   },
   "extensions": {
     "serviceBus": {
-      "autoCompleteMessages": false,
+      "autoCompleteMessages": true,
       "maxConcurrentCalls": 4,
       "maxAutoLockRenewalDuration": "00:05:00"
     }
   }
-}
+} 
