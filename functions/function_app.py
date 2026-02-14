@@ -944,94 +944,106 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
 )
 def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
     """
-    Process appeal document messages from Service Bus.
-    Validates against schema and uploads to blob storage.
-    Dead-letters invalid messages immediately on first attempt.
-    
-    CRITICAL: We do NOT raise exceptions after dead-lettering to prevent retries.
+    Process appeal document messages.
+    Dead-letters invalid messages immediately with proper reason.
     """
+    from servicebus_funcs import dead_letter_with_reason, get_payloads_and_validate, send_to_storage_trigger
+    
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
+    subscription = config["global"]["entities"]["appeal-document"]["subscription"]
     
     message_id = receivedmessage.message_id or "unknown"
     delivery_count = receivedmessage.delivery_count or 0
+    lock_token = receivedmessage.lock_token
+    
+    # Get connection string from environment
+    connection_string = os.environ.get("ServiceBusConnectionAppeals")
     
     logging.info(
-        f"[appeal-document] Processing message {message_id}, delivery count: {delivery_count}"
+        f"[appeal-document] Processing message_id={message_id}, "
+        f"delivery_count={delivery_count}"
     )
     
-    # =================================================================
+    # ========================================================
     # STEP 1: Validate message
-    # =================================================================
-    payload, error_reason, error_description = get_payloads_and_validate(
-        [receivedmessage], 
+    # ========================================================
+    payloads, error_reason, error_description = get_payloads_and_validate(
+        [receivedmessage],
         schema
     )
     
-    # Check if validation failed
-    if error_reason is not None:
+    if error_reason:
         # Validation failed - dead-letter immediately
         logging.error(
-            f"[appeal-document] Validation failed for message {message_id}. "
-            f"Reason: {error_reason}, Description: {error_description}"
-        )
-        
-        receivedmessage.dead_letter(
-            reason=error_reason,
-            error_description=error_description[:4096]
-        )
-        
-        logging.warning(
-            f"[appeal-document] ✓ Message {message_id} moved to dead-letter queue. "
+            f"[appeal-document] Validation failed for message_id={message_id}. "
             f"Reason: {error_reason}"
         )
         
-        # CRITICAL: Return without raising exception
-        # This allows the function to complete successfully
-        # The message is already dead-lettered, so it won't be retried
-        return
+        # Use SDK to dead-letter with proper reason
+        success = dead_letter_with_reason(
+            connection_string=connection_string,
+            topic_name=topic,
+            subscription_name=subscription,
+            lock_token=lock_token,
+            reason=error_reason,
+            description=error_description
+        )
+        
+        if success:
+            logging.warning(
+                f"[appeal-document] ✓ Message {message_id} dead-lettered. "
+                f"Reason: {error_reason}"
+            )
+            return  # Exit cleanly - message is already dead-lettered
+        else:
+            logging.error(f"[appeal-document] Failed to dead-letter message {message_id}")
+            raise RuntimeError(f"Dead-letter failed: {error_reason}")
     
-    # =================================================================
-    # STEP 2: Upload to blob storage (only if validation passed)
-    # =================================================================
+    # ========================================================
+    # STEP 2: Upload to blob storage
+    # ========================================================
     try:
         uploaded = send_to_storage_trigger(
             account_url=_STORAGE,
             credentials=_CREDENTIAL,
             container=_CONTAINER,
             entity=topic,
-            data=payload,
+            data=payloads,
         )
         
-        if uploaded is None or not uploaded:
+        if not uploaded:
             raise RuntimeError("Blob upload returned None or False")
         
         logging.info(
-            f"[appeal-document] ✓ Message {message_id} processed successfully "
-            f"and uploaded to blob storage."
+            f"[appeal-document] ✓ Message {message_id} uploaded successfully"
         )
         
-        # Function completes successfully - message will be auto-completed
-        
     except Exception as upload_ex:
-        # Blob upload failed - dead-letter immediately
+        # Upload failed - dead-letter immediately
         error_reason = "BlobUploadFailed"
-        error_description = f"Blob upload failed: {type(upload_ex).__name__}: {str(upload_ex)}"
+        error_description = f"Upload failed: {type(upload_ex).__name__}: {str(upload_ex)}"
         
         logging.error(
-            f"[appeal-document] {error_description} - Message ID: {message_id}",
+            f"[appeal-document] {error_description}",
             exc_info=True
         )
         
-        receivedmessage.dead_letter(
+        # Use SDK to dead-letter
+        success = dead_letter_with_reason(
+            connection_string=connection_string,
+            topic_name=topic,
+            subscription_name=subscription,
+            lock_token=lock_token,
             reason=error_reason,
-            error_description=error_description[:4096]
+            description=error_description
         )
         
-        logging.warning(
-            f"[appeal-document] ✓ Message {message_id} moved to dead-letter queue. "
-            f"Reason: {error_reason}"
-        )
-        
-        # CRITICAL: Return without raising exception
-        return
+        if success:
+            logging.warning(
+                f"[appeal-document] ✓ Message {message_id} dead-lettered. "
+                f"Reason: {error_reason}"
+            )
+            return
+        else:
+            raise RuntimeError(f"Dead-letter failed: {error_reason}")
