@@ -6,6 +6,10 @@
         "isEnabled": true,
         "excludedTypes": "Request"
       }
+    },
+    "logLevel": {
+      "default": "Information",
+      "Function": "Information"
     }
   },
   "extensionBundle": {
@@ -14,9 +18,9 @@
   },
   "extensions": {
     "serviceBus": {
-      "autoCompleteMessages": true,
+      "autoCompleteMessages": false,
       "maxConcurrentCalls": 4,
       "maxAutoLockRenewalDuration": "00:05:00"
     }
   }
-} 
+}

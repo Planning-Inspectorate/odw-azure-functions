@@ -4,7 +4,7 @@ import json
 import logging
 from collections import OrderedDict
 from time import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional,Tuple
 import uuid
 import azure.functions as func
 from azure.identity import DefaultAzureCredential
@@ -336,34 +336,19 @@ def send_to_storage_trigger(
 
 #     return valid_with_properties
 
-
-class ValidationResult:
-    """Container for validation results"""
-    def __init__(self, is_valid: bool, reason: str = None, description: str = None, payload: Dict[str, Any] = None):
-        self.is_valid = is_valid
-        self.reason = reason
-        self.description = description
-        self.payload = payload
-
-
 def get_payloads_and_validate(
     messages: List[Any],
     schema: Dict[str, Any],
-    raise_on_error: bool = True,
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], Optional[str], Optional[str]]:
     """
-    Trigger-safe validator with optional error raising.
-    
-    Args:
-        messages: List of Service Bus messages
-        schema: JSON schema to validate against
-        raise_on_error: If True, raises exceptions (for retry). If False, returns empty list on error.
-    
+    Trigger-safe validator:
+      - Validate RAW payload (not enriched)
+      - Enrich AFTER validation
+      - Returns (payloads, error_reason, error_description)
+      
     Returns:
-        List of validated and enriched payloads
-        
-    When raise_on_error=False, check the returned list length.
-    If empty and message was invalid, the function will have logged the error details.
+        - (List of valid payloads, None, None) on success
+        - ([], error_reason, error_description) on validation failure
     """
 
     valid_with_properties: List[Dict[str, Any]] = []
@@ -375,8 +360,16 @@ def get_payloads_and_validate(
             # ------------------------------------------------------------------
             # 0) RAW Body extraction + debug log
             # ------------------------------------------------------------------
-            raw_bytes = m.get_body()
-            raw_payload = raw_bytes.decode("utf-8", errors="replace")
+            try:
+                raw_bytes = m.get_body()
+                raw_payload = raw_bytes.decode("utf-8", errors="replace")
+            except Exception as decode_ex:
+                logging.error(
+                    "[Body Decode Failed] message_id=%s error='%s'",
+                    message_id,
+                    str(decode_ex),
+                )
+                return ([], "BodyDecodeFailed", f"Unable to decode message body: {str(decode_ex)}")
 
             logging.info(
                 "[DEBUG] Raw message received message_id=%s raw_preview=%s",
@@ -396,17 +389,12 @@ def get_payloads_and_validate(
                     str(ex),
                     raw_payload[:300],
                 )
-                if raise_on_error:
-                    raise ValueError(f"JSON decode failed: {ex}") from ex
-                else:
-                    # Store error info in message metadata for dead-lettering
-                    setattr(m, '_validation_error_reason', 'InvalidJSON')
-                    setattr(m, '_validation_error_description', f"JSON decode failed: {str(ex)}")
-                    return []  # Return empty to signal validation failure
+                return ([], "InvalidJSON", f"JSON decode failed: {str(ex)}")
 
             # ------------------------------------------------------------------
-            # 2) Validate RAW payload (unchanged)
+            # 2) Validate RAW payload
             # ------------------------------------------------------------------
+            
             errors = validate_data(payload, schema)
             if errors:
                 logging.error(
@@ -414,16 +402,10 @@ def get_payloads_and_validate(
                     message_id,
                     errors,
                 )
-                if raise_on_error:
-                    raise ValueError(f"Schema validation failed: {errors}")
-                else:
-                    # Store error info in message metadata for dead-lettering
-                    setattr(m, '_validation_error_reason', 'SchemaValidationFailed')
-                    setattr(m, '_validation_error_description', f"Schema validation failed: {str(errors)[:4000]}")
-                    return []  # Return empty to signal validation failure
+                return ([], "SchemaValidationFailed", f"Schema validation failed: {str(errors)[:4000]}")
 
             # ------------------------------------------------------------------
-            # 3) Extract metadata (unchanged logic)
+            # 3) Extract metadata
             # ------------------------------------------------------------------
             message_type = None
             props = getattr(m, "application_properties", None)
@@ -449,7 +431,7 @@ def get_payloads_and_validate(
                 )
 
             # ------------------------------------------------------------------
-            # 4) Enrich AFTER validation (unchanged)
+            # 4) Enrich AFTER validation
             # ------------------------------------------------------------------
             enriched: Dict[str, Any] = dict(payload)
             enriched["message_type"] = message_type
@@ -459,19 +441,24 @@ def get_payloads_and_validate(
             valid_with_properties.append(enriched)
 
         except Exception as ex:
-            # Generic catch — keep for retry/DLQ handling
+            # Generic catch for unexpected errors
             logging.exception(
                 "[Processing Error] message_id=%s",
                 message_id,
             )
-            if raise_on_error:
-                raise  # IMPORTANT: do not swallow exceptions
-            else:
-                # Store error info in message metadata for dead-lettering
-                setattr(m, '_validation_error_reason', 'UnexpectedError')
-                setattr(m, '_validation_error_description', f"Unexpected error: {type(ex).__name__}: {str(ex)[:4000]}")
-                return []  # Return empty to signal validation failure
+            return ([], "UnexpectedError", f"Unexpected processing error: {type(ex).__name__}: {str(ex)[:4000]}")
 
-    return valid_with_properties
+    # Return success
+    return (valid_with_properties, None, None)
+
+
+
+
+
+
+
+
+
+
 
 
