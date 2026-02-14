@@ -858,82 +858,7 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
 
-@_app.function_name(name="testFunction")
-@_app.route(route="testFunction", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-@_app.sql_input(
-    arg_name="logs",
-    command_text="""
-    SELECT TOP (1000) [file_ID],
-                    [ingested_datetime],
-                    [ingested_by_process_name],
-                    [input_file],
-                    [modified_datetime],
-                    [modified_by_process_name],
-                    [entity_name],
-                    [rows_raw],
-                    [rows_new]
-    FROM logging.dbo.tables_logs
-    """,
-    command_type="Text",
-    connection_string_setting="SqlConnectionString"
-)
-def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResponse:
-    try:
-        rows = []
-        for r in logs:
-            rows.append(json.loads(r.to_json()))
 
-        return func.HttpResponse(
-            json.dumps(rows),
-            status_code=200,
-            mimetype="application/json"
-        )
-    except Exception as e:
-        return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-
-@_app.function_name("appealeventestimate")
-@_app.route(route="appealeventestimate", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling appeal-event-estimate service bus messages.
-    """
-    _SCHEMA = _SCHEMAS["appeal-event-estimate.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-event-estimate"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-event-estimate"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps(
-            {"message": f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-    
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
     arg_name="receivedmessage",
@@ -941,24 +866,28 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
     cardinality=func.Cardinality.ONE,
+    data_type=DataType.STRING
 )
-def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
+@_app.generic_input_binding(
+    arg_name="messageActions",
+    type="serviceBus",
+    direction="in",
+    data_type=DataType.STRING,
+    connection="ServiceBusConnectionAppeals"
+)
+def appeal_document_servicebus(
+    receivedmessage: func.ServiceBusMessage,
+    messageActions
+):
     """
-    Process appeal document messages.
+    Process appeal document messages using Python v2 SDK bindings.
     Dead-letters invalid messages immediately with proper reason.
     """
-    from servicebus_funcs import dead_letter_with_reason, get_payloads_and_validate, send_to_storage_trigger
-    
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
-    subscription = config["global"]["entities"]["appeal-document"]["subscription"]
     
     message_id = receivedmessage.message_id or "unknown"
     delivery_count = receivedmessage.delivery_count or 0
-    lock_token = receivedmessage.lock_token
-    
-    # Get connection string from environment
-    connection_string = os.environ.get("ServiceBusConnectionAppeals")
     
     logging.info(
         f"[appeal-document] Processing message_id={message_id}, "
@@ -974,31 +903,35 @@ def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
     )
     
     if error_reason:
-        # Validation failed - dead-letter immediately
+        # Validation failed - dead-letter immediately with custom reason
         logging.error(
             f"[appeal-document] Validation failed for message_id={message_id}. "
             f"Reason: {error_reason}"
         )
         
-        # Use SDK to dead-letter with proper reason
-        success = dead_letter_with_reason(
-            connection_string=connection_string,
-            topic_name=topic,
-            subscription_name=subscription,
-            lock_token=lock_token,
-            reason=error_reason,
-            description=error_description
-        )
-        
-        if success:
+        try:
+            # Use messageActions to dead-letter with custom reason
+            messageActions.dead_letter_message(
+                receivedmessage,
+                reason=error_reason,
+                error_description=error_description[:4096]
+            )
+            
             logging.warning(
                 f"[appeal-document] ✓ Message {message_id} dead-lettered. "
                 f"Reason: {error_reason}"
             )
-            return  # Exit cleanly - message is already dead-lettered
-        else:
-            logging.error(f"[appeal-document] Failed to dead-letter message {message_id}")
-            raise RuntimeError(f"Dead-letter failed: {error_reason}")
+            
+            # Return successfully - message is already dead-lettered
+            return
+            
+        except Exception as dlq_ex:
+            logging.error(
+                f"[appeal-document] Failed to dead-letter: {str(dlq_ex)}",
+                exc_info=True
+            )
+            # Fall back to raising exception
+            raise ValueError(f"{error_reason}: {error_description}")
     
     # ========================================================
     # STEP 2: Upload to blob storage
@@ -1029,21 +962,22 @@ def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
             exc_info=True
         )
         
-        # Use SDK to dead-letter
-        success = dead_letter_with_reason(
-            connection_string=connection_string,
-            topic_name=topic,
-            subscription_name=subscription,
-            lock_token=lock_token,
-            reason=error_reason,
-            description=error_description
-        )
-        
-        if success:
+        try:
+            # Use messageActions to dead-letter
+            messageActions.dead_letter_message(
+                receivedmessage,
+                reason=error_reason,
+                error_description=error_description[:4096]
+            )
+            
             logging.warning(
                 f"[appeal-document] ✓ Message {message_id} dead-lettered. "
                 f"Reason: {error_reason}"
             )
             return
-        else:
-            raise RuntimeError(f"Dead-letter failed: {error_reason}")
+            
+        except Exception as dlq_ex:
+            logging.error(
+                f"[appeal-document] Failed to dead-letter: {str(dlq_ex)}"
+            )
+            raise RuntimeError(f"{error_reason}: {error_description}")
