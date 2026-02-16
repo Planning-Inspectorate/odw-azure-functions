@@ -5,7 +5,7 @@ One function for each Service us topic
 
 import logging
 import azure.functions as func
-from servicebus_funcs import send_to_storage,send_to_storage_trigger,get_messages_and_validate,get_payloads_and_validate
+from servicebus_funcs import send_to_storage,send_to_storage_trigger,get_messages_and_validate,get_payloads_and_validate,dead_letter_message
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
@@ -13,7 +13,10 @@ from azure.functions.decorators.core import DataType
 import json
 import os
 from typing import List
-from azure.servicebus import ServiceBusClient, ServiceBusMessage
+
+
+
+
 
 _STORAGE = ""
 _CONTAINER = ""
@@ -858,98 +861,164 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
 
+@_app.function_name(name="testFunction")
+@_app.route(route="testFunction", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+@_app.sql_input(
+    arg_name="logs",
+    command_text="""
+    SELECT TOP (1000) [file_ID],
+                    [ingested_datetime],
+                    [ingested_by_process_name],
+                    [input_file],
+                    [modified_datetime],
+                    [modified_by_process_name],
+                    [entity_name],
+                    [rows_raw],
+                    [rows_new]
+    FROM logging.dbo.tables_logs
+    """,
+    command_type="Text",
+    connection_string_setting="SqlConnectionString"
+)
+def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResponse:
+    try:
+        rows = []
+        for r in logs:
+            rows.append(json.loads(r.to_json()))
 
+        return func.HttpResponse(
+            json.dumps(rows),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+
+@_app.function_name("appealeventestimate")
+@_app.route(route="appealeventestimate", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
+def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function endpoint for handling appeal-event-estimate service bus messages.
+    """
+    _SCHEMA = _SCHEMAS["appeal-event-estimate.schema.json"]
+    _TOPIC = config["global"]["entities"]["appeal-event-estimate"]["topic"]
+    _SUBSCRIPTION = config["global"]["entities"]["appeal-event-estimate"]["subscription"]
+
+    try:
+        _data = get_messages_and_validate(
+            namespace=_NAMESPACE_APPEALS,
+            credential=_CREDENTIAL,
+            topic=_TOPIC,
+            subscription=_SUBSCRIPTION,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time=_MAX_WAIT_TIME,
+            schema=_SCHEMA,
+        )
+        _message_count = send_to_storage(
+            account_url=_STORAGE,
+            credential=_CREDENTIAL,
+            container=_CONTAINER,
+            entity=_TOPIC,
+            data=_data,
+        )
+
+        response = json.dumps(
+            {"message": f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+
+        return func.HttpResponse(
+            response,
+            status_code=200
+        )
+
+    except Exception as e:
+        return (
+            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
+            if f"{_VALIDATION_ERROR}" in str(e)
+            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )
+    
+
+# -------------------------------
+# APPEAL DOCUMENT TRIGGER
+# -------------------------------
 @_app.function_name(name="appeal_document_trigger")
 @_app.service_bus_topic_trigger(
-    arg_name="receivedmessage",
+    arg_name="message",
     topic_name=config["global"]["entities"]["appeal-document"]["topic"],
     subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
     connection="ServiceBusConnectionAppeals",
     cardinality=func.Cardinality.ONE,
 )
-def appeal_document_servicebus(receivedmessage: func.ServiceBusMessage):
-    """
-    Process appeal document messages.
-    Dead-letters invalid messages on first attempt.
-    """
+def appealdocument_servicebus(message):
+
     schema = _SCHEMAS["appeal-document.schema.json"]
     topic = config["global"]["entities"]["appeal-document"]["topic"]
-    
-    message_id = receivedmessage.message_id or "unknown"
-    delivery_count = receivedmessage.delivery_count or 0
-    
-    logging.info(
-        f"[appeal-document] Processing message_id={message_id}, "
-        f"delivery_count={delivery_count}"
+
+    # Validation failure → DO NOT RETRY → dead-letter immediately
+    payload = get_payloads_and_validate([message], schema)
+    if not payload:
+        logging.warning("Invalid message; dead-lettering")
+        dead_letter_message(
+            message,
+            reason="Invalid schema",
+            description="Schema validation failed for appeal-document"
+        )
+        return   # Important: avoid retries
+
+    # Normal processing
+    uploaded = send_to_storage_trigger(
+        account_url=_STORAGE,
+        credential=_CREDENTIAL,
+        container=_CONTAINER,
+        entity=topic,
+        data=payload,
     )
-    
-    # ========================================================
-    # STEP 1: Validate message
-    # ========================================================
-    payloads, error_reason, error_description = get_payloads_and_validate(
-        [receivedmessage],
-        schema
+
+    # Upload failure → real operational issue → allow retries
+    if uploaded is None:
+        raise RuntimeError("Storage upload failed")
+
+    logging.info("Processed message successfully")
+
+
+# -------------------------------
+# NSIP DOCUMENT TRIGGER
+# -------------------------------
+@_app.function_name(name="nsip_document_trigger")
+@_app.service_bus_topic_trigger(
+    arg_name="message",
+    topic_name=config["global"]["entities"]["nsip-document"]["topic"],
+    subscription_name=config["global"]["entities"]["nsip-document"]["subscription"],
+    connection="ServiceBusConnection",
+    cardinality=func.Cardinality.ONE,
+)
+def nsipdocument_servicebus(message):
+
+    schema = _SCHEMAS["nsip-document.schema.json"]
+    topic = config["global"]["entities"]["nsip-document"]["topic"]
+
+    # Validation failure → DO NOT RETRY → dead-letter immediately
+    payload = get_payloads_and_validate([message], schema)
+    if not payload:
+        logging.warning("Invalid message; dead-lettering")
+        dead_letter_message(
+            message,
+            reason="Invalid schema",
+            description="Schema validation failed for nsip-document"
+        )
+        return
+
+    # Normal processing
+    uploaded = send_to_storage_trigger(
+        account_url=_STORAGE,
+        credential=_CREDENTIAL,
+        container=_CONTAINER,
+        entity=topic,
+        data=payload,
     )
-    
-    if error_reason:
-        # Validation failed - add custom properties and raise exception
-        logging.error(
-            f"[appeal-document] Validation failed for message_id={message_id}. "
-            f"Reason: {error_reason}, Description: {error_description}"
-        )
-        
-        # Add custom dead-letter reason to application properties
-        # (These will be visible in Azure Portal on the dead-lettered message)
-        try:
-            if receivedmessage.application_properties is None:
-                receivedmessage.application_properties = {}
-            
-            receivedmessage.application_properties['DeadLetterReason'] = error_reason
-            receivedmessage.application_properties['DeadLetterErrorDescription'] = error_description[:4000]
-            receivedmessage.application_properties['ProcessingTimestamp'] = str(receivedmessage.enqueued_time_utc)
-        except Exception as prop_ex:
-            logging.warning(f"Could not set application properties: {str(prop_ex)}")
-        
-        # Raise exception to trigger dead-lettering
-        # With maxDeliveryCount=1, this goes to DLQ immediately
-        raise ValueError(f"[{error_reason}] {error_description}")
-    
-    # ========================================================
-    # STEP 2: Upload to blob storage
-    # ========================================================
-    try:
-        uploaded = send_to_storage_trigger(
-            account_url=_STORAGE,
-            credentials=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=topic,
-            data=payloads,
-        )
-        
-        if not uploaded:
-            raise RuntimeError("Blob upload returned None or False")
-        
-        logging.info(
-            f"[appeal-document] ✓ Message {message_id} uploaded successfully"
-        )
-        
-    except Exception as upload_ex:
-        # Upload failed - add custom properties and raise
-        error_reason = "BlobUploadFailed"
-        error_description = f"Upload failed: {type(upload_ex).__name__}: {str(upload_ex)}"
-        
-        logging.error(
-            f"[appeal-document] {error_description}",
-            exc_info=True
-        )
-        
-        try:
-            if receivedmessage.application_properties is None:
-                receivedmessage.application_properties = {}
-            
-            receivedmessage.application_properties['DeadLetterReason'] = error_reason
-            receivedmessage.application_properties['DeadLetterErrorDescription'] = error_description[:4000]
-        except Exception as prop_ex:
-            logging.warning(f"Could not set application properties: {str(prop_ex)}")
-        
-        raise RuntimeError(f"[{error_reason}] {error_description}")
+
+    # Upload failure → real operational issue → allow retries
+    if uploaded is None:
+        raise RuntimeError("Storage upload failed")
+
+    logging.info("Processed message successfully")

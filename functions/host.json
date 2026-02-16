@@ -1,27 +1,27 @@
 {
   "version": "2.0",
+
   "logging": {
     "applicationInsights": {
       "samplingSettings": {
         "isEnabled": true,
         "excludedTypes": "Request"
       }
-    },
-    "logLevel": {
-      "default": "Information",
-      "Function": "Information"
     }
   },
+
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.0.0, 5.0.0)"
   },
+
   "extensions": {
     "serviceBus": {
-      "prefetchCount": 0,
-      "autoCompleteMessages": true,
-      "maxConcurrentCalls": 1,
-      "maxAutoLockRenewalDuration": "00:05:00"
+      "ProcessingOptions": {
+        "maxConcurrentCalls": 4,
+        "autoCompleteMessages": true,
+        "maxAutoLockRenewalDuration": "00:05:00"
+      }
     }
   }
 }
