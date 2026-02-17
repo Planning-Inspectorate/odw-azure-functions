@@ -1,18 +1,69 @@
-"""
-Module containing functions to read messages from Service Bus and send them to Azure Storage.
 
-Functions:
-- get_messages: Retrieve messages from a Service Bus topic subscription.
-- send_to_storage: Upload data to Azure Blob Storage.
-"""
-
-import logging
-from azure.servicebus import ServiceBusClient
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
+from __future__ import annotations
 import json
+import logging
+from collections import OrderedDict
+from time import time
+from typing import Any, Dict, List, Optional
+import uuid
+import azure.functions as func
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient,ContentSettings
+from azure.servicebus import ServiceBusClient
+# Your validator (adjust the module path if different)
 from validate_messages import validate_data
+from azure.functions import ServiceBusMessage
+from var_funcs import current_date  # keep your existing helper
+from azure.core.exceptions import ResourceExistsError, AzureError
 
+def send_to_storage(
+    account_url: str,
+    credential: DefaultAzureCredential,
+    container: str,
+    entity: str,
+    data: list[list | dict],
+) -> int:
+    """
+    Upload data to Azure Blob Storage.
+
+    Args:
+        account_url (str): The URL of the Azure Blob Storage account.
+        credential: The credential object for authentication.
+        container (str): The name of the container in Azure Blob Storage.
+        entity (str): The name of the entity, e.g. service-user, nsip-project
+        data: The data to be uploaded.
+
+    Returns:
+        int: a count of messages processed. This is used in the http response body.
+    """
+
+    from var_funcs import current_date, current_time
+
+    _CURRENT_DATE = current_date()
+    _CURRENT_TIME = current_time()
+    _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
+
+    try:
+        if data:
+            print("Creating blob service client...")
+            blob_service_client = BlobServiceClient(account_url, credential)
+            print("Blob service client created")
+            blob_client = blob_service_client.get_blob_client(container, blob=_FILENAME)
+            print("Converting data to json format...")
+            json_data = json.dumps(data)
+            print("Data converted to json")
+            print("Uploading file to storage...")
+            blob_client.upload_blob(json_data, overwrite=True)
+            print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
+
+        else:
+            print("No messages to send to storage")
+
+    except Exception as e:
+        print(f"Error sending to storage account\n{e}")
+        raise e
+
+    return len(data)
 
 def get_messages_and_validate(
     namespace: str,
@@ -129,52 +180,131 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
-
-def send_to_storage(
+def append_to_storage_batch(
     account_url: str,
     credential: DefaultAzureCredential,
     container: str,
     entity: str,
-    data: list[list | dict],
-) -> int:
+    record: Dict[str, Any],
+) -> str:
     """
-    Upload data to Azure Blob Storage.
-
-    Args:
-        account_url (str): The URL of the Azure Blob Storage account.
-        credential: The credential object for authentication.
-        container (str): The name of the container in Azure Blob Storage.
-        entity (str): The name of the entity, e.g. service-user, nsip-project
-        data: The data to be uploaded.
-
-    Returns:
-        int: a count of messages processed. This is used in the http response body.
+    Append a single NDJSON record to an hourly-partitioned Append Blob.
+    Returns the blob path.
+    Raises AzureError for non-recoverable storage errors.
     """
+    now = datetime.now(timezone.utc)
+    hour = now.strftime("%H")
+    blob_name = f"{entity}/{current_date()}/{entity}_{hour}.ndjson"
 
-    from var_funcs import current_date, current_time
+    blob_service = BlobServiceClient(account_url=account_url, credential=credential)
+    blob_client = blob_service.get_blob_client(container=container, blob=blob_name)
 
-    _CURRENT_DATE = current_date()
-    _CURRENT_TIME = current_time()
-    _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
+    # Create append blob if it doesn't exist (race-safe)
+    try:
+        blob_client.create_append_blob(
+            if_none_match="*",
+            content_settings=ContentSettings(
+                content_type="application/x-ndjson; charset=utf-8"
+            ),
+        )
+        # Optionally log "created"
+        logging.debug("Created append blob %s", blob_name)
+    except ResourceExistsError:
+        # Another writer already created it—fine to proceed
+        pass
+
+    line = json.dumps(record, ensure_ascii=False) + "\n"
+    data = line.encode("utf-8")
 
     try:
-        if data:
-            print("Creating blob service client...")
-            blob_service_client = BlobServiceClient(account_url, credential)
-            print("Blob service client created")
-            blob_client = blob_service_client.get_blob_client(container, blob=_FILENAME)
-            print("Converting data to json format...")
-            json_data = json.dumps(data)
-            print("Data converted to json")
-            print("Uploading file to storage...")
-            blob_client.upload_blob(json_data, overwrite=True)
-            print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
+        blob_client.append_block(data, timeout=30)
+    except AzureError:
+        logging.exception("Append failed for %s", blob_name)
+        raise
 
-        else:
-            print("No messages to send to storage")
+    logging.debug("Appended %d bytes to %s", len(data), blob_name)
+    return blob_name
 
-    except Exception as e:
-        print(f"Error sending to storage account\n{e}")
-        raise e
 
-    return len(data)
+
+def get_payloads_and_validate(
+    messages: List[Any],
+    schema: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """
+    Trigger-safe validator:
+      - Validate RAW payload (not enriched)
+      - Enrich AFTER validation
+      - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
+      - Robust message_type extraction (matches existing function)
+      - Excludes delivery_count and content_type
+
+    IMPORTANT:
+      - Validation and processing failures RAISE
+      - This enables retry + DLQ and prevents silent data loss
+    """
+    
+    valid_with_properties: List[Dict[str, Any]] = []
+
+    for m in messages:
+        message_id = getattr(m, "message_id", "<unknown>")
+
+        try:
+            # 1) Decode RAW payload
+            payload = json.loads(m.get_body().decode("utf-8"))
+
+            # 2) Validate RAW payload
+            errors = validate_data(payload, schema)
+            if errors:
+                logging.error(
+                    "[Validation Failed] message_id=%s errors=%s",
+                    message_id,
+                    errors,
+                )
+                # RAISE -> retry + DLQ
+                raise ValueError(f"Schema validation failed: {errors}")
+
+            # 3) Extract metadata (unchanged logic)
+            message_type = None
+            props = getattr(m, "application_properties", None)
+            if props:
+                raw_type = None
+                if b"type" in props:
+                    raw_type = props.get(b"type")
+                elif "type" in props:
+                    raw_type = props.get("type")
+
+                if raw_type is not None:
+                    message_type = (
+                        raw_type.decode("utf-8")
+                        if isinstance(raw_type, (bytes, bytearray))
+                        else str(raw_type)
+                    )
+
+            message_enqueued_time_utc = None
+            if getattr(m, "enqueued_time_utc", None):
+                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                    "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
+
+            # 4) Enrich AFTER validation (metadata appended at the END)
+            #    - Start with the original payload to preserve its field order
+            #    - Then add metadata so it appears at the end of the dict
+            enriched: Dict[str, Any] = dict(payload)  # make a shallow copy to avoid mutating original
+            enriched["message_type"] = message_type
+            enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+            enriched["message_id"] = message_id
+
+            valid_with_properties.append(enriched)
+
+        except Exception:
+            logging.exception(
+                "[Processing Error] message_id=%s",
+                message_id,
+            )
+            # RAISE so Azure retries / DLQs
+            raise
+
+    return valid_with_properties
+
+

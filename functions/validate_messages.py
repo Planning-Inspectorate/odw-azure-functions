@@ -8,6 +8,12 @@ check that the date-time is compliant with ISO8601.
 
 from jsonschema import validate, FormatChecker, ValidationError
 from iso8601 import parse_date, ParseError
+import logging
+import json
+import azure.functions as func
+from typing import List, Dict, Any
+
+
 
 
 def is_iso8601_date_time(instance) -> bool:
@@ -40,3 +46,5 @@ def validate_data(message, schema: dict) -> bool:
         error_path = "/".join([str(p) for p in e.path]) or "<root>"
         errors = [f"{error_path}: {e.message}"]
     return errors
+
+

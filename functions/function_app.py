@@ -5,13 +5,19 @@ One function for each Service us topic
 
 import logging
 import azure.functions as func
-from servicebus_funcs import get_messages_and_validate, send_to_storage
+from servicebus_funcs import send_to_storage,append_to_storage_batch,get_messages_and_validate,get_payloads_and_validate
 from set_environment import current_config, config
 from var_funcs import CREDENTIAL
 from pins_data_model import load_schemas
 from azure.functions.decorators.core import DataType
 import json
 import os
+from typing import List
+from validate_messages import validate_data
+
+
+
+
 
 _STORAGE = ""
 _CONTAINER = ""
@@ -22,7 +28,7 @@ try:
     _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
     _CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
     _NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
-    _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
+    _NAMESPACE_APPEALS = os.environ["ServiceBusConnectionAppeals__fullyQualifiedNamespace"]
 except:
     print("Warning: Missing Environment Variables")
 
@@ -772,7 +778,6 @@ def appeals78(req: func.HttpRequest) -> func.HttpResponse:
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
     
-
 @_app.function_name("appealrepresentation")
 @_app.route(route="appealrepresentation", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 def appealrepresentation(req: func.HttpRequest) -> func.HttpResponse:
@@ -932,3 +937,120 @@ def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
             if f"{_VALIDATION_ERROR}" in str(e)
             else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
+    
+
+@_app.function_name(name="appeal_document_trigger")
+@_app.service_bus_topic_trigger(
+    arg_name="message",
+    topic_name=config["global"]["entities"]["appeal-document"]["topic"],
+    subscription_name=config["global"]["entities"]["appeal-document"]["subscription"],
+    connection="ServiceBusConnectionAppeals",
+    cardinality=func.Cardinality.ONE,
+)
+def appealdocument_servicebus(message: func.ServiceBusMessage) -> None:
+    schema = _SCHEMAS["appeal-document.schema.json"]
+    topic = config["global"]["entities"]["appeal-document"]["topic"]
+
+    message_id = getattr(message, "message_id", "<unknown>")
+
+    try:
+        # -------------------------------------------------------
+        # 1) Decode message
+        # -------------------------------------------------------
+        try:
+            payload = json.loads(message.get_body().decode("utf-8"))
+        except Exception as e:
+            logging.error(
+                "[appeal-document][INVALID_JSON] message_id=%s error=%s",
+                message_id,
+                str(e),
+            )
+            # Bad message → send to DLQ (no retries)
+            message.dead_letter(
+                reason="Invalid JSON",
+                error_description=str(e),
+            )
+            return
+
+        # -------------------------------------------------------
+        # 2) Schema validation
+        # -------------------------------------------------------
+        errors = validate_data(payload, schema)
+        if errors:
+            logging.error(
+                "[appeal-document][INVALID_SCHEMA] message_id=%s errors=%s",
+                message_id,
+                errors,
+            )
+            # Bad message → send to DLQ (no retries)
+            message.dead_letter(
+                reason="Schema validation failed",
+                error_description=json.dumps(errors),
+            )
+            return
+
+        # -------------------------------------------------------
+        # 3) Extract metadata
+        # -------------------------------------------------------
+        message_type = None
+        props = getattr(message, "application_properties", None)
+        if props:
+            raw_type = props.get(b"type") if b"type" in props else props.get("type")
+            if raw_type is not None:
+                message_type = (
+                    raw_type.decode("utf-8")
+                    if isinstance(raw_type, (bytes, bytearray))
+                    else str(raw_type)
+                )
+
+        message_enqueued_time_utc = None
+        if getattr(message, "enqueued_time_utc", None):
+            message_enqueued_time_utc = message.enqueued_time_utc.strftime(
+                "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
+
+        enriched = dict(payload)
+        enriched["message_type"] = message_type
+        enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+        enriched["message_id"] = message_id
+
+        # -------------------------------------------------------
+        # 4) Append to storage (transient errors should retry)
+        # -------------------------------------------------------
+        try:
+            out_file = append_to_storage_batch(
+                account_url=_STORAGE,
+                credential=_CREDENTIAL,
+                container=_CONTAINER,
+                entity=topic,
+                record=enriched,
+            )
+        except Exception as e:
+            logging.exception(
+                "[appeal-document][STORAGE_FAIL] message_id=%s error=%s",
+                message_id,
+                str(e),
+            )
+            # Transient error → retry, NOT DLQ
+            message.abandon()
+            return
+
+        logging.info(
+            "[appeal-document][OK] message_id=%s appended_to=%s",
+            message_id,
+            out_file,
+        )
+
+        # -------------------------------------------------------
+        # 5) Success → complete message
+        # -------------------------------------------------------
+        message.complete()
+
+    except Exception as e:
+        # Anything unexpected → retry instead of DLQ
+        logging.exception(
+            "[appeal-document][FAIL_UNEXPECTED] message_id=%s error=%s",
+            message_id,
+            str(e),
+        )
+        message.abandon()
