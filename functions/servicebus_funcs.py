@@ -1,18 +1,67 @@
-"""
-Module containing functions to read messages from Service Bus and send them to Azure Storage.
 
-Functions:
-- get_messages: Retrieve messages from a Service Bus topic subscription.
-- send_to_storage: Upload data to Azure Blob Storage.
-"""
-
-import logging
-from azure.servicebus import ServiceBusClient
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
+from __future__ import annotations
 import json
+import logging
+from collections import OrderedDict
+from time import time
+from typing import Any, Dict, List, Optional
+import uuid
+import azure.functions as func
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient,ContentSettings
+from azure.servicebus import ServiceBusClient
+# Your validator (adjust the module path if different)
 from validate_messages import validate_data
+from azure.functions import ServiceBusMessage
 
+def send_to_storage(
+    account_url: str,
+    credential: DefaultAzureCredential,
+    container: str,
+    entity: str,
+    data: list[list | dict],
+) -> int:
+    """
+    Upload data to Azure Blob Storage.
+
+    Args:
+        account_url (str): The URL of the Azure Blob Storage account.
+        credential: The credential object for authentication.
+        container (str): The name of the container in Azure Blob Storage.
+        entity (str): The name of the entity, e.g. service-user, nsip-project
+        data: The data to be uploaded.
+
+    Returns:
+        int: a count of messages processed. This is used in the http response body.
+    """
+
+    from var_funcs import current_date, current_time
+
+    _CURRENT_DATE = current_date()
+    _CURRENT_TIME = current_time()
+    _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
+
+    try:
+        if data:
+            print("Creating blob service client...")
+            blob_service_client = BlobServiceClient(account_url, credential)
+            print("Blob service client created")
+            blob_client = blob_service_client.get_blob_client(container, blob=_FILENAME)
+            print("Converting data to json format...")
+            json_data = json.dumps(data)
+            print("Data converted to json")
+            print("Uploading file to storage...")
+            blob_client.upload_blob(json_data, overwrite=True)
+            print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
+
+        else:
+            print("No messages to send to storage")
+
+    except Exception as e:
+        print(f"Error sending to storage account\n{e}")
+        raise e
+
+    return len(data)
 
 def get_messages_and_validate(
     namespace: str,
@@ -129,52 +178,178 @@ def get_messages_and_validate(
 
     return valid_with_properties
 
-
-def send_to_storage(
+def send_to_storage_trigger(
     account_url: str,
     credential: DefaultAzureCredential,
     container: str,
     entity: str,
-    data: list[list | dict],
-) -> int:
+    data: List[Dict[str, Any]],
+) -> Optional[int]:
     """
-    Upload data to Azure Blob Storage.
-
-    Args:
-        account_url (str): The URL of the Azure Blob Storage account.
-        credential: The credential object for authentication.
-        container (str): The name of the container in Azure Blob Storage.
-        entity (str): The name of the entity, e.g. service-user, nsip-project
-        data: The data to be uploaded.
+    Safe blob uploader.
 
     Returns:
-        int: a count of messages processed. This is used in the http response body.
+        - positive int: number of records uploaded (success)
+        - 0: no valid payloads (nothing to upload)
+        - None: upload attempt failed (transient/permanent storage error)
+
+    Never raises to caller.
     """
 
+    if not data:
+        # Important: this is not a failure; just nothing to do.
+        logging.info("No valid data to upload for entity '%s'; skipping blob write.", entity)
+        return 0
+
+    # Keep your date/time partitioning but ensure uniqueness with a GUID.
     from var_funcs import current_date, current_time
 
-    _CURRENT_DATE = current_date()
-    _CURRENT_TIME = current_time()
-    _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
+    guid = uuid.uuid4().hex  # 32 chars, no hyphens
+    filename = f"{entity}/{current_date()}/{entity}_{current_time()}_{guid}.json"
 
     try:
-        if data:
-            print("Creating blob service client...")
-            blob_service_client = BlobServiceClient(account_url, credential)
-            print("Blob service client created")
-            blob_client = blob_service_client.get_blob_client(container, blob=_FILENAME)
-            print("Converting data to json format...")
-            json_data = json.dumps(data)
-            print("Data converted to json")
-            print("Uploading file to storage...")
-            blob_client.upload_blob(json_data, overwrite=True)
-            print(f"JSON file '{_FILENAME}' uploaded to Azure Blob Storage.")
+        blob_service = BlobServiceClient(account_url=account_url, credential=credential)
+        blob_client = blob_service.get_blob_client(container=container, blob=filename)
 
-        else:
-            print("No messages to send to storage")
+        blob_client.upload_blob(
+            json.dumps(data, ensure_ascii=False),
+            overwrite=False,  # with GUID we do not expect collisions; fail fast if it ever happens
+            content_settings=ContentSettings(content_type="application/json; charset=utf-8"),
+        )
 
-    except Exception as e:
-        print(f"Error sending to storage account\n{e}")
-        raise e
+        logging.info("Uploaded %d records to %s", len(data), filename)
+        return len(data)
 
-    return len(data)
+    except Exception:
+        # This is a real failure and should cause the trigger to retry.
+        logging.exception("Storage upload failed for blob %s", filename)
+        return None
+
+
+def get_payloads_and_validate(
+    messages: List[Any],
+    schema: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """
+    Trigger-safe validator:
+      - Validate RAW payload (not enriched)
+      - Enrich AFTER validation
+      - Field order: <payload fields>, message_type, message_enqueued_time_utc, message_id
+      - Robust message_type extraction (matches existing function)
+      - Excludes delivery_count and content_type
+
+    IMPORTANT:
+      - Validation and processing failures RAISE
+      - This enables retry + DLQ and prevents silent data loss
+    """
+
+    valid_with_properties: List[Dict[str, Any]] = []
+
+    for m in messages:
+        message_id = getattr(m, "message_id", "<unknown>")
+
+        try:
+            # ------------------------------------------------------------------
+            # 0) RAW Body extraction + debug log
+            # ------------------------------------------------------------------
+            raw_bytes = m.get_body()
+            raw_payload = raw_bytes.decode("utf-8", errors="replace")
+
+            logging.info(
+                "[DEBUG] Raw message received message_id=%s raw_preview=%s",
+                message_id,
+                raw_payload[:300],  # safe preview
+            )
+
+            # ------------------------------------------------------------------
+            # 1) Decode RAW JSON with explicit error handler
+            # ------------------------------------------------------------------
+            try:
+                payload = json.loads(raw_payload)
+            except json.JSONDecodeError as ex:
+                logging.error(
+                    "[Invalid JSON] message_id=%s error='%s' raw_preview=%s",
+                    message_id,
+                    str(ex),
+                    raw_payload[:300],
+                )
+                # RAISE => triggers retry until maxDeliveryCount is hit
+                # If maxDeliveryCount = 1, message will DLQ immediately.
+                raise ValueError(f"JSON decode failed: {ex}") from ex
+
+            # ------------------------------------------------------------------
+            # 2) Validate RAW payload (unchanged)
+            # ------------------------------------------------------------------
+            errors = validate_data(payload, schema)
+            if errors:
+                logging.error(
+                    "[Validation Failed] message_id=%s errors=%s",
+                    message_id,
+                    errors,
+                )
+                # RAISE => retry + DLQ
+                raise ValueError(f"Schema validation failed: {errors}")
+
+            # ------------------------------------------------------------------
+            # 3) Extract metadata (unchanged logic)
+            # ------------------------------------------------------------------
+            message_type = None
+            props = getattr(m, "application_properties", None)
+
+            if props:
+                raw_type = None
+                if b"type" in props:
+                    raw_type = props.get(b"type")
+                elif "type" in props:
+                    raw_type = props.get("type")
+
+                if raw_type is not None:
+                    message_type = (
+                        raw_type.decode("utf-8")
+                        if isinstance(raw_type, (bytes, bytearray))
+                        else str(raw_type)
+                    )
+
+            message_enqueued_time_utc = None
+            if getattr(m, "enqueued_time_utc", None):
+                message_enqueued_time_utc = m.enqueued_time_utc.strftime(
+                    "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
+
+            # ------------------------------------------------------------------
+            # 4) Enrich AFTER validation (unchanged)
+            # ------------------------------------------------------------------
+            enriched: Dict[str, Any] = dict(payload)
+            enriched["message_type"] = message_type
+            enriched["message_enqueued_time_utc"] = message_enqueued_time_utc
+            enriched["message_id"] = message_id
+
+            valid_with_properties.append(enriched)
+
+        except Exception:
+            # Generic catch — keep for retry/DLQ handling
+            logging.exception(
+                "[Processing Error] message_id=%s",
+                message_id,
+            )
+            raise  # IMPORTANT: do not swallow exceptions
+
+    return valid_with_properties
+
+
+
+def dead_letter_message(message, reason: str, description: str):
+    try:
+        message.dead_letter(
+            reason=reason,
+            error_description=description,
+        )
+        logging.info(f"Message dead-lettered: {reason} – {description}")
+    except Exception as ex:
+        logging.error(f"Failed to dead-letter message: {ex}")
+        raise
+
+    
+
+
+
