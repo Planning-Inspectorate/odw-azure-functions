@@ -3,14 +3,13 @@ ODW Azure Functions - Service Bus ingestion
 
 This module is intentionally thin:
 - Load env + config + schemas once
-- Register all HTTP (pull) functions in a loop (Same as we had)
-- Register Service Bus trigger functions in a loop (new pattern)
+- Register all HTTP (pull) functions in a loop (as before)
+- Register Wake & Drain trigger functions in a loop (kind of real time with proper DLQ reasons)
 """
 
 from __future__ import annotations
 
 import json
-import logging
 import os
 from typing import Callable
 
@@ -21,7 +20,7 @@ from var_funcs import CREDENTIAL
 from set_environment import config
 from servicebus_funcs import get_messages_and_validate, send_to_storage
 from entity_registry import EntitySpec, all_entities
-from sb_trigger_processor import process_servicebus_trigger_message
+from sb_wake_drain_processor import process_wake_and_drain
 
 # Environment
 try:
@@ -43,22 +42,20 @@ _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
 _app = func.FunctionApp()
 
-# Toggle: which entities are enabled as Service Bus triggers
-# Later: set this to all entity keys OR control with an env var
-_SB_TRIGGER_ENABLED_ENTITY_KEYS = {"appeal-document"}
+# Pilot toggle Wake & Drain
+# Later: set to all entities OR via env var
+_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document"}
 
-# HTTP pull handler factory (keeps the approach that we had)
 
 def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], func.HttpResponse]:
     """
-    Builds an HTTP GET handler for an entity.
+    Builds an HTTP GET handler for an entity
     """
     def _handler(req: func.HttpRequest) -> func.HttpResponse:
         schema = _SCHEMAS[entity.schema_filename]
         topic = entity.topic
         subscription = entity.subscription
 
-        # HTTP pull (the way it was)
         namespace = os.environ.get(entity.http_namespace_env_var, "")
 
         try:
@@ -97,31 +94,33 @@ def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], 
     return _handler
 
 
-# Service Bus trigger handler factory (new)
-
-def _make_servicebus_trigger_handler(entity: EntitySpec) -> Callable[[func.ServiceBusMessage], None]:
+def _make_wake_drain_trigger_handler(entity: EntitySpec) -> Callable[[func.ServiceBusMessage], None]:
     """
-    Builds a Service Bus trigger handler for an entity.
+    Builds a Service Bus trigger handler for an entity
+
+    The trigger listens to entity.trigger_subscription (the wake subscription)
+    The draining is performed against entity.subscription (the real subscription for e.g appeal-document-odw-sub)
     """
     def _handler(msg: func.ServiceBusMessage) -> None:
         schema = _SCHEMAS[entity.schema_filename]
 
-        process_servicebus_trigger_message(
-            msg=msg,
+        namespace = os.environ.get(entity.http_namespace_env_var, "")
+
+        process_wake_and_drain(
+            wake_msg=msg,
             entity=entity,
             schema=schema,
             storage_account_url=_STORAGE,
             storage_container=_CONTAINER,
             credential=_CREDENTIAL,
-            validation_error_token=_VALIDATION_ERROR,
+            namespace=namespace,
+            max_message_count=_MAX_MESSAGE_COUNT,
+            max_wait_time_seconds=_MAX_WAIT_TIME,
         )
 
     return _handler
 
-# Register the functions here
-
 for entity in all_entities():
-    # Register HTTP pull endpoint
     http_fn_name = entity.route
     http_route = entity.route
 
@@ -131,17 +130,21 @@ for entity in all_entities():
         )
     )
 
-    # Register Service Bus trigger
-    if entity.key in _SB_TRIGGER_ENABLED_ENTITY_KEYS:
-        sb_fn_name = f"{entity.route}_sb"
+    if entity.key in _WAKE_DRAIN_ENABLED_ENTITY_KEYS:
+        if not entity.wake_subscription:
+            raise ValueError(
+                f"Wake&Drain enabled for {entity.key} but no wake_subscription is configured"
+            )
+
+        sb_fn_name = f"{entity.route}_wake_drain"
 
         _app.function_name(sb_fn_name)(
             _app.service_bus_topic_trigger(
                 arg_name="msg",
                 topic_name=entity.topic,
-                subscription_name=entity.subscription,
+                subscription_name=entity.trigger_subscription,
                 connection=entity.sb_connection,
             )(
-                _make_servicebus_trigger_handler(entity)
+                _make_wake_drain_trigger_handler(entity)
             )
         )
