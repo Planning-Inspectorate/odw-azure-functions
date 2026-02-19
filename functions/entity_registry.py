@@ -1,5 +1,5 @@
 """
-Entity registry for ODW Azure Functions.
+Entity registry for ODW Azure Functions
 
 Goal:
 - Keep entity definitions in one place
@@ -31,19 +31,19 @@ class EntitySpec:
     subscription: str  # the REAL subscription we drain (e.g. appeal-document-odw-sub)
     schema_filename: str  # e.g. "appeal-document.schema.json"
 
-    # Service Bus connection prefix (identity-based) for trigger binding
+    # Service Bus connection prefix (identity based) for trigger binding
     sb_connection: str
 
     # HTTP pull uses explicit namespace env vars
     http_namespace_env_var: str
 
-    # Storage folder name override (rare cases)
+    # Storage folder name override (rare cases - I think like nsip-project)
     storage_entity_override: Optional[str] = None
 
     # HTTP route override (normally key without hyphens)
     http_route: Optional[str] = None
 
-    # Optional wake subscription that triggers the function (wake-only, we do NOT drain this)
+    # Optional wake subscription that triggers the function (wake only, we do NOT drain this)
     wake_subscription: Optional[str] = None
 
     @property

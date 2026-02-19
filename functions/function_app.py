@@ -43,7 +43,7 @@ _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 _app = func.FunctionApp()
 
 # Pilot toggle Wake & Drain
-# Later: set to all entities OR via env var
+# Later: set to all entities OR via env var (which would be better tbh)
 _WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document"}
 
 
@@ -97,7 +97,6 @@ def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], 
 def _make_wake_drain_trigger_handler(entity: EntitySpec) -> Callable[[func.ServiceBusMessage], None]:
     """
     Builds a Service Bus trigger handler for an entity
-
     The trigger listens to entity.trigger_subscription (the wake subscription)
     The draining is performed against entity.subscription (the real subscription for e.g appeal-document-odw-sub)
     """

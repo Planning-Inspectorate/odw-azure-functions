@@ -4,10 +4,10 @@ Wake + Drain Processor
 Pattern:
 - A lightweight wake subscription triggers the Function when messages arrive
 - The Function then drains the REAL subscription using the azure-servicebus SDK
-- On validation failure, we explicitly dead letter messages on the REAL subscription
+- On validation failure we explicitly dead letter messages on the REAL subscription
   so that DeadLetterReason and DeadLetterErrorDescription are populated in Service Bus
 
-This avoids relying on Data Lake quarantine as the primary source of failure reasons which was the other options if staying fully with ServiceBusTrigger
+This avoids not having a hand on the errors if staying fully with ServiceBusTrigger
 """
 
 from __future__ import annotations
@@ -65,9 +65,8 @@ def _dead_letter(
 ) -> None:
     """
     Explicit DLQ to show meaningful DeadLetterReason/Description
-    Note: SB has limits on these fields, so we truncate
+    Note: SB has limits on these fields so we truncate
     """
-    # Keep reasons short and stable
     reason = _truncate(reason, 128)
     description = _truncate(description, 4096)
 
@@ -91,12 +90,12 @@ def process_wake_and_drain(
     max_wait_time_seconds: int,
 ) -> None:
     """
-    Triggered by a wake subscription message.
+    Triggered by a wake subscription message
 
     Important:
-    - We do NOT drain the wake subscription.
-    - We drain the REAL subscription (entity.subscription).
-    - If the function returns successfully, the wake message is auto completed by Functions runtime.
+    - We do NOT drain the wake subscription
+    - We drain the REAL subscription (entity.subscription e.g appeal-document-odw-sub)
+    - If the function returns successfully, the wake message is auto completed by Functions runtime (meaning goes away from SB sub queue)
     """
     logging.info(
         "WAKE_DRAIN TRIGGERED entity=%s topic=%s wake_sub=%s drain_sub=%s",
@@ -169,7 +168,7 @@ def _process_one_message(
     Process ONE message from the REAL subscription
     - JSON parse
     - schema validate
-    - on fail > dead letter it to the real subscription DLQ
+    - on fail > dead letter it to the real subscription DLQ (so for e.g appeal-document-odw-sub)
     - on success > write to storage + complete
     """
     message_id = getattr(msg, "message_id", None)
