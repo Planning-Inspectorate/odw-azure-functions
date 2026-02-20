@@ -81,6 +81,8 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
         http_namespace_env_var = "ServiceBusConnection__fullyQualifiedNamespace"
 
     http_route = entity_key.replace("-", "")
+    if entity_key == "nsip-s51-advice":
+        http_route = "s51advice"
 
     storage_override = None
     if entity_key == "nsip-s51-advice":
