@@ -73,6 +73,14 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
 
     schema_filename = f"{entity_key}.schema.json"
 
+    # overriding schemas here for entity_key naming that don't match their schema
+    SCHEMA_OVERRIDES = {
+        "appeal-service-user": "service-user.schema.json",
+        "nsip-s51-advice": "s51-advice.schema.json",
+    }
+
+    schema_filename = SCHEMA_OVERRIDES.get(entity_key, schema_filename)
+
     if _is_appeals_entity(entity_key):
         sb_connection = "ServiceBusConnectionAppeals"
         http_namespace_env_var = "SERVICEBUS_NAMESPACE_APPEALS"
