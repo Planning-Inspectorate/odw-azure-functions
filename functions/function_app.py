@@ -150,61 +150,60 @@ for entity in all_entities():
 
 @_app.function_name(name="gettimesheets")
 @_app.route(route="gettimesheets", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-@_app.sql_input(
-    arg_name="timesheet",
-    command_text=(
-        "SELECT [caseReference], [applicationReference], [siteAddressLine1], [siteAddressLine2], "
-        "[siteAddressTown], [siteAddressCounty], [siteAddressPostcode] "
-        "FROM [odw_curated_db].[dbo].[appeal_has] "
-        "WHERE UPPER([caseReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) "
-        "OR UPPER([applicationReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) "
-        "OR UPPER([siteAddressLine1]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) "
-        "OR UPPER([siteAddressLine2]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) "
-        "OR UPPER([siteAddressTown]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) "
-        "OR UPPER([siteAddressCounty]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) "
-        "OR UPPER([siteAddressPostcode]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37))"
-    ),
-    command_type="Text",
-    parameters="@searchCriteria={searchCriteria}",
-    connection_string_setting="SqlConnectionString",
-)
+@_app.sql_input(arg_name="timesheet",
+                command_text="SELECT [caseReference], [applicationReference], [siteAddressLine1], [siteAddressLine2], [siteAddressTown], [siteAddressCounty], [siteAddressPostcode] FROM [odw_curated_db].[dbo].[appeal_has] WHERE UPPER([caseReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([applicationReference]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressLine1]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressLine2]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressTown]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressCounty]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37)) OR UPPER([siteAddressPostcode]) LIKE Concat(Char(37), UPPER(@searchCriteria), Char(37))",
+                command_type="Text",
+                parameters="@searchCriteria={searchCriteria}",
+                connection_string_setting="SqlConnectionString")
 def gettimesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
+    """
+    We need to use Char(37) to escape the %
+    https://stackoverflow.com/questions/71914897/how-do-i-use-sql-like-value-operator-with-azure-functions-sql-binding
+    """
     try:
-        rows = [json.loads(r.to_json()) for r in timesheet]
-        return func.HttpResponse(json.dumps(rows), status_code=200, mimetype="application/json")
+        rows = list(map(lambda r: json.loads(r.to_json()), timesheet))
+        return func.HttpResponse(
+            json.dumps(rows),
+            status_code=200,
+            mimetype="application/json"
+        )
     except Exception as e:
-        return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        return (
+            func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+        )
 
 
 @_app.function_name(name="getDaRT")
 @_app.route(route="getDaRT", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-@_app.sql_input(
-    arg_name="dart",
-    command_text="""
-        SELECT *
-        FROM odw_curated_db.dbo.dart_api
-        WHERE UPPER([applicationReference]) = UPPER(@applicationReference)
-        OR UPPER([caseReference]) = UPPER(@caseReference)
-    """,
-    command_type="Text",
-    parameters="@caseReference={caseReference},@applicationReference={applicationReference}",
-    connection_string_setting="SqlConnectionString",
-)
+@_app.sql_input(arg_name="dart",
+                command_text="""
+                SELECT *
+                FROM odw_curated_db.dbo.dart_api
+                WHERE UPPER([applicationReference]) = UPPER(@applicationReference) 
+                OR UPPER([caseReference]) = UPPER(@caseReference)
+                """,
+                command_type="Text",
+                parameters="@caseReference={caseReference},@applicationReference={applicationReference}",
+                connection_string_setting="SqlConnectionString"
+                )
 def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
     try:
         rows = []
         for r in dart:
             row = json.loads(r.to_json())
-            # Parse JSON fields that are stored as strings
             for key, value in row.items():
                 if isinstance(value, str):
                     try:
-                        row[key] = json.loads(value)
-                    except json.JSONDecodeError:
-                        pass
+                        parsed_value = json.loads(value)
+                        row[key] = parsed_value
+                    except json.JSONDecodeError as e:
+                        row[key] = value
             rows.append(row)
-
-        return func.HttpResponse(json.dumps(rows), status_code=200, mimetype="application/json")
+        return func.HttpResponse(
+            json.dumps(rows),
+            status_code=200,
+            mimetype="application/json"
+        )
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
 
@@ -214,24 +213,30 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
 @_app.sql_input(
     arg_name="logs",
     command_text="""
-        SELECT TOP (1000)
-            [file_ID],
-            [ingested_datetime],
-            [ingested_by_process_name],
-            [input_file],
-            [modified_datetime],
-            [modified_by_process_name],
-            [entity_name],
-            [rows_raw],
-            [rows_new]
-        FROM logging.dbo.tables_logs
+    SELECT TOP (1000) [file_ID],
+                    [ingested_datetime],
+                    [ingested_by_process_name],
+                    [input_file],
+                    [modified_datetime],
+                    [modified_by_process_name],
+                    [entity_name],
+                    [rows_raw],
+                    [rows_new]
+    FROM logging.dbo.tables_logs
     """,
     command_type="Text",
-    connection_string_setting="SqlConnectionString",
+    connection_string_setting="SqlConnectionString"
 )
 def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResponse:
     try:
-        rows = [json.loads(r.to_json()) for r in logs]
-        return func.HttpResponse(json.dumps(rows), status_code=200, mimetype="application/json")
+        rows = []
+        for r in logs:
+            rows.append(json.loads(r.to_json()))
+
+        return func.HttpResponse(
+            json.dumps(rows),
+            status_code=200,
+            mimetype="application/json"
+        )
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
