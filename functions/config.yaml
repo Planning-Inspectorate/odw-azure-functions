@@ -87,7 +87,3 @@ global:
     appeal-representation:
       topic: "appeal-representation"
       subscription: "appeal-representation-odw-sub"
-    
-    pins-inspector:
-      topic: "pins-inspector"
-      subscription: "pins-inspector-odw-sub"
