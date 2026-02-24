@@ -1,701 +1,151 @@
 """
-Azure Function code to read messages from Azure Service Bus and send them to Azure Storage
-One function for each Service us topic
+ODW Azure Functions - Service Bus ingestion
+
+This module is intentionally thin:
+- Load env + config + schemas once
+- Register all HTTP (pull) functions in a loop (as before)
+- Register Wake & Drain trigger functions in a loop (kind of real time with proper DLQ reasons)
 """
 
-import logging
-import azure.functions as func
-from servicebus_funcs import get_messages_and_validate, send_to_storage
-from set_environment import current_config, config
-from var_funcs import CREDENTIAL
-from pins_data_model import load_schemas
-from azure.functions.decorators.core import DataType
+from __future__ import annotations
+
 import json
 import os
+from typing import Callable
 
-_STORAGE = ""
-_CONTAINER = ""
-_NAMESPACE = ""
-_NAMESPACE_APPEALS = ""
+import azure.functions as func
 
+from pins_data_model import load_schemas
+from var_funcs import CREDENTIAL
+from set_environment import config
+from servicebus_funcs import get_messages_and_validate, send_to_storage
+from entity_registry import EntitySpec, all_entities
+from sb_wake_drain_processor import process_wake_and_drain
+
+# Environment
 try:
     _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
     _CONTAINER = os.environ["MESSAGE_STORAGE_CONTAINER"]
-    _NAMESPACE = os.environ["ServiceBusConnection__fullyQualifiedNamespace"]
-    _NAMESPACE_APPEALS = os.environ["SERVICEBUS_NAMESPACE_APPEALS"]
-except:
+except Exception:
+    # Keep the same behaviour we had before
     print("Warning: Missing Environment Variables")
+    _STORAGE = ""
+    _CONTAINER = ""
 
 _CREDENTIAL = CREDENTIAL
 _MAX_MESSAGE_COUNT = config["global"]["max_message_count"]
 _MAX_WAIT_TIME = config["global"]["max_wait_time"]
 _SUCCESS_RESPONSE = config["global"]["success_response"]
 _VALIDATION_ERROR = config["global"]["validation_error"]
+
 _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
 _app = func.FunctionApp()
 
+# Pilot toggle Wake & Drain
+# Later: set to all entities OR via env var (which would be better tbh)
+_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document"}
 
-@_app.function_name("folder")
-@_app.route(route="folder", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def folder(req: func.HttpRequest) -> func.HttpResponse:
+
+def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], func.HttpResponse]:
     """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
+    Builds an HTTP GET handler for an entity
     """
+    def _handler(req: func.HttpRequest) -> func.HttpResponse:
+        schema = _SCHEMAS[entity.schema_filename]
+        topic = entity.topic
+        subscription = entity.subscription
 
-    _SCHEMA = _SCHEMAS["folder.schema.json"]
-    _TOPIC = config["global"]["entities"]["folder"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["folder"]["subscription"]
+        namespace = os.environ.get(entity.http_namespace_env_var, "")
 
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
+        try:
+            data = get_messages_and_validate(
+                namespace=namespace,
+                credential=_CREDENTIAL,
+                topic=topic,
+                subscription=subscription,
+                max_message_count=_MAX_MESSAGE_COUNT,
+                max_wait_time=_MAX_WAIT_TIME,
+                schema=schema,
+            )
+
+            message_count = send_to_storage(
+                account_url=_STORAGE,
+                credential=_CREDENTIAL,
+                container=_CONTAINER,
+                entity=entity.storage_entity,
+                data=data,
+            )
+
+            response = json.dumps({
+                "message": f"{_SUCCESS_RESPONSE} - {message_count} messages sent to storage",
+                "count": message_count
+            })
+
+            return func.HttpResponse(response, status_code=200)
+
+        except Exception as e:
+            return (
+                func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
+                if f"{_VALIDATION_ERROR}" in str(e)
+                else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+            )
+
+    return _handler
+
+
+def _make_wake_drain_trigger_handler(entity: EntitySpec) -> Callable[[func.ServiceBusMessage], None]:
+    """
+    Builds a Service Bus trigger handler for an entity
+    The trigger listens to entity.trigger_subscription (the wake subscription)
+    The draining is performed against entity.subscription (the real subscription for e.g appeal-document-odw-sub)
+    """
+    def _handler(msg: func.ServiceBusMessage) -> None:
+        schema = _SCHEMAS[entity.schema_filename]
+
+        namespace = os.environ.get(entity.http_namespace_env_var, "")
+
+        process_wake_and_drain(
+            wake_msg=msg,
+            entity=entity,
+            schema=schema,
+            storage_account_url=_STORAGE,
+            storage_container=_CONTAINER,
             credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
+            namespace=namespace,
             max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
+            max_wait_time_seconds=_MAX_WAIT_TIME,
         )
 
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
+    return _handler
 
-        return func.HttpResponse(
-            response,
-            status_code=200
+for entity in all_entities():
+    http_fn_name = entity.route
+    http_route = entity.route
+
+    _app.function_name(http_fn_name)(
+        _app.route(route=http_route, methods=["get"], auth_level=func.AuthLevel.FUNCTION)(
+            _make_http_pull_handler(entity)
         )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("nsipdocument")
-@_app.route(route="nsipdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def nsipdocument(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-document.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-document"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-document"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("nsipexamtimetable")
-@_app.route(
-    route="nsipexamtimetable", methods=["get"], auth_level=func.AuthLevel.FUNCTION
-)
-def nsipexamtimetable(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-exam-timetable.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-exam-timetable"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-exam-timetable"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("nsipproject")
-@_app.route(route="nsipproject", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def nsipproject(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-project.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-project"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-project"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("nsipprojectupdate")
-@_app.route(
-    route="nsipprojectupdate", methods=["get"], auth_level=func.AuthLevel.FUNCTION
-)
-def nsipprojectupdate(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-project-update.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-project-update"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-project-update"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("nsiprepresentation")
-@_app.route(
-    route="nsiprepresentation", methods=["get"], auth_level=func.AuthLevel.FUNCTION
-)
-def nsiprepresentation(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-representation.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-representation"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-representation"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("s51advice")
-@_app.route(route="s51advice", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def s51advice(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["s51-advice.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-s51-advice"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-s51-advice"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity='s51-advice',
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("nsipsubscription")
-@_app.route(
-    route="nsipsubscription", methods=["get"], auth_level=func.AuthLevel.FUNCTION
-)
-def nsipsubscription(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["nsip-subscription.schema.json"]
-    _TOPIC = config["global"]["entities"]["nsip-subscription"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["nsip-subscription"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-
-@_app.function_name("serviceuser")
-@_app.route(route="serviceuser", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def serviceuser(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["service-user.schema.json"]
-    _TOPIC = config["global"]["entities"]["service-user"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["service-user"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-        
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-@_app.function_name("appealdocument")
-@_app.route(route="appealdocument", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appealdocument(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["appeal-document.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-document"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-document"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-        
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-@_app.function_name("appealhas")
-@_app.route(route="appealhas", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appeal(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["appeal-has.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-has"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-has"]["subscription"]
-
-    # Log the schema being used
-    logging.info(f"Using schema for appealhas: {_SCHEMA}")
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-        
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        # Log the error and extract validation details if possible
-        logging.error(f"Error processing appealhas: {str(e)}")
-        if hasattr(e, 'errors'):
-            logging.error(f"Validation details: {e.errors}")
-            # Log the schema being used
-            logging.error("Schema used: %s", _SCHEMA)
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-@_app.function_name("appealevent")
-@_app.route(route="appealevent", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appealevent(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["appeal-event.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-event"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-event"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-        
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-    
-@_app.function_name("appealserviceuser")
-@_app.route(route="appealserviceuser", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["service-user.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-service-user"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-service-user"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity="service-user",
-            data=_data,
-        )
-        
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+    )
+
+    if entity.key in _WAKE_DRAIN_ENABLED_ENTITY_KEYS:
+        if not entity.wake_subscription:
+            raise ValueError(
+                f"Wake&Drain enabled for {entity.key} but no wake_subscription is configured"
+            )
+
+        sb_fn_name = f"{entity.route}_wake_drain"
+
+        _app.function_name(sb_fn_name)(
+            _app.service_bus_topic_trigger(
+                arg_name="msg",
+                topic_name=entity.topic,
+                subscription_name=entity.trigger_subscription,
+                connection=entity.sb_connection,
+            )(
+                _make_wake_drain_trigger_handler(entity)
+            )
         )
 
 @_app.function_name(name="gettimesheets")
@@ -707,7 +157,7 @@ def appealserviceuser(req: func.HttpRequest) -> func.HttpResponse:
                 connection_string_setting="SqlConnectionString")
 def gettimesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.HttpResponse:
     """
-    We need to use Char(37) to escape the % 
+    We need to use Char(37) to escape the %
     https://stackoverflow.com/questions/71914897/how-do-i-use-sql-like-value-operator-with-azure-functions-sql-binding
     """
     try:
@@ -720,106 +170,6 @@ def gettimesheets(req: func.HttpRequest, timesheet: func.SqlRowList) -> func.Htt
     except Exception as e:
         return (
             func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-
-    
-@_app.function_name("appeals78")
-@_app.route(route="appeals78", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appeals78(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["appeal-s78.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-s78"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-s78"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity="appeal-s78",
-            data=_data,
-        )
-        
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
-    
-
-@_app.function_name("appealrepresentation")
-@_app.route(route="appealrepresentation", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appealrepresentation(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling HTTP requests.
-
-    Args:
-        req: An instance of `func.HttpRequest` representing the HTTP request.
-
-    Returns:
-        An instance of `func.HttpResponse` representing the HTTP response.
-    """
-
-    _SCHEMA = _SCHEMAS["appeal-representation.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-representation"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-representation"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity="appeal-representation",
-            data=_data,
-        )
-
-        response = json.dumps({"message" : f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
         )
 
 
@@ -857,6 +207,7 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
 
+
 @_app.function_name(name="testFunction")
 @_app.route(route="testFunction", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
 @_app.sql_input(
@@ -889,46 +240,3 @@ def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResp
         )
     except Exception as e:
         return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-
-@_app.function_name("appealeventestimate")
-@_app.route(route="appealeventestimate", methods=["get"], auth_level=func.AuthLevel.FUNCTION)
-def appealeventestimate(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Azure Function endpoint for handling appeal-event-estimate service bus messages.
-    """
-    _SCHEMA = _SCHEMAS["appeal-event-estimate.schema.json"]
-    _TOPIC = config["global"]["entities"]["appeal-event-estimate"]["topic"]
-    _SUBSCRIPTION = config["global"]["entities"]["appeal-event-estimate"]["subscription"]
-
-    try:
-        _data = get_messages_and_validate(
-            namespace=_NAMESPACE_APPEALS,
-            credential=_CREDENTIAL,
-            topic=_TOPIC,
-            subscription=_SUBSCRIPTION,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time=_MAX_WAIT_TIME,
-            schema=_SCHEMA,
-        )
-        _message_count = send_to_storage(
-            account_url=_STORAGE,
-            credential=_CREDENTIAL,
-            container=_CONTAINER,
-            entity=_TOPIC,
-            data=_data,
-        )
-
-        response = json.dumps(
-            {"message": f"{_SUCCESS_RESPONSE} - {_message_count} messages sent to storage", "count": _message_count})
-
-        return func.HttpResponse(
-            response,
-            status_code=200
-        )
-
-    except Exception as e:
-        return (
-            func.HttpResponse(f"Validation error: {str(e)}", status_code=500)
-            if f"{_VALIDATION_ERROR}" in str(e)
-            else func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
-        )
