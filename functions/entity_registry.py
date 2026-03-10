@@ -106,6 +106,8 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
     wake_subscription = None
     if entity_key == "appeal-document":
         wake_subscription = "appeal-document-odw-wake-sub"
+    if entity_key == "appeal-has":
+        wake_subscription = "appeal-has-odw-wake-sub"
 
     return EntitySpec(
         key=entity_key,
