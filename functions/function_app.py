@@ -44,7 +44,8 @@ _app = func.FunctionApp()
 
 # Pilot toggle Wake & Drain
 # Later: set to all entities OR via env var (which would be better tbh)
-_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document","appeal-has","appeal-event","appeal-event-estimate","appeal-service-user","appeal-s78","appeal-representation"}
+_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document","appeal-has","appeal-event","appeal-event-estimate","appeal-service-user","appeal-s78","appeal-representation","folder","nsip-project","service-user",
+                                   "nsip-document","nsip-exam-timetable","nsip-project-update","nsip-representation","nsip-s51-advice","nsip-subscription"}
 
 
 def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], func.HttpResponse]:

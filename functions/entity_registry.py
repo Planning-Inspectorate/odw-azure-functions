@@ -120,6 +120,25 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
         wake_subscription = "appeal-s78-odw-wake-sub"
     if entity_key == "appeal-representation":
         wake_subscription = "appeal-representation-odw-wake-sub"
+    if entity_key == "folder":
+        wake_subscription = "folder-odw-wake-sub"
+    if entity_key == "service-user":
+        wake_subscription = "service-user-odw-wake-sub"
+    if entity_key == "nsip-document":
+        wake_subscription = "nsip-document-odw-wake-sub"
+    if entity_key == "nsip-exam-timetable":
+        wake_subscription = "nsip-exam-timetable-odw-wake-sub"
+    if entity_key == "nsip-project":
+        wake_subscription = "nsip-project-odw-wake-sub"
+    if entity_key == "nsip-project-update":
+        wake_subscription = "nsip-project-update-odw-wake-sub"
+    if entity_key == "nsip-representation":
+        wake_subscription = "nsip-representation-odw-wake-sub"
+    if entity_key == "nsip-s51-advice":
+            wake_subscription = "nsip-s51-advice-odw-wake-sub"
+    if entity_key == "nsip-subscription":
+           wake_subscription = "nsip-subscription-odw-wake-sub"
+
 
     return EntitySpec(
         key=entity_key,
