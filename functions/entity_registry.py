@@ -108,6 +108,18 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
         wake_subscription = "appeal-document-odw-wake-sub"
     if entity_key == "appeal-has":
         wake_subscription = "appeal-has-odw-wake-sub"
+    if entity_key == "appeal-event":
+        wake_subscription = "appeal-event-odw-wake-sub"
+    if entity_key == "appeal-event-estimate":
+        wake_subscription = "appeal-event-estimate-odw-wake-sub"
+    if entity_key == "appeal-event-estimate":
+        wake_subscription = "appeal-event-estimate-odw-wake-sub"
+    if entity_key == "appeal-service-user":
+        wake_subscription = "appeal-service-user-odw-wake-sub"
+    if entity_key == "appeal-s78":
+        wake_subscription = "appeal-s78-odw-wake-sub"
+    if entity_key == "appeal-representation":
+        wake_subscription = "appeal-representation-odw-wake-sub"
 
     return EntitySpec(
         key=entity_key,
