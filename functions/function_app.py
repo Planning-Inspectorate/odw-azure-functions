@@ -19,7 +19,7 @@ from pins_data_model import load_schemas
 from var_funcs import CREDENTIAL
 from set_environment import config
 from servicebus_funcs import get_messages_and_validate, send_to_storage
-from entity_registry import EntitySpec, all_entities
+from entity_registry import EntitySpec, all_entities,WAKE_DRAIN_ENABLED_ENTITY_KEYS
 from sb_wake_drain_processor import process_wake_and_drain
 
 # Environment
@@ -44,8 +44,7 @@ _app = func.FunctionApp()
 
 # Pilot toggle Wake & Drain
 # Later: set to all entities OR via env var (which would be better tbh)
-_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document","appeal-has","appeal-event","appeal-event-estimate","appeal-service-user","appeal-s78","appeal-representation","folder","nsip-project","service-user",
-                                   "nsip-document","nsip-exam-timetable","nsip-project-update","nsip-representation","nsip-s51-advice","nsip-subscription"}
+
 
 
 def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], func.HttpResponse]:
@@ -130,7 +129,7 @@ for entity in all_entities():
         )
     )
 
-    if entity.key in _WAKE_DRAIN_ENABLED_ENTITY_KEYS:
+    if entity.key in WAKE_DRAIN_ENABLED_ENTITY_KEYS:
         if not entity.wake_subscription:
             raise ValueError(
                 f"Wake&Drain enabled for {entity.key} but no wake_subscription is configured"
