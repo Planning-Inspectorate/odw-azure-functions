@@ -19,7 +19,7 @@ from pins_data_model import load_schemas
 from var_funcs import CREDENTIAL
 from set_environment import config
 from servicebus_funcs import get_messages_and_validate, send_to_storage
-from entity_registry import EntitySpec, all_entities,WAKE_DRAIN_ENABLED_ENTITY_KEYS
+from entity_registry import EntitySpec, all_entities
 from sb_wake_drain_processor import process_wake_and_drain
 
 # Environment
@@ -97,12 +97,11 @@ def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], 
 def _make_wake_drain_trigger_handler(entity: EntitySpec) -> Callable[[func.ServiceBusMessage], None]:
     """
     Builds a Service Bus trigger handler for an entity
-    The trigger listens to entity.trigger_subscription (the wake subscription)
-    The draining is performed against entity.subscription (the real subscription for e.g appeal-document-odw-sub)
+    The trigger listens to entity.wake_subscription (the wake subscription)
+    The draining is performed against entity.subscription (the real subscription, e.g. appeal-document-odw-sub)
     """
     def _handler(msg: func.ServiceBusMessage) -> None:
         schema = _SCHEMAS[entity.schema_filename]
-
         namespace = os.environ.get(entity.http_namespace_env_var, "")
 
         process_wake_and_drain(
@@ -129,19 +128,15 @@ for entity in all_entities():
         )
     )
 
-    if entity.key in WAKE_DRAIN_ENABLED_ENTITY_KEYS:
-        if not entity.wake_subscription:
-            raise ValueError(
-                f"Wake&Drain enabled for {entity.key} but no wake_subscription is configured"
-            )
-
+    # ✅ Only rely on the registry-provided wake/trigger subscription
+    if entity.wake_subscription:  # or: if entity.trigger_subscription
         sb_fn_name = f"{entity.route}_wake_drain"
 
         _app.function_name(sb_fn_name)(
             _app.service_bus_topic_trigger(
                 arg_name="msg",
                 topic_name=entity.topic,
-                subscription_name=entity.trigger_subscription,
+                subscription_name=entity.wake_subscription,  # or: entity.trigger_subscription
                 connection=entity.sb_connection,
             )(
                 _make_wake_drain_trigger_handler(entity)
