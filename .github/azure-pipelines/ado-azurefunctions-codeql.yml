@@ -27,15 +27,34 @@ steps:
 - script: |
     echo "Downloading CodeQL CLI..."
     wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
-    unzip codeql.zip
-    chmod +x codeql/bin/codeql
+    unzip codeql.zip -d codeql
+    chmod +x codeql/codeql
    
-    CODEQL_PATH="$(pwd)/codeql/bin/codeql"
+    CODEQL_PATH="$(pwd)/codeql/codeql"
+   
+    echo "Initializing CodeQL database for Python..."
+    $CODEQL_PATH database create codeql-db \
+      --language=python \
+      --source-root=$(Build.SourcesDirectory)
+   
+    echo "Running CodeQL analysis..."
+    $CODEQL_PATH database analyze codeql-db \
+      codeql/python-queries \
+      --format=sarifv2.1.0 \
+      --output=codeql-results.sarif
+
+    # echo "Downloading CodeQL CLI..."
+    # wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
+    # unzip codeql.zip
+    # chmod +x codeql/bin/codeql
+   
+    # CODEQL_PATH="$(pwd)/codeql/bin/codeql"
 
     # echo "Downloading CodeQL CLI..."
     # wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
     # unzip codeql.zip -d codeql
     # chmod +x codeql/codeql
+    
     export PATH="$PATH:$(pwd)/codeql"
 
     echo "Initializing CodeQL database for Python..."
