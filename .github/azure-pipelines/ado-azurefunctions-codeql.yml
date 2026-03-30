@@ -27,8 +27,15 @@ steps:
 - script: |
     echo "Downloading CodeQL CLI..."
     wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
-    unzip codeql.zip -d codeql
-    chmod +x codeql/codeql
+    unzip codeql.zip
+    chmod +x codeql/bin/codeql
+   
+    CODEQL_PATH="$(pwd)/codeql/bin/codeql"
+
+    # echo "Downloading CodeQL CLI..."
+    # wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
+    # unzip codeql.zip -d codeql
+    # chmod +x codeql/codeql
     export PATH="$PATH:$(pwd)/codeql"
 
     echo "Initializing CodeQL database for Python..."
