@@ -1,0 +1,49 @@
+trigger:
+  branches:
+    include:
+      - main
+      - feat
+
+pr:
+  branches:
+    include:
+      - main
+      - feat
+
+schedules:
+- cron: "21 19 * * 0"
+  displayName: Weekly CodeQL Scan
+  branches:
+    include:
+      - main
+  always: true
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- checkout: self
+
+- script: |
+    echo "Downloading CodeQL CLI..."
+    wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
+    unzip codeql.zip -d codeql
+    export PATH="$PATH:$(pwd)/codeql"
+
+    echo "Initializing CodeQL database for Python..."
+    codeql database create codeql-db \
+      --language=python \
+      --source-root=$(Build.SourcesDirectory)
+
+    echo "Running CodeQL analysis..."
+    codeql database analyze codeql-db \
+      codeql/python-queries \
+      --format=sarifv2.1.0 \
+      --output=codeql-results.sarif
+
+  displayName: Run CodeQL Analysis
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathToPublish: codeql-results.sarif
+    artifactName: CodeQL-Results
