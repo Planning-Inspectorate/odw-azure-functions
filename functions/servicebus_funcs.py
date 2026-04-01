@@ -154,7 +154,7 @@ def send_to_storage(
     from var_funcs import current_date, current_time
 
     _CURRENT_DATE = current_date()
-    _CURRENT_TIME = current_time()
+    _CURRENT_TIME = current_time().replace(":", "_")
     _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
 
     try:
