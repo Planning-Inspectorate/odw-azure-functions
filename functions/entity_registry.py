@@ -1,3 +1,4 @@
+
 """
 Entity registry for ODW Azure Functions
 
@@ -21,6 +22,50 @@ from typing import Optional
 from set_environment import config
 
 
+# -----------------------------
+# Centralised config & overrides
+# -----------------------------
+
+# Wake & Drain: entities that get a wake subscription
+WAKE_DRAIN_ENABLED_ENTITY_KEYS = {
+    "appeal-document",
+    "appeal-has",
+    "appeal-event",
+    "appeal-event-estimate",
+    "appeal-service-user",
+    "appeal-s78",
+    "appeal-representation",
+    "folder",
+    "service-user",
+    "nsip-document",
+    "nsip-exam-timetable",
+    "nsip-project",
+    "nsip-project-update",
+    "nsip-representation",
+    "nsip-s51-advice",
+    "nsip-subscription",
+}
+
+# Some entities have schema filenames that don't match the entity key pattern
+SCHEMA_OVERRIDES = {
+    "appeal-service-user": "service-user.schema.json",
+    "nsip-s51-advice": "s51-advice.schema.json",
+}
+
+# HTTP route overrides (defaults to key with hyphens removed)
+HTTP_ROUTE_OVERRIDES = {
+    "nsip-s51-advice": "s51advice",
+}
+
+# Storage folder overrides (defaults to topic)
+STORAGE_ENTITY_OVERRIDES = {
+    "nsip-s51-advice": "s51-advice",
+    "appeal-service-user": "service-user",
+    "appeal-s78": "appeal-s78",
+    "appeal-representation": "appeal-representation",
+}
+
+
 @dataclass(frozen=True)
 class EntitySpec:
     """
@@ -28,8 +73,10 @@ class EntitySpec:
     """
     key: str  # e.g. "appeal-document"
     topic: str
-    subscription: str  # the REAL subscription we drain (e.g. appeal-document-odw-sub)
-    schema_filename: str  # e.g. "appeal-document.schema.json"
+    # The REAL subscription we drain (e.g. appeal-document-odw-sub)
+    subscription: str
+    # e.g. "appeal-document.schema.json"
+    schema_filename: str
 
     # Service Bus connection prefix (identity based) for trigger binding
     sb_connection: str
@@ -37,13 +84,13 @@ class EntitySpec:
     # HTTP pull uses explicit namespace env vars
     http_namespace_env_var: str
 
-    # Storage folder name override (rare cases - I think like nsip-project)
+    # Storage folder name override (rare cases - e.g. nsip-project)
     storage_entity_override: Optional[str] = None
 
     # HTTP route override (normally key without hyphens)
     http_route: Optional[str] = None
 
-    # Optional wake subscription that triggers the function (wake only, we do NOT drain this)
+    # Optional wake subscription that triggers the function (wake only; we do NOT drain this)
     wake_subscription: Optional[str] = None
 
     @property
@@ -55,8 +102,10 @@ class EntitySpec:
         return self.http_route or self.key.replace("-", "")
 
     @property
-    def trigger_subscription(self) -> str:
-        return self.wake_subscription or self.subscription
+    def trigger_subscription(self) -> Optional[str]:
+        # IMPORTANT: Do NOT fall back to the real subscription here.
+        # This field is specifically the WAKE (trigger) subscription or None.
+        return self.wake_subscription
 
 
 def _is_appeals_entity(entity_key: str) -> bool:
@@ -71,41 +120,34 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
     topic = entity_cfg["topic"]
     subscription = entity_cfg["subscription"]
 
-    schema_filename = f"{entity_key}.schema.json"
+    # schema (default follows the "<entity_key>.schema.json" convention)
+    schema_filename = SCHEMA_OVERRIDES.get(
+        entity_key, f"{entity_key}.schema.json"
+    )
 
-    # overriding schemas here for entity_key naming that don't match their schema
-    SCHEMA_OVERRIDES = {
-        "appeal-service-user": "service-user.schema.json",
-        "nsip-s51-advice": "s51-advice.schema.json",
-    }
-
-    schema_filename = SCHEMA_OVERRIDES.get(entity_key, schema_filename)
-
+    # connection prefixes / http namespace env var
     if _is_appeals_entity(entity_key):
         sb_connection = "ServiceBusConnectionAppeals"
         http_namespace_env_var = "SERVICEBUS_NAMESPACE_APPEALS"
     else:
         sb_connection = "ServiceBusConnection"
+        # this is what you already use elsewhere for non-appeals http namespace
         http_namespace_env_var = "ServiceBusConnection__fullyQualifiedNamespace"
 
-    http_route = entity_key.replace("-", "")
-    if entity_key == "nsip-s51-advice":
-        http_route = "s51advice"
+    # http route (default: strip hyphens) with override
+    http_route = HTTP_ROUTE_OVERRIDES.get(
+        entity_key, entity_key.replace("-", "")
+    )
 
-    storage_override = None
-    if entity_key == "nsip-s51-advice":
-        storage_override = "s51-advice"
-    if entity_key == "appeal-service-user":
-        storage_override = "service-user"
-    if entity_key == "appeal-s78":
-        storage_override = "appeal-s78"
-    if entity_key == "appeal-representation":
-        storage_override = "appeal-representation"
+    # storage entity override if any (default later: topic)
+    storage_override = STORAGE_ENTITY_OVERRIDES.get(entity_key)
 
-    # Wake subscription (pilot only for now)
-    wake_subscription = None
-    if entity_key == "appeal-document":
-        wake_subscription = "appeal-document-odw-wake-sub"
+    # Wake subscription (centralised logic derived from the enabled set)
+    wake_subscription = (
+        f"{entity_key}-odw-wake-sub"
+        if entity_key in WAKE_DRAIN_ENABLED_ENTITY_KEYS
+        else None
+    )
 
     return EntitySpec(
         key=entity_key,
