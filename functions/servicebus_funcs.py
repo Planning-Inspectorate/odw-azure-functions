@@ -13,7 +13,6 @@ from azure.storage.blob import BlobServiceClient
 import json
 from validate_messages import validate_data
 
-
 def get_messages_and_validate(
     namespace: str,
     credential: DefaultAzureCredential,
@@ -153,9 +152,11 @@ def send_to_storage(
 
     from var_funcs import current_date, current_time
 
+  
     _CURRENT_DATE = current_date()
     _CURRENT_TIME = current_time().replace(":", "_")
     _FILENAME = f"{entity}/{_CURRENT_DATE}/{entity}_{_CURRENT_TIME}.json"
+
 
     try:
         if data:
