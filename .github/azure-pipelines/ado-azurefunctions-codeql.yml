@@ -18,59 +18,54 @@ schedules:
       - main
   always: true
 
-pool:
-  vmImage: ubuntu-latest
+pool: pins-agent-pool-odw-build-uks
 
-steps:
-- checkout: self
+variables:
+  language: 'python'
 
-- script: |
-    echo "Downloading CodeQL CLI..."
-    wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
-    unzip codeql.zip -d codeql
-    chmod +x codeql/codeql
-   
-    CODEQL_PATH="$(pwd)/codeql/codeql"
-   
-    echo "Initializing CodeQL database for Python..."
-    $CODEQL_PATH database create codeql-db \
-      --language=python \
-      --source-root=$(Build.SourcesDirectory)
-   
-    echo "Running CodeQL analysis..."
-    $CODEQL_PATH database analyze codeql-db \
-      codeql/python-queries \
-      --format=sarifv2.1.0 \
-      --output=codeql-results.sarif
+jobs:
+  - job: Analyze
+    displayName: 'CodeQL Analysis'
+    steps:
+      # Checkout repository
+      - checkout: self
+        fetchDepth: 0
+        displayName: 'Checkout repository'
 
-    # echo "Downloading CodeQL CLI..."
-    # wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
-    # unzip codeql.zip
-    # chmod +x codeql/bin/codeql
-   
-    # CODEQL_PATH="$(pwd)/codeql/bin/codeql"
+      - script: |
+          mkdir -p $HOME/codeql-home
+          cd $HOME/codeql-home
+          wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip
+          unzip codeql-linux64.zip
+          echo "##vso[task.prependpath]$HOME/codeql-home/codeql"
+        displayName: 'Install CodeQL CLI'
 
-    # echo "Downloading CodeQL CLI..."
-    # wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -O codeql.zip
-    # unzip codeql.zip -d codeql
-    # chmod +x codeql/codeql
-    
-    export PATH="$PATH:$(pwd)/codeql"
+      # Download CodeQL Python query pack
+      - script: |
+          codeql pack download codeql/python-queries
+        displayName: 'Download CodeQL Python Query Pack'
 
-    echo "Initializing CodeQL database for Python..."
-    codeql database create codeql-db \
-      --language=python \
-      --source-root=$(Build.SourcesDirectory)
+      # Create CodeQL database
+      - script: |
+          codeql database create $(Build.SourcesDirectory)/codeql-db \
+            --language=$(language) \
+            --source-root=$(Build.SourcesDirectory) \
+            --verbose
+        displayName: 'Initialize CodeQL Database'
 
-    echo "Running CodeQL analysis..."
-    codeql database analyze codeql-db \
-      codeql/python-queries \
-      --format=sarifv2.1.0 \
-      --output=codeql-results.sarif
+      # Run CodeQL analysis
+      - script: |
+          codeql database analyze $(Build.SourcesDirectory)/codeql-db \
+            --format=sarif-latest \
+            --output=$(Build.ArtifactStagingDirectory)/results.sarif \
+            --verbose
+        displayName: 'Perform CodeQL Analysis'
 
-  displayName: Run CodeQL Analysis
-
-- task: PublishBuildArtifacts@1
-  inputs:
-    pathToPublish: codeql-results.sarif
-    artifactName: CodeQL-Results
+      # Upload SARIF as build artifact
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          ArtifactName: 'CodeQL-SARIF'
+          publishLocation: 'Container'
+        displayName: 'Publish SARIF Artifact'
+        condition: always()
