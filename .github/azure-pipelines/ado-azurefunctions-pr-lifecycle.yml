@@ -6,8 +6,7 @@ schedules:
       - main
   always: true
 
-pool:
-  vmImage: ubuntu-latest
+pool: pins-agent-pool-odw-build-uks
 
 variables:
   GH_TOKEN: $(GITHUB_TOKEN)   # PAT stored in ADO variable group
