@@ -9,7 +9,7 @@ schedules:
 pool: pins-agent-pool-odw-build-uks
 
 variables:
-  GH_TOKEN: $(GITHUB_TOKEN)   # PAT stored in ADO variable group
+- group: GitHub-Secrets  # PAT stored in Variable Group
 
 steps:
 - checkout: none
@@ -21,14 +21,14 @@ steps:
 
     # PRs with no activity for 14 days → mark stale
     stale_prs=$(curl -s \
-      -H "Authorization: token $GH_TOKEN" \
+      -H "Authorization: token $GITHUB_TOKEN" \
       "https://api.github.com/repos/$REPO/pulls?state=open" | \
       jq '.[] | select(.updated_at < "'$(date -d "14 days ago" -Iseconds)'") | .number')
 
     for pr in $stale_prs; do
       echo "Marking PR #$pr as stale..."
       curl -s -X POST \
-        -H "Authorization: token $GH_TOKEN" \
+        -H "Authorization: token $GITHUB_TOKEN" \
         -H "Content-Type: application/json" \
         -d '{"labels":["stale"]}' \
         "https://api.github.com/repos/$REPO/issues/$pr/labels"
@@ -36,17 +36,20 @@ steps:
 
     # PRs with no activity for 21 days → close
     very_stale_prs=$(curl -s \
-      -H "Authorization: token $GH_TOKEN" \
+      -H "Authorization: token $GITHUB_TOKEN" \
       "https://api.github.com/repos/$REPO/pulls?state=open" | \
       jq '.[] | select(.updated_at < "'$(date -d "21 days ago" -Iseconds)'") | .number')
 
     for pr in $very_stale_prs; do
       echo "Closing PR #$pr..."
       curl -s -X PATCH \
-        -H "Authorization: token $GH_TOKEN" \
+        -H "Authorization: token $GITHUB_TOKEN" \
         -H "Content-Type: application/json" \
         -d '{"state":"closed"}' \
         "https://api.github.com/repos/$REPO/pulls/$pr"
     done
 
+  env:
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
+    
   displayName: Close stale PRs
