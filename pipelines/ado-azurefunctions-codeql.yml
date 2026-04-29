@@ -24,7 +24,7 @@ variables:
   language: 'python'
 
 jobs:
-  - job: Analyze
+  - job: Analyse
     displayName: 'CodeQL Analysis'
     steps:
       # Checkout repository

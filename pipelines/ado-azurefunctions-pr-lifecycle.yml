@@ -1,0 +1,34 @@
+resources:
+  repositories:
+    - repository: odw-common
+      type: github
+      name: Planning-Inspectorate/odw-common
+      endpoint: GitHub  # Your GitHub service connection name
+      ref: refs/heads/feat/THEODW-2748-Convert-Github-actions-to-ADO-Common
+
+schedules:
+  - cron: "0 0 * * *"
+    displayName: Daily stale PR cleanup
+    branches:
+      include:
+        - main
+    always: true
+
+pool: pins-agent-pool-odw-build-uks
+
+variables:
+  - group: GitHub-Secrets
+
+stages:
+  - stage: CleanupStalePRs
+    displayName: Cleanup Stale PRs
+    jobs:
+      - job: CloseStalePRs
+        displayName: Close Stale PRs
+        steps:
+          - template: pipelines/templates/github/close-stale-prs.yml@odw-common
+            parameters:
+              githubRepository: 'Planning-Inspectorate/odw-azure-functions'
+              staleThresholdDays: 14
+              closureThresholdDays: 21
+              variableGroupName: 'GitHub-Secrets'
