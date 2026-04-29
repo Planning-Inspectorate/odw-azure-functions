@@ -4,7 +4,7 @@ resources:
       type: github
       name: Planning-Inspectorate/odw-common
       endpoint: GitHub  # Your GitHub service connection name
-      ref: refs/heads/feat/THEODW-2748-Convert-Github-actions-to-ADO-Common
+      ref: refs/heads/main
 
 schedules:
   - cron: "0 0 * * *"
