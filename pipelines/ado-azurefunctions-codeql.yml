@@ -18,54 +18,21 @@ schedules:
       - main
   always: true
 
+# Import the common repository
+resources:
+  repositories:
+  - repository: odw-common
+    type: github
+    name: Planning-Inspectorate/odw-common
+    endpoint: Planning-Inspectorate
+    ref: main
+
 pool: pins-agent-pool-odw-build-uks
 
 variables:
   language: 'python'
 
-jobs:
-  - job: Analyse
-    displayName: 'CodeQL Analysis'
-    steps:
-      # Checkout repository
-      - checkout: self
-        fetchDepth: 0
-        displayName: 'Checkout repository'
-
-      - script: |
-          mkdir -p $HOME/codeql-home
-          cd $HOME/codeql-home
-          wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip
-          unzip codeql-linux64.zip
-          echo "##vso[task.prependpath]$HOME/codeql-home/codeql"
-        displayName: 'Install CodeQL CLI'
-
-      # Download CodeQL Python query pack
-      - script: |
-          codeql pack download codeql/python-queries
-        displayName: 'Download CodeQL Python Query Pack'
-
-      # Create CodeQL database
-      - script: |
-          codeql database create $(Build.SourcesDirectory)/codeql-db \
-            --language=$(language) \
-            --source-root=$(Build.SourcesDirectory) \
-            --verbose
-        displayName: 'Initialize CodeQL Database'
-
-      # Run CodeQL analysis
-      - script: |
-          codeql database analyze $(Build.SourcesDirectory)/codeql-db \
-            --format=sarif-latest \
-            --output=$(Build.ArtifactStagingDirectory)/results.sarif \
-            --verbose
-        displayName: 'Perform CodeQL Analysis'
-
-      # Upload SARIF as build artifact
-      - task: PublishBuildArtifacts@1
-        inputs:
-          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-          ArtifactName: 'CodeQL-SARIF'
-          publishLocation: 'Container'
-        displayName: 'Publish SARIF Artifact'
-        condition: always()
+stages:
+- template: pipelines/stages/run-codeql-analysis.yaml@odw-common
+  parameters:
+    language: ${{ variables.language }}
