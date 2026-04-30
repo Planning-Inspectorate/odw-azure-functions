@@ -25,7 +25,7 @@ resources:
     type: github
     name: Planning-Inspectorate/odw-common
     endpoint: Planning-Inspectorate
-    ref: feat/THEODW-2748-Convert-Github-actions-to-ADO-Common
+    ref: main
 
 pool: pins-agent-pool-odw-build-uks
 
@@ -36,4 +36,3 @@ stages:
 - template: pipelines/stages/run-codeql-analysis.yaml@odw-common
   parameters:
     language: ${{ variables.language }}
-    
