@@ -21,18 +21,19 @@ from typing import Optional
 from set_environment import config
 
 # overriding schemas here for entity_key naming that don't match their schema
-SCHEMA_OVERRIDES = {
+_SCHEMA_OVERRIDES = {
     "appeal-service-user": "service-user.schema.json",
     "nsip-s51-advice": "s51-advice.schema.json",
 }
 
-STORAGE_OVERRIDES = {
+_STORAGE_OVERRIDES = {
     "nsip-s51-advice": "s51-advice",
     "appeal-service-user": "service-user",
 }
 
-# Wake subscription
-WAKE_SUBSCRIPTION_OVERRIDES = {
+# Wake subscriptions used by SB trigger
+# Entities not listed here remain HTTP pull only
+_WAKE_SUBSCRIPTION_OVERRIDES = {
     "nsip-document": "odw-nsip-document-wake-sub",
     "nsip-exam-timetable": "odw-nsip-exam-timetable-wake-sub",
     "nsip-project": "odw-nsip-project-wake-sub",
@@ -104,7 +105,7 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
 
     schema_filename = f"{entity_key}.schema.json"
 
-    schema_filename = SCHEMA_OVERRIDES.get(entity_key, schema_filename)
+    schema_filename = _SCHEMA_OVERRIDES.get(entity_key, schema_filename)
 
     if _is_appeals_entity(entity_key):
         sb_connection = "ServiceBusConnectionAppeals"
@@ -117,9 +118,9 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
     if entity_key == "nsip-s51-advice":
         http_route = "s51advice"
 
-    storage_override = STORAGE_OVERRIDES.get(entity_key)
+    storage_override = _STORAGE_OVERRIDES.get(entity_key)
 
-    wake_subscription = WAKE_SUBSCRIPTION_OVERRIDES.get(entity_key)
+    wake_subscription = _WAKE_SUBSCRIPTION_OVERRIDES.get(entity_key)
 
     return EntitySpec(
         key=entity_key,
