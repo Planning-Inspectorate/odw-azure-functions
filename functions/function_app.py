@@ -8,19 +8,17 @@ This module is intentionally thin:
 """
 
 from __future__ import annotations
-
 import json
 import os
 from typing import Callable
-
 import azure.functions as func
-
 from pins_data_model import load_schemas
 from var_funcs import CREDENTIAL
 from set_environment import config
 from servicebus_funcs import get_messages_and_validate, send_to_storage
 from entity_registry import EntitySpec, all_entities
 from sb_wake_drain_processor import process_wake_and_drain
+from entity_registry import _WAKE_SUBSCRIPTION_OVERRIDES
 
 # Environment
 try:
@@ -42,10 +40,7 @@ _SCHEMAS = load_schemas.load_all_schemas()["schemas"]
 
 _app = func.FunctionApp()
 
-# Pilot toggle Wake & Drain
-# Later: set to all entities OR via env var (which would be better tbh)
-_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document"}
-
+_WAKE_DRAIN_ENABLED_ENTITY_KEYS = set(_WAKE_SUBSCRIPTION_OVERRIDES.keys())
 
 def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], func.HttpResponse]:
     """
