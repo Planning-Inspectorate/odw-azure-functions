@@ -28,6 +28,7 @@ SCHEMA_OVERRIDES = {
 
 STORAGE_OVERRIDES = {
     "nsip-s51-advice": "s51-advice",
+    "appeal-service-user": "service-user",
 }
 
 # Wake subscription
