@@ -8,13 +8,10 @@ This module is intentionally thin:
 """
 
 from __future__ import annotations
-
 import json
 import os
 from typing import Callable
-
 import azure.functions as func
-
 from pins_data_model import load_schemas
 from var_funcs import CREDENTIAL
 from set_environment import config
@@ -44,7 +41,23 @@ _app = func.FunctionApp()
 
 # Pilot toggle Wake & Drain
 # Later: set to all entities OR via env var (which would be better tbh)
-_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {"appeal-document"}
+_WAKE_DRAIN_ENABLED_ENTITY_KEYS = {
+    "nsip-document",
+    "nsip-exam-timetable",
+    "nsip-project",
+    "nsip-project-update",
+    "nsip-representation",
+    "nsip-s51-advice",
+    "nsip-subscription",
+    "service-user",
+    "appeal-document",
+    "appeal-has",
+    "appeal-event",
+    "appeal-event-estimate",
+    "appeal-service-user",
+    "appeal-s78",
+    "appeal-representation",
+}
 
 
 def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], func.HttpResponse]:
