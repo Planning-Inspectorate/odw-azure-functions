@@ -42,6 +42,7 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "nsip-s51-advice": "odw-nsip-s51-advice-wake-sub",
     "nsip-subscription": "odw-nsip-subscription-wake-sub",
     "service-user": "odw-service-user-wake-sub",
+    "application-update": "planning-environmental-specialist-odw-sub",
 
     "appeal-document": "appeal-document-odw-wake-sub",
     "appeal-has": "appeal-has-odw-wake-sub",
@@ -50,6 +51,7 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "appeal-service-user": "appeal-service-user-odw-wake-sub",
     "appeal-s78": "appeal-s78-odw-wake-sub",
     "appeal-representation": "appeal-representation-odw-wake-sub",
+    "application-update": "application-update-odw-wake-sub"
 }
 
 
