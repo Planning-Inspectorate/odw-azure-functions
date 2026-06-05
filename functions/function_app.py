@@ -19,6 +19,7 @@ from servicebus_funcs import get_messages_and_validate, send_to_storage
 from entity_registry import EntitySpec, all_entities
 from sb_wake_drain_processor import process_wake_and_drain
 from entity_registry import _WAKE_SUBSCRIPTION_OVERRIDES
+import logging
 
 # Environment
 try:
@@ -89,31 +90,43 @@ def _make_http_pull_handler(entity: EntitySpec) -> Callable[[func.HttpRequest], 
     return _handler
 
 
-def _make_wake_drain_trigger_handler(entity: EntitySpec) -> Callable[[func.ServiceBusMessage], None]:
-    """
-    Builds a Service Bus trigger handler for an entity
-    The trigger listens to entity.trigger_subscription (the wake subscription)
-    The draining is performed against entity.subscription (the real subscription for e.g appeal-document-odw-sub)
-    """
+logger = logging.getLogger(__name__)
+
+def _make_wake_drain_trigger_handler(entity: EntitySpec):
     def _handler(msg: func.ServiceBusMessage) -> None:
-        schema = _SCHEMAS[entity.schema_filename]
+        message_id = getattr(msg, "message_id", None)
 
-        namespace = os.environ.get(entity.http_namespace_env_var, "")
-
-        process_wake_and_drain(
-            wake_msg=msg,
-            entity=entity,
-            schema=schema,
-            storage_account_url=_STORAGE,
-            storage_container=_CONTAINER,
-            credential=_CREDENTIAL,
-            namespace=namespace,
-            max_message_count=_MAX_MESSAGE_COUNT,
-            max_wait_time_seconds=_MAX_WAIT_TIME,
+        logger.info(
+            f"SB_RECEIVED | entity={entity.key} | function={entity.route}_wake_drain | message_id={message_id}"
         )
 
-    return _handler
+        schema = _SCHEMAS[entity.schema_filename]
+        namespace = os.environ.get(entity.http_namespace_env_var, "")
 
+        try:
+            process_wake_and_drain(
+                wake_msg=msg,
+                entity=entity,
+                schema=schema,
+                storage_account_url=_STORAGE,
+                storage_container=_CONTAINER,
+                credential=_CREDENTIAL,
+                namespace=namespace,
+                max_message_count=_MAX_MESSAGE_COUNT,
+                max_wait_time_seconds=_MAX_WAIT_TIME,
+            )
+
+            logger.info(
+                f"RAW_LAYER_WRITE_SUCCESS | entity={entity.key} | function={entity.route}_wake_drain | message_id={message_id}"
+            )
+
+        except Exception as ex:
+            logger.exception(
+                f"DEAD_LETTERED_OR_FAILED | entity={entity.key} | function={entity.route}_wake_drain | message_id={message_id} | error={str(ex)}"
+            )
+            raise
+
+    return _handler
 for entity in all_entities():
     http_fn_name = entity.route
     http_route = entity.route
