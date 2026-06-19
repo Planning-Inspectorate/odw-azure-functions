@@ -42,6 +42,7 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "nsip-s51-advice": "odw-nsip-s51-advice-wake-sub",
     "nsip-subscription": "odw-nsip-subscription-wake-sub",
     "service-user": "odw-service-user-wake-sub",
+    "application-update": "application-update-odw-wake-sub",
 
     "appeal-document": "appeal-document-odw-wake-sub",
     "appeal-has": "appeal-has-odw-wake-sub",
@@ -51,6 +52,8 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "appeal-s78": "appeal-s78-odw-wake-sub",
     "appeal-representation": "appeal-representation-odw-wake-sub",
 }
+
+_ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({"application-update"})
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,10 @@ def _is_appeals_entity(entity_key: str) -> bool:
     return entity_key.startswith("appeal-")
 
 
+def _uses_odw_service_bus_namespace(entity_key: str) -> bool:
+    return entity_key in _ODW_NAMESPACE_ENTITIES
+
+
 def build_entity_spec(entity_key: str) -> EntitySpec:
     """
     Build EntitySpec from config.yaml
@@ -110,6 +117,9 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
     if _is_appeals_entity(entity_key):
         sb_connection = "ServiceBusConnectionAppeals"
         http_namespace_env_var = "SERVICEBUS_NAMESPACE_APPEALS"
+    elif _uses_odw_service_bus_namespace(entity_key):
+        sb_connection = "ServiceBusConnectionOdw"
+        http_namespace_env_var = "ServiceBusConnectionOdw__fullyQualifiedNamespace"
     else:
         sb_connection = "ServiceBusConnection"
         http_namespace_env_var = "ServiceBusConnection__fullyQualifiedNamespace"
