@@ -19,7 +19,16 @@ from servicebus_funcs import get_messages_and_validate, send_to_storage
 from entity_registry import EntitySpec, all_entities
 from sb_wake_drain_processor import process_wake_and_drain
 from entity_registry import _WAKE_SUBSCRIPTION_OVERRIDES
-
+import logging
+for _noisy in (
+    "azure.core.pipeline.policies.http_logging_policy",
+    "azure.monitor.opentelemetry.exporter",
+    "azure.identity",
+    "azure.servicebus",
+    "uamqp",
+    "azure.servicebus._pyamqp",
+):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 # Environment
 try:
     _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
