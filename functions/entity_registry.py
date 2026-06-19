@@ -53,6 +53,8 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "appeal-representation": "appeal-representation-odw-wake-sub",
 }
 
+_ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({"application-update"})
+
 
 @dataclass(frozen=True)
 class EntitySpec:
@@ -97,7 +99,7 @@ def _is_appeals_entity(entity_key: str) -> bool:
 
 
 def _uses_odw_service_bus_namespace(entity_key: str) -> bool:
-    return entity_key == "application-update"
+    return entity_key in _ODW_NAMESPACE_ENTITIES
 
 
 def build_entity_spec(entity_key: str) -> EntitySpec:
