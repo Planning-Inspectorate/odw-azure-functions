@@ -100,21 +100,10 @@ def process_wake_and_drain(
     """
     operation_id = str(uuid.uuid4())
 
-    logging.info(
-        "WAKE_DRAIN TRIGGERED entity=%s topic=%s wake_sub=%s drain_sub=%s operation_id=%s",
-        entity.key,
-        entity.topic,
-        entity.trigger_subscription,
-        entity.subscription,
-        operation_id,
-    )
-
     if not namespace:
         raise ValueError(f"Missing Service Bus namespace env var for entity={entity.key}")
 
     drained_total = 0
-    success_count = 0
-    failure_count = 0
 
     # Drain loop: receive batches until empty or hit max_message_count
     try:
@@ -140,7 +129,7 @@ def process_wake_and_drain(
 
                     for msg in messages:
                         drained_total += 1
-                        ok = _process_one_message(
+                        _process_one_message(
                             receiver=receiver,
                             msg=msg,
                             entity=entity,
@@ -150,10 +139,6 @@ def process_wake_and_drain(
                             credential=credential,
                             operation_id=operation_id,
                         )
-                        if ok:
-                            success_count += 1
-                        else:
-                            failure_count += 1
 
     except ServiceBusError as e:
         logging.exception("WAKE_DRAIN SERVICEBUS_ERROR entity=%s error=%s operation_id=%s", entity.key, str(e), operation_id)
@@ -161,15 +146,6 @@ def process_wake_and_drain(
     except Exception as e:
         logging.exception("WAKE_DRAIN UNEXPECTED_ERROR entity=%s error=%s operation_id=%s", entity.key, str(e), operation_id)
         raise
-
-    logging.info(
-        "WAKE_DRAIN DONE entity=%s drained_total=%s success=%s failed=%s operation_id=%s",
-        entity.key,
-        drained_total,
-        success_count,
-        failure_count,
-        operation_id,
-    )
 
 
 def _process_one_message(
