@@ -223,15 +223,12 @@ def getDaRT(req: func.HttpRequest, dart: func.SqlRowList) -> func.HttpResponse:
     connection_string_setting="SqlConnectionString"
 )
 def test_function(req: func.HttpRequest, logs: func.SqlRowList) -> func.HttpResponse:
-    try:
-        rows = []
-        for r in logs:
-            rows.append(json.loads(r.to_json()))
+    rows = []
+    for r in logs:
+        rows.append(json.loads(r.to_json()))
 
-        return func.HttpResponse(
-            json.dumps(rows),
-            status_code=200,
-            mimetype="application/json"
-        )
-    except Exception as e:
-        return func.HttpResponse(f"Unknown error: {str(e)}", status_code=500)
+    return func.HttpResponse(
+        json.dumps(rows),
+        status_code=200,
+        mimetype="application/json"
+    )
