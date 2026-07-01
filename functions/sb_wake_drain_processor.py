@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -97,13 +98,7 @@ def process_wake_and_drain(
     - We drain the REAL subscription (entity.subscription e.g appeal-document-odw-sub)
     - If the function returns successfully, the wake message is auto completed by Functions runtime (meaning goes away from SB sub queue)
     """
-    logging.info(
-        "WAKE_DRAIN TRIGGERED entity=%s topic=%s wake_sub=%s drain_sub=%s",
-        entity.key,
-        entity.topic,
-        entity.trigger_subscription,
-        entity.subscription,
-    )
+    operation_id = str(uuid.uuid4())
 
     if not namespace:
         raise ValueError(f"Missing Service Bus namespace env var for entity={entity.key}")
@@ -142,16 +137,15 @@ def process_wake_and_drain(
                             storage_account_url=storage_account_url,
                             storage_container=storage_container,
                             credential=credential,
+                            operation_id=operation_id,
                         )
 
     except ServiceBusError as e:
-        logging.exception("WAKE_DRAIN SERVICEBUS_ERROR entity=%s error=%s", entity.key, str(e))
+        logging.exception("WAKE_DRAIN SERVICEBUS_ERROR entity=%s error=%s operation_id=%s", entity.key, str(e), operation_id)
         raise
     except Exception as e:
-        logging.exception("WAKE_DRAIN UNEXPECTED_ERROR entity=%s error=%s", entity.key, str(e))
+        logging.exception("WAKE_DRAIN UNEXPECTED_ERROR entity=%s error=%s operation_id=%s", entity.key, str(e), operation_id)
         raise
-
-    logging.info("WAKE_DRAIN DONE entity=%s drained_total=%s", entity.key, drained_total)
 
 
 def _process_one_message(
@@ -163,7 +157,8 @@ def _process_one_message(
     storage_account_url: str,
     storage_container: str,
     credential: Any,
-) -> None:
+    operation_id: str,
+) -> bool:
     """
     Process ONE message from the REAL subscription
     - JSON parse
@@ -184,7 +179,7 @@ def _process_one_message(
             reason="BodyReadFailed",
             description="Could not read message body bytes/utf-8 decode.",
         )
-        return
+        return False
 
     try:
         payload = json.loads(body_text)
@@ -195,7 +190,7 @@ def _process_one_message(
             reason="InvalidJson",
             description=f"JSON deserialization failed: {str(e)}. Body(sample)={body_text[:500]}",
         )
-        return
+        return False
 
     errors = validate_data(payload, schema)
     if errors:
@@ -206,7 +201,7 @@ def _process_one_message(
             reason="SchemaValidationFailed",
             description=f"{errors_joined}",
         )
-        return
+        return False
 
     msg_type = _extract_message_type(msg)
 
@@ -229,20 +224,15 @@ def _process_one_message(
             data=[payload],
         )
         receiver.complete_message(msg)
-
-        logging.info(
-            "WAKE_DRAIN OK entity=%s message_id=%s delivery_count=%s",
-            entity.key,
-            message_id,
-            delivery_count,
-        )
+        return True
     except Exception as e:
         # If storage write fails we don't complete
         # Let the message be retried we do not DLQ infra problems here
         logging.exception(
-            "WAKE_DRAIN STORAGE_WRITE_FAILED entity=%s message_id=%s error=%s",
+            "WAKE_DRAIN STORAGE_WRITE_FAILED entity=%s message_id=%s error=%s operation_id=%s",
             entity.key,
             message_id,
             str(e),
+            operation_id,
         )
         raise
