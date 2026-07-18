@@ -1,6 +1,14 @@
 {
   "version": "2.0",
   "logging": {
+    "logLevel": {
+      "default": "Warning",
+      "Function": "Information",
+      "Host.Results": "Warning",
+      "Host.Aggregator": "Warning",
+      "Microsoft": "Warning",
+      "Azure": "Warning"
+    },
     "applicationInsights": {
       "samplingSettings": {
         "isEnabled": true,
