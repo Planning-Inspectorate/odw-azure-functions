@@ -2,12 +2,17 @@
   "version": "2.0",
   "logging": {
     "logLevel": {
-      "default": "Warning",
-      "Function": "Information",
+      "default": "Error",
+      "Function": "Warning",
       "Host.Results": "Warning",
       "Host.Aggregator": "Warning",
       "Microsoft": "Warning",
-      "Azure": "Warning"
+      "Azure": "Warning",
+      "azure": "Warning",
+      "azure.core": "Warning",
+      "azure.identity": "Warning",
+      "azure.storage": "Warning",
+      "azure.servicebus": "Warning"
     },
     "applicationInsights": {
       "samplingSettings": {
