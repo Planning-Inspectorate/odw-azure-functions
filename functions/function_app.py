@@ -22,10 +22,7 @@ from entity_registry import _WAKE_SUBSCRIPTION_OVERRIDES
 import logging
 
 # Mute Azure SDK logs
-logging.getLogger("azure").setLevel(logging.ERROR)
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
-
+logging.getLogger("azure").disabled = True
 # Environment
 try:
     _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]
