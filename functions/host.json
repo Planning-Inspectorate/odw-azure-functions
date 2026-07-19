@@ -1,8 +1,12 @@
 {
   "version": "2.0",
   "logging": {
+    "fileLoggingMode": "debugOnly",
     "logLevel": {
-      "default": "Error"
+      "default": "None",
+      "Function": "None",
+      "Host": "None",
+      "Worker": "None"
     },
     "applicationInsights": {
       "samplingSettings": {

@@ -12,15 +12,13 @@ import json
 import os
 from typing import Callable
 import logging
-logging.getLogger("uamqp").setLevel(logging.CRITICAL)
-logging.getLogger("uamqp.connection").setLevel(logging.CRITICAL)
-logging.getLogger("uamqp.c_uamqp").setLevel(logging.CRITICAL)
-logging.getLogger("azure.servicebus").setLevel(logging.CRITICAL)
-
+logging.getLogger("azure").disabled = True
+logging.getLogger("azure.servicebus").disabled = True
+logging.getLogger("azure.identity").disabled = True
+logging.getLogger("azure.storage").disabled = True
 logging.getLogger("uamqp").disabled = True
 logging.getLogger("uamqp.connection").disabled = True
 logging.getLogger("uamqp.c_uamqp").disabled = True
-logging.getLogger("azure.servicebus").disabled = True
 import azure.functions as func
 from pins_data_model import load_schemas
 from var_funcs import CREDENTIAL
