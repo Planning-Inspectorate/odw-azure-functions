@@ -11,6 +11,16 @@ from __future__ import annotations
 import json
 import os
 from typing import Callable
+import logging
+for logger_name in [
+    "azure",
+    "azure.servicebus",
+    "azure.identity",
+    "azure.storage",
+    "uamqp",
+]:
+    logging.getLogger(logger_name).setLevel(logging.CRITICAL)
+    logging.getLogger(logger_name).propagate = False
 import azure.functions as func
 from pins_data_model import load_schemas
 from var_funcs import CREDENTIAL
@@ -19,13 +29,6 @@ from servicebus_funcs import get_messages_and_validate, send_to_storage
 from entity_registry import EntitySpec, all_entities
 from sb_wake_drain_processor import process_wake_and_drain
 from entity_registry import _WAKE_SUBSCRIPTION_OVERRIDES
-# Mute Azure SDK logs
-import logging
-logging.getLogger("azure").disabled = True
-logging.getLogger("azure.servicebus").disabled = True
-logging.getLogger("azure.identity").disabled = True
-logging.getLogger("azure.storage").disabled = True
-logging.getLogger("uamqp").disabled = True
 # Environment
 try:
     _STORAGE = os.environ["MESSAGE_STORAGE_ACCOUNT"]

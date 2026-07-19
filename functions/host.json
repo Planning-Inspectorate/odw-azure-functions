@@ -2,12 +2,9 @@
   "version": "2.0",
   "logging": {
     "logLevel": {
-      "default": "Information",
-      "Function": "Information",
-      "Microsoft.Azure.WebJobs": "Warning",
-      "Microsoft.Azure.WebJobs.ServiceBus": "Warning",
-      "Azure.Messaging.ServiceBus": "Warning",
-      "Host.Executor": "Warning",
+      "default": "Warning",
+      "Function": "Warning",
+      "Host": "Warning",
       "Worker": "Warning"
     },
     "applicationInsights": {
