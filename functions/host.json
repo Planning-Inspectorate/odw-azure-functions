@@ -2,10 +2,7 @@
   "version": "2.0",
   "logging": {
     "logLevel": {
-      "default": "Warning",
-      "Function": "Warning",
-      "Host": "Warning",
-      "Worker": "Warning"
+      "default": "Error"
     },
     "applicationInsights": {
       "samplingSettings": {
