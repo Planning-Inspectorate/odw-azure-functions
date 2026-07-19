@@ -19,6 +19,12 @@ from servicebus_funcs import get_messages_and_validate, send_to_storage
 from entity_registry import EntitySpec, all_entities
 from sb_wake_drain_processor import process_wake_and_drain
 from entity_registry import _WAKE_SUBSCRIPTION_OVERRIDES
+import logging
+
+# Mute Azure SDK logs
+logging.getLogger("azure").setLevel(logging.ERROR)
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 # Environment
 try:
