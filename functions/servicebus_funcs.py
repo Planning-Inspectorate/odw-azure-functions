@@ -6,12 +6,6 @@ Functions:
 - send_to_storage: Upload data to Azure Blob Storage.
 """
 import logging
-logging.getLogger("azure").setLevel(logging.WARNING)
-logging.getLogger("azure.identity").setLevel(logging.WARNING)
-logging.getLogger("azure.servicebus").setLevel(logging.WARNING)
-logging.getLogger("azure.storage").setLevel(logging.WARNING)
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
-logging.getLogger("azure.servicebus._pyamqp").setLevel(logging.WARNING)
 from azure.servicebus import ServiceBusClient
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
