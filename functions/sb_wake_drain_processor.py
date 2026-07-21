@@ -16,11 +16,6 @@ import json
 import logging
 import logging
 logging.getLogger("azure").setLevel(logging.WARNING)
-logging.getLogger("azure.identity").setLevel(logging.WARNING)
-logging.getLogger("azure.servicebus").setLevel(logging.WARNING)
-logging.getLogger("azure.storage").setLevel(logging.WARNING)
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
-logging.getLogger("azure.servicebus._pyamqp").setLevel(logging.WARNING)
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
