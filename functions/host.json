@@ -3,13 +3,13 @@
   "logging": {
     "fileLoggingMode": "debugOnly",
     "logLevel": {
-       "default": "Warning",
-        "Function": "Information",
-         "Host.Results": "Error",
-          "Host.Aggregator": "Error",
-          "Azure.Core": "Warning",
-         "Azure.Messaging.ServiceBus": "Warning",
-         "Azure.Storage": "Warning"
+      "default": "Warning",
+      "Function": "Information",
+      "Host.Results": "Error",
+      "Host.Aggregator": "Error",
+      "Azure.Core": "Warning",
+      "Azure.Messaging.ServiceBus": "Warning",
+      "Azure.Storage": "Warning"
     },
     "applicationInsights": {
       "samplingSettings": {
