@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 import logging
+import logging
+logging.getLogger("azure").setLevel(logging.WARNING)
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional

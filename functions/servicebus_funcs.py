@@ -5,8 +5,8 @@ Functions:
 - get_messages: Retrieve messages from a Service Bus topic subscription.
 - send_to_storage: Upload data to Azure Blob Storage.
 """
-
 import logging
+logging.getLogger("azure").setLevel(logging.WARNING)
 from azure.servicebus import ServiceBusClient
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
