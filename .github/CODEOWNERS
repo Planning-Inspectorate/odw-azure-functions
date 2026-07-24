@@ -1,16 +1,16 @@
 # Define owner of the CODEOWNERS file itself
-/.github/CODEOWNERS                                             @beejjacobs @m-juckes-pins @raamvar @mukundaraogummadi-pins
+/.github/CODEOWNERS                                             @beejjacobs @m-juckes-pins @Medini-Aithal @raamvar @mukundaraogummadi-pins
 
 # Protect important folders
 
 # Github Actions workflows
-/.github/workflows                                              @beejjacobs @m-juckes-pins @HarrisonBoyleThomas @KranthiRayipudi @mukundaraogummadi-pins
+/.github/workflows                                              @beejjacobs @m-juckes-pins @Medini-Aithal @HarrisonBoyleThomas @KranthiRayipudi @mukundaraogummadi-pins
 
 # Azure Function files
 /functions/**                                                   @HarrisonBoyleThomas @KranthiRayipudi @mukundaraogummadi-pins
 
 # Azure DevOps pipeline files
-/pipelines/**                                                   @m-juckes-pins @HarrisonBoyleThomas @KranthiRayipudi @mukundaraogummadi-pins
+/pipelines/**                                                   @m-juckes-pins @Medini-Aithal @HarrisonBoyleThomas @KranthiRayipudi @mukundaraogummadi-pins
 
 # Add protection for certain file extensions,
 # i.e. a python or sql expert must approve
