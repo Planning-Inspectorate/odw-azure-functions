@@ -42,7 +42,7 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "nsip-s51-advice": "odw-nsip-s51-advice-wake-sub",
     "nsip-subscription": "odw-nsip-subscription-wake-sub",
     "service-user": "odw-service-user-wake-sub",
-    "application-update": "planning-environmental-specialist-odw-wake-sub",
+    "applications-application-update": "applications-application-update-odw-wake-sub",
 
     "appeal-document": "appeal-document-odw-wake-sub",
     "appeal-has": "appeal-has-odw-wake-sub",
@@ -53,7 +53,7 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "appeal-representation": "appeal-representation-odw-wake-sub",
 }
 
-_ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({"application-update"})
+_ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({"applications-application-update"})
 
 
 @dataclass(frozen=True)

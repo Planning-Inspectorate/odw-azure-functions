@@ -44,9 +44,9 @@ global:
       topic: "nsip-project-update"
       subscription: "odw-nsip-project-update-sub"
 
-    application-update:
-      topic: "application-update"
-      subscription: "planning-environmental-specialist-odw-sub"
+    applications-application-update:
+      topic: "applications-application-update"
+      subscription: "applications-application-update-sub"
 
     nsip-representation:
       topic: "nsip-representation"
