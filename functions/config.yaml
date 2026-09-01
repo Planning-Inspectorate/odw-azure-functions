@@ -91,3 +91,11 @@ global:
     appeal-representation:
       topic: "appeal-representation"
       subscription: "appeal-representation-odw-sub"
+
+    applications-notify-email:
+      topic: "applications-notify-email"
+      subscription: "applications-notify-email-sub"
+      
+    applications-representation:
+      topic: "applications-representation"
+      subscription: "applications-representation-sub"
