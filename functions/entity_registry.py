@@ -54,9 +54,11 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "appeal-representation": "appeal-representation-odw-wake-sub",
 }
 
-_ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({"application-update"})
-
-
+_ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({
+    "application-update",
+    "applications-notify-email",
+    "applications-representation",
+})
 @dataclass(frozen=True)
 class EntitySpec:
     """
