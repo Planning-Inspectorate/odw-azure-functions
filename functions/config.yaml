@@ -46,7 +46,7 @@ global:
 
     applications-application-update:
       topic: "applications-application-update"
-      subscription: "applications-application-update-sub"
+      subscription: "applications-application-update-odw-sub"
 
     nsip-representation:
       topic: "nsip-representation"
