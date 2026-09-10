@@ -94,8 +94,8 @@ global:
 
     applications-notify-email:
       topic: "applications-notify-email"
-      subscription: "applications-notify-email-sub"
+      subscription: "applications-notify-email-odw-sub"
       
     applications-representation:
       topic: "applications-representation"
-      subscription: "applications-representation-sub"
+      subscription: "applications-representation-odw-sub"
