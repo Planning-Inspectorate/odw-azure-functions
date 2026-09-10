@@ -52,6 +52,10 @@ global:
       topic: "nsip-representation"
       subscription: "odw-nsip-representation-sub"
 
+    applications-crowndev-application:
+      topic: "applications-crowndev-application"
+      subscription: "applications-crowndev-application-odw-sub"
+
     nsip-s51-advice:
       topic: "nsip-s51-advice"
       subscription: "odw-nsip-s51-advice-sub"
