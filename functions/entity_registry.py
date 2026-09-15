@@ -44,8 +44,8 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "service-user": "odw-service-user-wake-sub",
     "applications-application-update": "applications-application-update-odw-wake-sub",
 
-    "applications-notify-email": "applications-notify-email-wake-sub",
-    "applications-representation": "applications-representation-wake-sub",
+    "applications-notify-email": "applications-notify-email-odw-wake-sub",
+    "applications-representation": "applications-representation-odw-wake-sub",
     "appeal-document": "appeal-document-odw-wake-sub",
     "appeal-has": "appeal-has-odw-wake-sub",
     "appeal-event": "appeal-event-odw-wake-sub",
