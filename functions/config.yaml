@@ -99,3 +99,6 @@ global:
     applications-representation:
       topic: "applications-representation"
       subscription: "applications-representation-odw-sub"
+    applications-crowndev-application:
+      topic: "applications-crowndev-application"
+      subscription: "applications-crowndev-application-odw-wake-sub"
