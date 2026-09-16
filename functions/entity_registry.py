@@ -45,6 +45,7 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "application-update": "planning-environmental-specialist-odw-wake-sub",
     "applications-notify-email": "applications-notify-email-odw-wake-sub",
     "applications-representation": "applications-representation-odw-wake-sub",
+    "applications-crowndev-application": "applications-crowndev-application-odw-wake-sub",
     "appeal-document": "appeal-document-odw-wake-sub",
     "appeal-has": "appeal-has-odw-wake-sub",
     "appeal-event": "appeal-event-odw-wake-sub",
@@ -58,6 +59,7 @@ _ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({
     "application-update",
     "applications-notify-email",
     "applications-representation",
+    "applications-crowndev-application",
 })
 @dataclass(frozen=True)
 class EntitySpec:
