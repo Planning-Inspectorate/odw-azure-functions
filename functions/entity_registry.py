@@ -24,6 +24,7 @@ from set_environment import config
 _SCHEMA_OVERRIDES = {
     "appeal-service-user": "service-user.schema.json",
     "nsip-s51-advice": "s51-advice.schema.json",
+    "applications-crowndev-application": "applications-application.schema.json",
 }
 
 _STORAGE_OVERRIDES = {
