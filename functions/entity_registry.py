@@ -43,6 +43,7 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "nsip-subscription": "odw-nsip-subscription-wake-sub",
     "service-user": "odw-service-user-wake-sub",
     "applications-application-update": "applications-application-update-odw-wake-sub",
+    "applications-crowndev-application": "applications-crowndev-application-odw-wake-sub",
 
     "applications-notify-email": "applications-notify-email-odw-wake-sub",
     "applications-representation": "applications-representation-odw-wake-sub",
@@ -59,6 +60,7 @@ _ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({
     "applications-application-update",
     "applications-notify-email",
     "applications-representation",
+    "applications-crowndev-application",
 })
 @dataclass(frozen=True)
 class EntitySpec:
