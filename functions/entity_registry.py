@@ -23,8 +23,7 @@ from set_environment import config
 # overriding schemas here for entity_key naming that don't match their schema
 _SCHEMA_OVERRIDES = {
     "appeal-service-user": "service-user.schema.json",
-    "nsip-s51-advice": "s51-advice.schema.json",
-    "applications-crowndev-application": "applications-application.schema.json",
+    "nsip-s51-advice": "s51-advice.schema.json"
 }
 
 _STORAGE_OVERRIDES = {
