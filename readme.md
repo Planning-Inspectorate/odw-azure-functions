@@ -30,6 +30,38 @@ The following steps outline how to get up and running with this repo on your own
     1. Create a Personal Access Token in GitHub or use another authentication method e.g. SSH
     2. Clone the repo in VSCode/Azure Data Studio to a local folder
 
+# Testing
+
+The Azure Functions have unit and integration tests under `functions/tests`. Run them from
+the `functions` directory after installing the function and test requirements:
+
+```bash
+python -m pip install -r requirements.txt -r tests/requirements.txt
+python -m pytest tests/unit tests/integration \
+  --cov=entity_registry \
+  --cov=function_app \
+  --cov=sb_wake_drain_processor \
+  --cov=servicebus_funcs \
+  --cov=set_environment \
+  --cov=validate_messages \
+  --cov=var_funcs \
+  --cov-branch \
+  --cov-report=term-missing \
+  --cov-fail-under=100
+```
+
+The integration tests use fake Azure SDK clients at the external-service boundary. They
+exercise the entity dispatch, message validation, and storage-upload flow without requiring
+Azure credentials, a deployed Function App, or a Service Bus emulator. They do not verify
+Azure-hosted SQL input bindings or connectivity to deployed Azure resources.
+
+The Azure DevOps pipeline runs this test command before deployment and skips deployment for
+pull-request builds. To make the test run a required merge check, require the Azure Pipelines
+status check in the GitHub branch protection rule or ruleset for the target branch. If the
+repository is also mirrored to Azure Repos, configure the pipeline as a Build Validation branch
+policy there. Integration checks that require deployed SQL bindings or live Azure resources
+should be run as a separate post-deploy smoke check if those bindings change.
+
 # Environments
 The ODW environment is deployed to three Azure subscriptions as follows:
 
