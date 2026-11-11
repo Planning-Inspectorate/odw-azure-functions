@@ -8,7 +8,7 @@ parameters:
 stages:
 - stage: DeployFunctionApp
   displayName: 'Deploy Function App to the ${{ parameters.env }} environment'
-  condition: not(or(failed(), canceled()))
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
   jobs:
   - template: ${{variables['System.DefaultWorkingDirectory']}}/pipelines/jobs/deploy-functionapp.yaml
     parameters:

@@ -42,6 +42,54 @@ variables:
 - group: ${{ variables.variableGroupName }}
 
 stages:
+- stage: TestFunctions
+  displayName: 'Test Azure Functions'
+  jobs:
+  - job: UnitAndIntegrationTests
+    displayName: 'Run unit and integration tests'
+    pool: ${{ variables.agentPool }}
+    steps:
+    - checkout: self
+      displayName: 'Checkout repo'
+
+    - bash: |
+        set -e
+        python3 --version
+        python3 -m venv "$(Agent.TempDirectory)/odw-functions-test-venv"
+        source "$(Agent.TempDirectory)/odw-functions-test-venv/bin/activate"
+        python -m pip install -r functions/requirements.txt -r functions/tests/requirements.txt
+        mkdir -p "$(Common.TestResultsDirectory)"
+        cd functions
+        python -m pytest tests/unit tests/integration \
+          --cov=entity_registry \
+          --cov=function_app \
+          --cov=sb_wake_drain_processor \
+          --cov=servicebus_funcs \
+          --cov=set_environment \
+          --cov=validate_messages \
+          --cov=var_funcs \
+          --cov-branch \
+          --cov-report=term-missing \
+          --cov-report=xml:$(Common.TestResultsDirectory)/functions-coverage.xml \
+          --cov-fail-under=100 \
+          --junitxml=$(Common.TestResultsDirectory)/functions-test-results.xml
+      displayName: 'Install test dependencies and run coverage tests'
+
+    - task: PublishTestResults@2
+      displayName: 'Publish Functions test results'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFiles: '$(Common.TestResultsDirectory)/functions-test-results.xml'
+        testRunTitle: 'ODW Azure Functions tests - $(Build.BuildId) - $(Build.SourceBranch)'
+        mergeTestResults: true
+
+    - task: PublishCodeCoverageResults@2
+      displayName: 'Publish Functions coverage'
+      condition: succeededOrFailed()
+      inputs:
+        summaryFileLocation: '$(Common.TestResultsDirectory)/functions-coverage.xml'
+        pathToSources: '$(Build.SourcesDirectory)/functions'
+
 - template: stages/wait-for-approval.yaml
 
 - template: stages/deploy-function-app.yaml
