@@ -103,3 +103,11 @@ global:
     applications-crowndev-application:
       topic: "applications-crowndev-application"
       subscription: "applications-crowndev-application-odw-sub"
+    
+    plans-case:
+      topic: "plans-case"
+      subscription: "plans-case-odw-sub"
+    
+    plans-event:
+      topic: "plans-event"
+      subscription: "plans-event-odw-sub"
