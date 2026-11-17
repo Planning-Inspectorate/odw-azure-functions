@@ -103,7 +103,7 @@ global:
     applications-crowndev-application:
       topic: "applications-crowndev-application"
       subscription: "applications-crowndev-application-odw-sub"
-
+ 
     appeal-group-c:
       topic: "appeal-group-c"
       subscription: "appeal-group-c-odw-sub"
