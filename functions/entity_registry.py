@@ -55,6 +55,8 @@ _WAKE_SUBSCRIPTION_OVERRIDES = {
     "appeal-s78": "appeal-s78-odw-wake-sub",
     "appeal-representation": "appeal-representation-odw-wake-sub",
     "appeal-group-c": "appeal-group-c-odw-wake-sub",
+    "plans-case": "plans-case-odw-wake-sub",
+    "plans-event": "plans-event-odw-wake-sub",
 }
 
 _ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({
