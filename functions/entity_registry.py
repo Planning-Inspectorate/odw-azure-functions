@@ -64,6 +64,8 @@ _ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({
     "applications-notify-email",
     "applications-representation",
     "applications-crowndev-application",
+    "plans-case",
+    "plans-event"
 })
 @dataclass(frozen=True)
 class EntitySpec:
