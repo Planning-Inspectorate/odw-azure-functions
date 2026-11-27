@@ -64,7 +64,6 @@ _ODW_NAMESPACE_ENTITIES: frozenset[str] = frozenset({
     "applications-crowndev-application",
 })
 @dataclass(frozen=True)
-@dataclass(frozen=True)
 class EntitySpec:
     """
     Defines everything needed to process an entity end to end
@@ -142,7 +141,7 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
         http_namespace_env_var = "ServiceBusConnectionOdw__fullyQualifiedNamespace"
 
         if topic.startswith("applications-"):
-            message_source = "Crown-dev"
+            message_source = "rown-dev"
         elif topic.startswith("plans-"):
             message_source = "LocalPlans"
         else:
