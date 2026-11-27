@@ -171,6 +171,7 @@ def _process_one_message(
     message_id = getattr(msg, "message_id", None)
     delivery_count = getattr(msg, "delivery_count", None)
 
+
     try:
         body_raw = b"".join([b for b in msg.body])
         body_text = body_raw.decode("utf-8", errors="replace")
@@ -183,6 +184,7 @@ def _process_one_message(
         )
         return False
 
+
     try:
         payload = json.loads(body_text)
     except Exception as e:
@@ -193,6 +195,7 @@ def _process_one_message(
             description=f"JSON deserialization failed: {str(e)}. Body(sample)={body_text[:500]}",
         )
         return False
+
 
     errors = validate_data(payload, schema)
     if errors:
@@ -205,7 +208,9 @@ def _process_one_message(
         )
         return False
 
+
     msg_type = _extract_message_type(msg)
+
 
     enqueued = getattr(msg, "enqueued_time_utc", None)
     if isinstance(enqueued, datetime):
@@ -213,9 +218,12 @@ def _process_one_message(
     else:
         enqueued_time_utc = _utc_now_iso()
 
+
     payload["message_id"] = message_id
     payload["message_type"] = msg_type
     payload["message_enqueued_time_utc"] = enqueued_time_utc
+    payload["message_source"] = entity.message_source or "Unknown"
+
 
     try:
         send_to_storage(

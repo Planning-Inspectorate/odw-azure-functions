@@ -113,3 +113,68 @@ def test_entity_spec_properties_apply_optional_overrides(
     assert spec.storage_entity == expected_storage
     assert spec.route == expected_route
     assert spec.trigger_subscription == expected_trigger
+
+
+@pytest.mark.parametrize(
+    ("entity_key", "expected_message_source"),
+    [
+        ("appeal-document", "Appeals"),
+        ("appeal-service-user", "Appeals"),
+        ("applications-application-update", "Crown-dev"),
+        ("applications-crowndev-application", "Crown-dev"),
+        ("applications-notify-email", "Crown-dev"),
+        ("applications-representation", "Crown-dev"),
+        ("nsip-document", "NSIP"),
+        ("nsip-s51-advice", "NSIP"),
+    ],
+)
+def test_build_entity_spec_sets_correct_message_source(entity_key, expected_message_source):
+    spec = build_entity_spec(entity_key)
+    assert spec.message_source == expected_message_source
+
+
+def test_build_entity_spec_message_source_for_plans_topic(monkeypatch):
+    # Mock config and _ODW_NAMESPACE_ENTITIES to include a plans- prefixed entity
+    original_entities = config["global"]["entities"].copy()
+    original_odw_set = _ODW_NAMESPACE_ENTITIES
+    
+    config["global"]["entities"]["plans-local"] = {
+        "topic": "plans-local",
+        "subscription": "plans-local-sub",
+    }
+    
+    # Monkeypatch the _ODW_NAMESPACE_ENTITIES to include this test entity
+    monkeypatch.setattr(
+        "entity_registry._ODW_NAMESPACE_ENTITIES",
+        frozenset(original_odw_set | {"plans-local"})
+    )
+    
+    try:
+        spec = build_entity_spec("plans-local")
+        assert spec.message_source == "LocalPlans"
+    finally:
+        config["global"]["entities"] = original_entities
+
+
+def test_build_entity_spec_message_source_for_odw_other_topic(monkeypatch):
+    # Mock config and _ODW_NAMESPACE_ENTITIES to include a non-applications, non-plans topic
+    original_entities = config["global"]["entities"].copy()
+    original_odw_set = _ODW_NAMESPACE_ENTITIES
+    
+    config["global"]["entities"]["other-entity"] = {
+        "topic": "other-entity",
+        "subscription": "other-entity-sub",
+    }
+    
+    # Monkeypatch the _ODW_NAMESPACE_ENTITIES to include this test entity
+    monkeypatch.setattr(
+        "entity_registry._ODW_NAMESPACE_ENTITIES",
+        frozenset(original_odw_set | {"other-entity"})
+    )
+    
+    try:
+        spec = build_entity_spec("other-entity")
+        # This should match the else case in build_entity_spec
+        assert spec.message_source == "Applications"
+    finally:
+        config["global"]["entities"] = original_entities

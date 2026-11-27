@@ -73,28 +73,39 @@ class EntitySpec:
     subscription: str  # the REAL subscription we drain (e.g. appeal-document-odw-sub)
     schema_filename: str  # e.g. "appeal-document.schema.json"
 
+
     # Service Bus connection prefix (identity based) for trigger binding
     sb_connection: str
+
 
     # HTTP pull uses explicit namespace env vars
     http_namespace_env_var: str
 
+
     # Storage folder name override for rare cases where raw folder differs from topic
     storage_entity_override: Optional[str] = None
+
 
     # HTTP route override (normally key without hyphens)
     http_route: Optional[str] = None
 
+
     # Optional wake subscription that triggers the function (wake only, we do NOT drain this)
     wake_subscription: Optional[str] = None
+
+    # Source system that produced the message
+    message_source: Optional[str] = None
+
 
     @property
     def storage_entity(self) -> str:
         return self.storage_entity_override or self.topic
 
+
     @property
     def route(self) -> str:
         return self.http_route or self.key.replace("-", "")
+
 
     @property
     def trigger_subscription(self) -> str:
@@ -118,25 +129,34 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
     subscription = entity_cfg["subscription"]
 
     schema_filename = f"{entity_key}.schema.json"
-
     schema_filename = _SCHEMA_OVERRIDES.get(entity_key, schema_filename)
 
     if _is_appeals_entity(entity_key):
         sb_connection = "ServiceBusConnectionAppeals"
         http_namespace_env_var = "SERVICEBUS_NAMESPACE_APPEALS"
+        message_source = "Appeals"
+
     elif _uses_odw_service_bus_namespace(entity_key):
         sb_connection = "ServiceBusConnectionOdw"
         http_namespace_env_var = "ServiceBusConnectionOdw__fullyQualifiedNamespace"
+
+        if topic.startswith("applications-"):
+            message_source = "Crown-dev"
+        elif topic.startswith("plans-"):
+            message_source = "LocalPlans"
+        else:
+            message_source = "Applications"
+
     else:
         sb_connection = "ServiceBusConnection"
         http_namespace_env_var = "ServiceBusConnection__fullyQualifiedNamespace"
+        message_source = "NSIP"
 
     http_route = entity_key.replace("-", "")
     if entity_key == "nsip-s51-advice":
         http_route = "s51advice"
 
     storage_override = _STORAGE_OVERRIDES.get(entity_key)
-
     wake_subscription = _WAKE_SUBSCRIPTION_OVERRIDES.get(entity_key)
 
     return EntitySpec(
@@ -149,6 +169,7 @@ def build_entity_spec(entity_key: str) -> EntitySpec:
         storage_entity_override=storage_override,
         http_route=http_route,
         wake_subscription=wake_subscription,
+        message_source=message_source,
     )
 
 
